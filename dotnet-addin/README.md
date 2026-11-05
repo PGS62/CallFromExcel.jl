@@ -17,15 +17,22 @@ All of the August plan's steps 2-5 are done and working:
   wire format supports, arbitrary array rank (1-9), the "V" bulk-Double
   fast path, the Julia-to-Excel-only Range ("R") format.
 - **Step 4** (`JuliaCall`/`JuliaEval` as XLL functions): `JuliaFunctions.cs`.
-- **Step 5** (`JuliaCallVBA`/`JuliaEvalVBA` via COM): `ComServer.cs`,
-  `WireValues.cs`'s COM-visible `JuliaDictionary`.
+  Also includes `JuliaCallNamedArgs` (`/callkw`), `JuliaIsRunning`,
+  `JuliaExcelPID`, `JuliaSetVar`, `JuliaInclude`, `JuliaLaunch` itself.
+- **Step 5** (`JuliaCallVBA`/`JuliaEvalVBA` via COM): `ComServer.cs`
+  (also `JuliaCallNamedArgsVBA`), `WireValues.cs`'s COM-visible
+  `JuliaDictionary`.
 
-**Not done / explicitly deferred:** WSL/Linux Julia launch;
-`JuliaCallNamedArgs`/`JuliaCallNamedArgsVBA` (the `/callkw` endpoint);
-`JuliaSetVar`/`JuliaInclude`/`JuliaExcelPID`/`JuliaIsRunning` (should be
-quick now that the hard parts exist, just not done yet); a real installer
-(the COM registration below is a dev-session workaround, not a shippable
-install story).
+So essentially the full `modMain.bas` worksheet/VBA-facing surface is now
+ported, except where explicitly deferred below.
+
+**Not done / explicitly deferred:** WSL/Linux Julia launch; a real
+installer (the COM registration below is a dev-session workaround, not a
+shippable install story); `modRegister.bas`'s Function-Wizard/IntelliSense
+registration (the plan's own view is this should simply disappear in
+favour of Excel-DNA's declarative IntelliSense, not be ported -- not yet
+wired up, but shouldn't need new logic, just `ExcelArgument`/
+`ExcelFunction` attributes, which are already present on every function).
 
 ## Validated
 
@@ -49,6 +56,9 @@ install story).
   4-argument calls), Dictionary results (`Count`/`Keys`/`Items`/`Item`/
   `Exists` all correct), and nested-array results (array of arrays,
   recursing into the "V" fast path per inner array).
+- `JuliaCallNamedArgs`/`JuliaCallNamedArgsVBA` verified via Julia's own
+  `round(x; digits=n)`; `JuliaIsRunning`/`JuliaExcelPID` verified correct;
+  `JuliaSetVar` verified by reading the variable back via `JuliaEval`.
 
 ## Performance: a real, nuanced finding worth reading before quoting a number
 
@@ -88,10 +98,12 @@ worksheet-formula path.
 
 ## Known housekeeping items
 
-- Testing left some orphaned `julia.exe` processes running (Julia is a
+- Testing left several orphaned `julia.exe` processes running (Julia is a
   separate process from Excel by design, so it doesn't auto-exit when a
-  test's Excel instance quits) -- harmless (just memory), but check
-  Task Manager if you want to clear them.
+  test's Excel instance quits) -- harmless (just memory, a few hundred MB
+  each), but check Task Manager if you want to clear them. One of them
+  (PID varies, the one with no corresponding recent Excel/test activity)
+  is your own VS Code Julia session, left untouched throughout.
 - `JuliaExcel.AddIn.ComServer` is registered for COM under
   `HKCU:\Software\Classes` (user-level, no admin needed), pointing at this
   session's build output path
@@ -123,15 +135,19 @@ For manual testing from real VBA: see `vba\TestRealAddin.bas`.
 
 ## Suggested next steps
 
-1. `JuliaCallNamedArgs`/`JuliaCallNamedArgsVBA` (the `/callkw` endpoint) --
-   same shape as `JuliaCall`/`JuliaCallVBA`, should be quick.
-2. `JuliaSetVar`/`JuliaInclude`/`JuliaExcelPID`/`JuliaIsRunning` -- small,
-   mechanical, the hard infrastructure already exists.
-3. Investigate whether the ~435ms XLOPER marshaling cost can be reduced
+1. Investigate whether the ~435ms XLOPER marshaling cost can be reduced
    for the common case (e.g. detecting an all-numeric incoming range and
    using a more specific parameter type, if Excel-DNA supports that
    without losing the ability to accept mixed-type arguments generally).
-4. A real installer/distribution story (replacing the dev-session HKCU
-   COM registration workaround here).
-5. Decide whether to still pursue the Julia-side ZMQ swap, now that real
+2. A real installer/distribution story (replacing the dev-session HKCU
+   COM registration workaround here) -- e.g. Excel-DNA's own COM-server
+   self-registration (the plan's original note: no admin rights, no
+   regsvr32 needed), rather than the manual HKCU registry writes used for
+   this session's testing.
+3. Decide whether to still pursue the Julia-side ZMQ swap, now that real
    numbers exist for where time actually goes.
+4. `modRegister.bas`'s Function-Wizard/IntelliSense mechanism: confirm
+   Excel-DNA's own declarative IntelliSense (via `ExcelDna.IntelliSense`)
+   picks up the `ExcelFunction`/`ExcelArgument` descriptions already on
+   every function, with no new code needed.
+5. WSL/Linux Julia launch support, if still wanted.

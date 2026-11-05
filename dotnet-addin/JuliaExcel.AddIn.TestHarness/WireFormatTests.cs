@@ -158,9 +158,12 @@ namespace JuliaExcel.AddIn.TestHarness
             }
             string wire = WireFormatEncode.Encode(arr);
             CheckTrue("Large Double array takes V path", wire.StartsWith("V1,10000;"));
-            var decoded = (object[])WireFormatDecode.Decode(wire, allowNesting: true);
+            // V-format decode returns a genuinely-typed double[], not object[] -- see
+            // WireFormatDecode.DecodeV's own comment on why that matters for Excel-DNA's
+            // return-value marshaling.
+            var decoded = (double[])WireFormatDecode.Decode(wire, allowNesting: true);
             bool ok = decoded.Length == n;
-            for (int i = 0; i < n && ok; i++) if (!Equals(decoded[i], plain[i])) ok = false;
+            for (int i = 0; i < n && ok; i++) if (decoded[i] != plain[i]) ok = false;
             CheckTrue("Large Double array round-trip", ok);
         }
 
@@ -224,7 +227,9 @@ namespace JuliaExcel.AddIn.TestHarness
         {
             string wire = WireFormatEncode.Encode(value);
             object decoded = WireFormatDecode.Decode(wire, allowNesting: true);
-            var decodedArr = decoded as object[];
+            // V-format decode (an all-Double input) returns double[], not object[] -- see
+            // WireFormatDecode.DecodeV's own comment on why.
+            object[] decodedArr = (decoded is double[] dbl) ? ConvertToObjectArray(dbl) : decoded as object[];
             bool ok = decodedArr != null && decodedArr.Length == value.Length;
             if (ok)
             {
@@ -234,6 +239,13 @@ namespace JuliaExcel.AddIn.TestHarness
                 }
             }
             CheckTrue(label + " round-trip (wire=" + wire + ")", ok);
+        }
+
+        private static object[] ConvertToObjectArray(double[] values)
+        {
+            var result = new object[values.Length];
+            for (int i = 0; i < values.Length; i++) result[i] = values[i];
+            return result;
         }
 
         private static void Check(string label, object actual, object expected)

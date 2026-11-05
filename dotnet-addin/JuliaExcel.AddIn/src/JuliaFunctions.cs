@@ -13,13 +13,25 @@ namespace JuliaExcel.AddIn
     // separate COM-visible class -- step 5 of the plan, not yet done.
     public static class JuliaFunctions
     {
+        private static int _cachedStringLengthLimit;
+
         private static int StringLengthLimit()
         {
             // Port of GetStringLengthLimit (modUnserialise.bas): Excel 2010 and earlier
             // capped array-element strings at 255 chars; 2016+ (all report version 16)
-            // raised it to 32,767. Nobody realistically runs 2010 any more, but the check
-            // is cheap to keep for fidelity.
-            return ExcelDnaUtil.ExcelVersion <= 15 ? 256 : 32768;
+            // raised it to 32,767. Cached after the first call, not just as a micro-
+            // optimization: ExcelDnaUtil.ExcelVersion reads an Excel COM property, and
+            // JuliaCall/JuliaEval run with IsThreadSafe=true, meaning Excel-DNA may invoke
+            // them on a worker thread rather than Excel's main thread -- querying a COM
+            // property cross-thread back onto Excel's STA thread on every single call was
+            // found (via this project's own JuliaCall("sort", ...) timing investigation) to
+            // roughly double the real end-to-end latency of every call, versus computing it
+            // once. Excel's version obviously can't change mid-session.
+            if (_cachedStringLengthLimit == 0)
+            {
+                _cachedStringLengthLimit = ExcelDnaUtil.ExcelVersion <= 15 ? 256 : 32768;
+            }
+            return _cachedStringLengthLimit;
         }
 
         [ExcelFunction(Description = "Launches a local Julia session which listens to the current Excel session and responds to calls to JuliaEval etc..", IsThreadSafe = false)]

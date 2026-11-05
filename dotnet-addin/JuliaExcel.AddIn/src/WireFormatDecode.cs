@@ -189,6 +189,17 @@ namespace JuliaExcel.AddIn
             return dict;
         }
 
+        // Returns a genuinely-typed double[]/double[,]/double[...] rather than a boxed
+        // object array -- not just a style choice. Found via this project's own
+        // JuliaCall("sort", ...) end-to-end timing investigation: Excel-DNA must marshal
+        // whatever JuliaCall/JuliaEval return into Excel's XLOPER format, and doing that
+        // for an object[,] of 1,000,000 boxed doubles (each needing its own per-element
+        // XLOPER conversion) measured at roughly double the latency of the same data as a
+        // genuinely-typed double[,] (which Excel-DNA can convert in bulk). The "V" format
+        // is already guaranteed all-Double by construction (that's its entire reason to
+        // exist - see this file's own format-spec comment), so there's no correctness
+        // reason to box it; only the general "*" per-element path (genuinely
+        // mixed-type) needs object[]/object[,].
         private static object DecodeV(string wire, bool vectorToColumn)
         {
             int p1 = wire.IndexOf(';');
@@ -203,8 +214,8 @@ namespace JuliaExcel.AddIn
                 if (wire.Length - payloadStart != n * bytesPerElement)
                     throw new FormatException("'V'-format string has the wrong number of hex characters for a 1-D array of " + n + " element(s)");
                 double[] buf = Hex.ReadBulkHex(wire, payloadStart, n);
-                if (!vectorToColumn) return ToObjectArray(buf);
-                var column = new object[n, 1];
+                if (!vectorToColumn) return buf;
+                var column = new double[n, 1];
                 for (int i = 0; i < n; i++) column[i, 0] = buf[i];
                 return column;
             }
@@ -217,7 +228,7 @@ namespace JuliaExcel.AddIn
                 if (wire.Length - payloadStart != nr * nc * bytesPerElement)
                     throw new FormatException("'V'-format string has the wrong number of hex characters for a " + nr + "x" + nc + " array");
                 double[] buf = Hex.ReadBulkHex(wire, payloadStart, nr * nc);
-                var result = new object[nr, nc];
+                var result = new double[nr, nc];
                 int k = 0;
                 for (int j = 0; j < nc; j++)
                     for (int i = 0; i < nr; i++)
@@ -237,7 +248,7 @@ namespace JuliaExcel.AddIn
                 throw new FormatException("'V'-format string has the wrong number of hex characters for a " + rank + "-D array");
             double[] flatBuf = Hex.ReadBulkHex(wire, payloadStart, total);
 
-            Array nd = Array.CreateInstance(typeof(object), dims);
+            Array nd = Array.CreateInstance(typeof(double), dims);
             var idx = new int[rank];
             for (int count = 0; count < total; count++)
             {
@@ -281,13 +292,6 @@ namespace JuliaExcel.AddIn
             var column = new object[n, 1];
             for (int i = 0; i < n; i++) column[i, 0] = flat[i];
             return column;
-        }
-
-        private static object[] ToObjectArray(double[] buf)
-        {
-            var result = new object[buf.Length];
-            for (int i = 0; i < buf.Length; i++) result[i] = buf[i];
-            return result;
         }
 
         private static int[] ParseDims(string wire, int start, int end, int rank)

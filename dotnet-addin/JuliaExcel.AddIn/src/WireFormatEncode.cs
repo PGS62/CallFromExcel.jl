@@ -109,12 +109,37 @@ namespace JuliaExcel.AddIn
             }
 
             var encoded = new string[total];
-            var idx = (int[])lb.Clone();
-            for (int k = 0; k < total; k++)
+            // Fast paths for rank 1/2 (by far the common case: Excel always hands worksheet
+            // ranges to Excel-DNA as object[]/object[,]) use direct typed indexer access.
+            // Array.GetValue(int[]) -- needed for the generic rank-3+ path -- measured as a
+            // dominant cost for large arrays (a real regression found via this project's own
+            // end-to-end JuliaCall("sort", ...) timing: ~800-1750ms through this path versus
+            // ~330-450ms through the csharp-prototype's rank-specific VFormat.cs, for the
+            // same 1,000,000-element input) -- generic per-element Array.GetValue/SetValue is
+            // measurably slower than direct [,] indexing, consistent with .NET's own
+            // well-known multi-dimensional-array performance characteristics.
+            if (rank == 1)
             {
-                object element = arr.GetValue(idx);
-                encoded[k] = Encode(element);
-                AdvanceIndex(idx, lb, dims, rank);
+                var a1 = (object[])arr;
+                int k = 0;
+                for (int i = lb[0]; i <= lb[0] + dims[0] - 1; i++) encoded[k++] = Encode(a1[i]);
+            }
+            else if (rank == 2)
+            {
+                var a2 = (object[,])arr;
+                int k = 0;
+                for (int j = lb[1]; j <= lb[1] + dims[1] - 1; j++)
+                    for (int i = lb[0]; i <= lb[0] + dims[0] - 1; i++)
+                        encoded[k++] = Encode(a2[i, j]);
+            }
+            else
+            {
+                var idx = (int[])lb.Clone();
+                for (int k = 0; k < total; k++)
+                {
+                    encoded[k] = Encode(arr.GetValue(idx));
+                    AdvanceIndex(idx, lb, dims, rank);
+                }
             }
 
             var lens = new StringBuilder();
@@ -125,18 +150,49 @@ namespace JuliaExcel.AddIn
 
         // Port of TrySerialiseArrayAsV (modSerialise.bas): optimistic single pass over the
         // array, bailing (returning false) the instant a non-Double element is found, so
-        // the caller falls back to the general per-element encoding unchanged.
+        // the caller falls back to the general per-element encoding unchanged. See the
+        // fast-path note above EncodeArray's own rank 1/2 handling for why this also
+        // special-cases rank 1/2 rather than using Array.GetValue uniformly.
         private static bool TryEncodeArrayAsV(Array arr, int rank, int[] dims, int[] lb, int total, int effectiveRank, string dimStr, out string result)
         {
             result = null;
             var buf = new double[total];
-            var idx = (int[])lb.Clone();
-            for (int k = 0; k < total; k++)
+
+            if (rank == 1)
             {
-                object element = arr.GetValue(idx);
-                if (!(element is double)) return false;
-                buf[k] = (double)element;
-                AdvanceIndex(idx, lb, dims, rank);
+                var a1 = (object[])arr;
+                int k = 0;
+                for (int i = lb[0]; i <= lb[0] + dims[0] - 1; i++)
+                {
+                    object element = a1[i];
+                    if (!(element is double)) return false;
+                    buf[k++] = (double)element;
+                }
+            }
+            else if (rank == 2)
+            {
+                var a2 = (object[,])arr;
+                int k = 0;
+                for (int j = lb[1]; j <= lb[1] + dims[1] - 1; j++)
+                {
+                    for (int i = lb[0]; i <= lb[0] + dims[0] - 1; i++)
+                    {
+                        object element = a2[i, j];
+                        if (!(element is double)) return false;
+                        buf[k++] = (double)element;
+                    }
+                }
+            }
+            else
+            {
+                var idx = (int[])lb.Clone();
+                for (int k = 0; k < total; k++)
+                {
+                    object element = arr.GetValue(idx);
+                    if (!(element is double)) return false;
+                    buf[k] = (double)element;
+                    AdvanceIndex(idx, lb, dims, rank);
+                }
             }
 
             string header = "V" + effectiveRank.ToString(CultureInfo.InvariantCulture) + "," + dimStr;

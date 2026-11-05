@@ -6,3 +6,6 @@
 .vba-backups/
 ~$*.x*
 /csharp-prototype/bin/
+/dotnet-addin/**/bin/
+/dotnet-addin/**/obj/
+/dotnet-addin/**/harness_out.txt

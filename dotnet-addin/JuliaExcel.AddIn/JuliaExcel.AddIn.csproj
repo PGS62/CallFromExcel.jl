@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <!-- Target .NET Framework 4.8, not modern .NET: see the August plan. Only one .NET
+         runtime version can load per Excel process (compatibility risk with other
+         add-ins), and the COM-server + single-file-packing combination isn't clearly
+         documented as proven under modern .NET. -->
+    <Platforms>x64</Platforms>
+    <RootNamespace>JuliaExcel.AddIn</RootNamespace>
+    <AssemblyName>JuliaExcel.AddIn</AssemblyName>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <!-- We write ComVisible(false) at the assembly level ourselves (AssemblyInfo.cs) and
+         opt specific classes in individually. SDK-style auto-generated AssemblyInfo
+         would otherwise collide with that. -->
+    <Deterministic>true</Deterministic>
+    <LangVersion>7.3</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ExcelDna.AddIn" Version="1.9.0" />
+  </ItemGroup>
+
+</Project>

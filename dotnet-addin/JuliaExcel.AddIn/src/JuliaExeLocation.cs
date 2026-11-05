@@ -1,0 +1,60 @@
+using System;
+using System.IO;
+
+namespace JuliaExcel.AddIn
+{
+    // C# port of JuliaExeLocation (modMain.bas), Windows-native only -- the WSL branch
+    // (UseLinux=True, just returning the literal string "julia") is deferred along with
+    // the rest of JuliaLaunch's WSL support.
+    public static class JuliaExeLocation
+    {
+        public static string Find()
+        {
+            // First search PATH.
+            string pathEnv = Environment.GetEnvironmentVariable("PATH") ?? "";
+            foreach (string folder in pathEnv.Split(';'))
+            {
+                if (folder.Length == 0) continue;
+                string exeFile = Path.Combine(folder, "julia.exe");
+                if (File.Exists(exeFile)) return exeFile;
+            }
+
+            // If not found on PATH, search the locations the Windows installer uses by
+            // default (if the user accepted defaults), choosing the most recently
+            // installed if more than one version is found.
+            string chosenExe = null;
+            DateTime chosenCreatedDate = DateTime.MinValue;
+            string[] parentFolders =
+            {
+                Path.Combine(Environment.GetEnvironmentVariable("LOCALAPPDATA") ?? "", "Programs"),
+                Environment.GetEnvironmentVariable("LOCALAPPDATA") ?? ""
+            };
+
+            foreach (string parentFolderName in parentFolders)
+            {
+                if (!Directory.Exists(parentFolderName)) continue;
+                foreach (string childFolder in Directory.GetDirectories(parentFolderName))
+                {
+                    string folderName = Path.GetFileName(childFolder);
+                    if (!folderName.StartsWith("Julia", StringComparison.Ordinal)) continue;
+                    string exeFile = Path.Combine(childFolder, "bin", "julia.exe");
+                    if (!File.Exists(exeFile)) continue;
+                    DateTime createdDate = Directory.GetCreationTime(childFolder);
+                    if (createdDate > chosenCreatedDate)
+                    {
+                        chosenCreatedDate = createdDate;
+                        chosenExe = exeFile;
+                    }
+                }
+            }
+
+            if (chosenExe == null)
+            {
+                throw new InvalidOperationException(
+                    "Julia executable not found, after looking on the path and in folders to which Julia " +
+                    "is typically installed on Windows. When installing Julia check the \"Add Julia to Path\" option.");
+            }
+            return chosenExe;
+        }
+    }
+}

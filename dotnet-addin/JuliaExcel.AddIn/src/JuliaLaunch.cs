@@ -1,0 +1,239 @@
+using System;
+using System.Diagnostics;
+using System.IO;
+using System.Text;
+using System.Threading;
+
+namespace JuliaExcel.AddIn
+{
+    // C# port of JuliaLaunch (modMain.bas), Windows-native only -- the WSL/Linux launch
+    // path (bash statements, wsl.exe, Windows<->WSL path translation) is deferred; see
+    // JuliaExeLocation's own note. Everything else (the flag-file/window-title readiness
+    // protocol, the generated Julia startup script, the stale-port/stale-window checks)
+    // is ported as closely as .NET's own APIs allow -- see inline notes for the handful of
+    // places .NET's Process/ProcessStartInfo don't have an exact equivalent of
+    // WshShell.Run's behavior.
+    public static class JuliaLaunch
+    {
+        private const string PackageName = "JuliaExcel";
+
+        public static string Launch(
+            bool minimiseWindow = false,
+            string commandLineOptions = "",
+            string packages = "",
+            int timeoutSeconds = 30)
+        {
+            string juliaExe = JuliaExeLocation.Find();
+
+            string userSuppliedCommandLineOptions = commandLineOptions ?? "";
+            commandLineOptions = userSuppliedCommandLineOptions;
+            if (commandLineOptions.Contains("-L") || commandLineOptions.Contains("--load "))
+            {
+                throw new ArgumentException(
+                    "CommandLineOptions cannot include the -L or --load options. Instead use JuliaLaunch " +
+                    "without that option and then use JuliaCall(\"include\",\"path_to_file\")");
+            }
+            if (!commandLineOptions.Contains("-i"))
+            {
+                // Lets OhMyREPL work correctly in the REPL, which requires -i (interactive).
+                // https://github.com/KristofferC/OhMyREPL.jl/issues/271
+                commandLineOptions = commandLineOptions.Trim() + " -i";
+            }
+            if (!commandLineOptions.Contains("--threads"))
+            {
+                // Without a dedicated interactive thread, HTTP.jl's server tasks share
+                // Julia's single default thread with whatever expression is currently
+                // being evaluated - a long-running or blocking evaluation (even exit())
+                // can then leave the server unable to respond, or even to shut down
+                // cleanly. See the "Server" docstring in HTTP.jl's http_server.jl.
+                commandLineOptions = commandLineOptions.Trim() + " --threads=auto,1";
+            }
+
+            int pid = Process.GetCurrentProcess().Id;
+            string windowPartialTitle = "serving Excel PID " + pid; // must match Julia's JuliaExcel.settitle
+
+            bool foundWindow = WindowUtils.TryGetHandleFromPartialCaption(windowPartialTitle, out IntPtr hwndJulia);
+
+            int existingPort = JuliaPort.ReadJuliaPortFromFile();
+            bool isListening = existingPort > 0 && JuliaHttpClient.IsListening(existingPort);
+
+            if (isListening && foundWindow && WindowUtils.WindowTitleFromHandle(hwndJulia).Contains(", port " + existingPort))
+            {
+                JuliaPort.SetJuliaPort(existingPort);
+                return "Julia is already running in window \"" + WindowUtils.WindowTitleFromHandle(hwndJulia) + "\"";
+            }
+            if (isListening)
+            {
+                // Either no window was found, or the one found doesn't match the currently
+                // listening port - most likely a session started by calling
+                // JuliaExcel.serve_xl directly (e.g. from a Julia REPL in VS Code), which
+                // has no dedicated console window to find. Read from disk rather than the
+                // (possibly stale) cache, and refresh that cache, so this reliably
+                // discovers a session attached this way instead of launching a redundant one.
+                JuliaPort.SetJuliaPort(existingPort);
+                return "Julia is already running, listening on port " + existingPort +
+                       " with no dedicated console window - most likely a session attached via JuliaExcel.serve_xl";
+            }
+            if (foundWindow)
+            {
+                throw new InvalidOperationException(
+                    "A Julia session titled \"" + WindowUtils.WindowTitleFromHandle(hwndJulia) + "\" is already running for " +
+                    "this Excel session, but it is not responding to HTTP requests. Switch to that window: if it's sitting " +
+                    "at a \"julia>\" prompt, its HTTP server has likely crashed - close the window and call JuliaLaunch " +
+                    "again. If it's busy running code, either wait for it to finish, or press Ctrl+C to interrupt it, " +
+                    "then call JuliaLaunch again.");
+            }
+
+            // Not exiting early - clear the cached port so GetJuliaPort can be used below
+            // to test whether the connection was correctly established.
+            JuliaPort.SetJuliaPort(0);
+
+            string errorFile = Path.Combine(FileUtils.LocalTemp(), "LoadError_" + pid + ".txt");
+            if (File.Exists(errorFile)) File.Delete(errorFile);
+
+            string flagFile = Path.Combine(FileUtils.LocalTemp(), "Flag_" + pid + ".txt");
+            FileUtils.SaveTextFile(flagFile, "");
+
+            string loadFile = Path.Combine(FileUtils.LocalTemp(), "StartUp_" + pid + ".jl");
+
+            string flagFileX = flagFile.Replace("\\", "/");
+            string commsFolderX = FileUtils.LocalTemp().Replace("\\", "/");
+            string errorFileX = errorFile.Replace("\\", "/");
+            string loadFileX = loadFile.Replace("\\", "/");
+
+            string trimmedOptions = commandLineOptions.Trim();
+            string command = "\"" + juliaExe + "\" " + trimmedOptions + " --load \"" + loadFileX + "\"";
+
+            // MakeJuliaLiteral wraps its result in quotes (so it can stand alone as a
+            // Julia string literal); strip them here since the escaped content is about
+            // to be embedded inside another double-quoted println string below, which
+            // supplies its own quotes.
+            string literalCommand = JuliaLiteral.MakeJuliaLiteral(command);
+            literalCommand = literalCommand.Substring(1, literalCommand.Length - 2);
+
+            string loadFileContents = BuildStartupScript(packages, pid, commsFolderX, errorFileX, flagFileX, literalCommand);
+            FileUtils.SaveTextFile(loadFile, loadFileContents);
+
+            var stopwatch = Stopwatch.StartNew();
+
+            // UseShellExecute MUST be true here, not false. This was found the hard way:
+            // with UseShellExecute=false (a direct CreateProcess call, bypassing the
+            // shell), a Julia installed via the Microsoft Store -- an MSIX/UWP package,
+            // where "julia.exe" on PATH is an App Execution Alias stub that redirects into
+            // the real packaged exe -- launches into a broken state on this machine: its
+            // HTTP server reports itself as listening, but loopback TCP connections to it
+            // fail even from Windows' own Test-NetConnection (not just from this code),
+            // and its console window isn't discoverable via classic FindWindow/GetWindow
+            // enumeration either. Both symptoms vanished when switched to
+            // UseShellExecute=true, which goes through ShellExecuteEx -- the same
+            // activation path Explorer/WshShell.Run use, which evidently matters for an
+            // App Execution Alias to activate with correct loopback networking capability.
+            // Confirmed independently both ways with Test-NetConnection while the launched
+            // process was kept alive -- see this file's own git history for the full
+            // investigation. This is plausibly specific to Microsoft Store Julia installs;
+            // a standalone-installer Julia may not need this, but UseShellExecute=true
+            // works for both, so there's no reason to special-case it.
+            var psi = new ProcessStartInfo
+            {
+                FileName = juliaExe,
+                Arguments = trimmedOptions + " --load \"" + loadFileX + "\"",
+                UseShellExecute = true,
+                WindowStyle = minimiseWindow ? ProcessWindowStyle.Minimized : ProcessWindowStyle.Normal
+            };
+            Process juliaProcess = Process.Start(psi);
+
+            // The VBA version detects "Julia's console window closed before start-up
+            // finished" (e.g. from malformed CommandLineOptions) by counting top-level
+            // windows whose caption contains "Julia" -- a necessary workaround since
+            // WshShell.Run gives VBA no direct handle to the child process. .NET's
+            // Process object gives us that handle directly via HasExited, which is both
+            // simpler and (now that UseShellExecute=true gives us a real, correctly
+            // activated process) reliable -- confirmed it correctly detects a deliberately
+            // bad command-line option's quick exit, and correctly stays false throughout a
+            // real successful launch.
+            while (File.Exists(flagFile))
+            {
+                Thread.Sleep(50);
+                if (juliaProcess.HasExited)
+                {
+                    string errDescription = "Julia's process exited (exit code " + juliaProcess.ExitCode +
+                                             ") before start-up finished.";
+                    if (userSuppliedCommandLineOptions != "")
+                    {
+                        errDescription += " Check the CommandLineOptions are valid " +
+                                           "(https://docs.julialang.org/en/v1/manual/command-line-interface/#command-line-interface)";
+                    }
+                    throw new InvalidOperationException(errDescription);
+                }
+                if (stopwatch.Elapsed.TotalSeconds > timeoutSeconds)
+                {
+                    return "Julia has not signalled it's ready after " + timeoutSeconds + " seconds - it may " +
+                           "still be precompiling packages. Once you see \"JuliaExcel HTTP server listening\" " +
+                           "printed in its window, call JuliaLaunch (or JuliaEval) again.";
+                }
+            }
+
+            int port = JuliaPort.ReadJuliaPortFromFile();
+            if (port > 0) JuliaPort.SetJuliaPort(port);
+            FileUtils.CleanLocalTemp();
+
+            if (File.Exists(errorFile))
+            {
+                throw new InvalidOperationException(
+                    "Julia launched but encountered an error when executing '" + loadFile + "' the error was: " +
+                    FileUtils.ReadTextFile(errorFile));
+            }
+            if (JuliaPort.GetJuliaPort() == 0)
+            {
+                throw new InvalidOperationException(
+                    "Failed to establish connection between Julia and Excel. Is JuliaExcel installed correctly. " +
+                    "See https://github.com/PGS62/JuliaExcel.jl#installation");
+            }
+
+            // Best-effort only: on this exact machine (and plausibly for anyone using
+            // Windows Terminal as their default terminal host) no matching top-level
+            // window is ever found - see this method's own notes above. That's cosmetic
+            // only; it doesn't affect whether the launch itself succeeded.
+            if (WindowUtils.TryGetHandleFromPartialCaption(windowPartialTitle, out IntPtr hwndFinal))
+            {
+                return "Julia launched in window \"" + WindowUtils.WindowTitleFromHandle(hwndFinal) + "\"";
+            }
+            return "Julia launched (listening on port " + JuliaPort.GetJuliaPort() + ")";
+        }
+
+        private static string BuildStartupScript(string packages, int pid, string commsFolderX, string errorFileX, string flagFileX, string literalCommand)
+        {
+            // PGS 8 Dec 2021 (ported comment): it's important to make "using JuliaExcel"
+            // the last "using" statement, believed to help avoid "world-age" problems.
+            string allPackages = packages == ""
+                ? "Dates," + PackageName
+                : "Dates," + packages + "," + PackageName;
+
+            var usingStatements = new StringBuilder();
+            foreach (string pkg in allPackages.Split(','))
+            {
+                string trimmed = pkg.Trim();
+                usingStatements.Append("    println(\"using " + trimmed + "\")\n");
+                usingStatements.Append("    using " + trimmed + "\n");
+            }
+
+            return "try\n" +
+                   usingStatements +
+                   "    JuliaExcel.setxlpid(" + pid + ")\n" +
+                   "    JuliaExcel.comms_folder(\"" + commsFolderX + "\")\n" +
+                   "    println(\"Julia $VERSION, using " + PackageName + " to serve Excel running as process ID " + pid + ".\")\n" +
+                   "    println(\"Julia launched with command: " + literalCommand + " \")\n" +
+                   "    JuliaExcel.start_server()\n" +
+                   "    rm(\"" + flagFileX + "\")\n" +
+                   "catch e\n" +
+                   "    theerror = \"$e\"\n" +
+                   "    @error theerror \n" +
+                   "    errorfile = \"" + errorFileX + "\"\n" +
+                   "    io = open(errorfile, \"w\")\n" +
+                   "    write(io,theerror)\n" +
+                   "    close(io)\n" +
+                   "    rm(\"" + flagFileX + "\")\n" +
+                   "end";
+        }
+    }
+}

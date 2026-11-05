@@ -5,3 +5,4 @@
 /deps/build.log
 .vba-backups/
 ~$*.x*
+/csharp-prototype/bin/

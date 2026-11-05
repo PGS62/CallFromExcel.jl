@@ -1,0 +1,320 @@
+using System;
+using System.Globalization;
+
+namespace JuliaExcel.AddIn
+{
+    // C# port of Unserialise (modUnserialise.bas) -- decodes a JuliaExcel wire-format
+    // string back into a .NET value. See WireFormatEncode.cs for the .NET<->VBA Variant
+    // type mapping used throughout.
+    //
+    // Wire format (ported from modUnserialise.bas's own spec comment):
+    //   # Double, payload is hex e.g. 1.5 encoded as #3FF8000000000000
+    //   Chr(163) (pound sterling sign) String
+    //   T / F Boolean True / False
+    //   D Date, payload is decimal of Excel's date serial e.g. 22-Dec-2025 is D64013
+    //   G DateTime, payload is hex (Excel date serial, which is exactly .NET's OADate)
+    //   E Empty (-> null)   N Null (-> DBNull.Value)
+    //   % Integer (Int16)   & Long (Int32)   B Byte   S Single (hex)   ^ LongLong (Int64)
+    //   C Currency (decimal string) -- reserved, not currently produced by Julia
+    //   @ Decimal (decimal string) -- reserved, not currently produced by Julia
+    //   ! Error, payload is VBA's own XlCVError UI code (e.g. 2007 for #DIV/0!)
+    //   * Array: "*<rank>,<dims>;<lengths-comma-terminated>;<concatenated-encodings>"
+    //   H Dictionary: "H<n>;<key/value lengths-comma-terminated>;<concatenated encodings>"
+    //   V Array of Float64 only, no per-element type indicator/length (Julia -> Excel
+    //     only): "V<rank>,<dims>;<hex>", 16 hex chars/element, no delimiters
+    //   R Range (Julia -> Excel only), "RI,<n>,<first>,<step>;" (integer) or
+    //     "RF,<n>;<hex first><hex step>" (float), reconstructed via arithmetic
+    public static class WireFormatDecode
+    {
+        public static object Decode(string wire, bool allowNesting = true, int stringLengthLimit = 0, bool vectorToColumn = false)
+        {
+            return Decode(wire, allowNesting, stringLengthLimit, vectorToColumn, 0);
+        }
+
+        private static object Decode(string wire, bool allowNesting, int stringLengthLimit, bool vectorToColumn, int depth)
+        {
+            depth++;
+            char tag = wire[0];
+            switch (tag)
+            {
+                case '#': return Hex.HexToDouble(wire, 1);
+                case (char)163:
+                    if (stringLengthLimit > 0)
+                    {
+                        int limit = depth == 1 ? 32768 : stringLengthLimit;
+                        if (wire.Length > limit)
+                        {
+                            throw new InvalidOperationException(
+                                "Data contains a string of length " + (wire.Length - 1).ToString("#,###", CultureInfo.InvariantCulture) +
+                                ", too long to be returned to an Excel worksheet" +
+                                (stringLengthLimit == 32768 ? ", for which the limit is 32,767" :
+                                    ", for which the limit is 32,767 for a string and " + (stringLengthLimit - 1).ToString("#,###", CultureInfo.InvariantCulture) + " for string elements of an array"));
+                        }
+                    }
+                    return wire.Substring(1);
+                case 'T': return true;
+                case 'F': return false;
+                case 'D': return DateTime.FromOADate(long.Parse(wire.Substring(1), CultureInfo.InvariantCulture));
+                case 'G': return DateTime.FromOADate(Hex.HexToDouble(wire, 1));
+                case 'E': return null;
+                case 'N': return DBNull.Value;
+                case '%': return short.Parse(wire.Substring(1), CultureInfo.InvariantCulture);
+                case '&': return int.Parse(wire.Substring(1), CultureInfo.InvariantCulture);
+                case 'B': return byte.Parse(wire.Substring(1), CultureInfo.InvariantCulture);
+                case '^': return long.Parse(wire.Substring(1), CultureInfo.InvariantCulture);
+                case 'S': return Hex.HexToSingle(wire, 1);
+                case 'C': return decimal.Parse(wire.Substring(1), CultureInfo.InvariantCulture);
+                case '@': return decimal.Parse(wire.Substring(1), CultureInfo.InvariantCulture);
+                case '!': return new ExcelErrorValue(int.Parse(wire.Substring(1), CultureInfo.InvariantCulture));
+                case '*': return DecodeArray(wire, allowNesting, stringLengthLimit, vectorToColumn, depth);
+                case 'H': return DecodeDictionary(wire, allowNesting, stringLengthLimit, vectorToColumn, depth);
+                case 'V': return DecodeV(wire, vectorToColumn);
+                case 'R': return DecodeRange(wire, vectorToColumn);
+                default: throw new FormatException("Character '" + tag + "' is not recognised as a type identifier");
+            }
+        }
+
+        private static object DecodeArray(string wire, bool allowNesting, int stringLengthLimit, bool vectorToColumn, int depth)
+        {
+            if (depth > 1 && !allowNesting) throw new InvalidOperationException("Excel cannot display arrays containing arrays");
+
+            int p1 = wire.IndexOf(';');
+            int p2 = wire.IndexOf(';', p1 + 1);
+            if (wire[2] != ',') throw new FormatException("Cannot unserialise arrays with more than 9 dimensions");
+            int rank = wire[1] - '0';
+
+            if (rank == 1)
+            {
+                int n = int.Parse(wire.Substring(3, p1 - 3), CultureInfo.InvariantCulture);
+                if (n == 0)
+                {
+                    if (!allowNesting) throw new InvalidOperationException("Excel cannot display arrays with zero elements");
+                    return new object[0];
+                }
+
+                var flat = new object[n];
+                int m = p1 + 1;
+                int pos = p2 + 1;
+                for (int i = 0; i < n; i++)
+                {
+                    int comma = wire.IndexOf(',', m);
+                    int len = ParseIntFast(wire, m, comma);
+                    flat[i] = Decode(wire.Substring(pos, len), allowNesting, stringLengthLimit, vectorToColumn, depth);
+                    pos += len;
+                    m = comma + 1;
+                }
+
+                if (!vectorToColumn) return flat;
+                var column = new object[n, 1];
+                for (int i = 0; i < n; i++) column[i, 0] = flat[i];
+                return column;
+            }
+
+            if (rank == 2)
+            {
+                int commaPos = wire.IndexOf(',', 3);
+                int nr = int.Parse(wire.Substring(3, commaPos - 3), CultureInfo.InvariantCulture);
+                int nc = int.Parse(wire.Substring(commaPos + 1, p1 - commaPos - 1), CultureInfo.InvariantCulture);
+                if (nr == 0 || nc == 0) throw new InvalidOperationException("Cannot create array of size zero");
+
+                var result = new object[nr, nc];
+                int m = p1 + 1;
+                int pos = p2 + 1;
+                for (int j = 0; j < nc; j++)
+                {
+                    for (int i = 0; i < nr; i++)
+                    {
+                        int comma = wire.IndexOf(',', m);
+                        int len = ParseIntFast(wire, m, comma);
+                        result[i, j] = Decode(wire.Substring(pos, len), allowNesting, stringLengthLimit, vectorToColumn, depth);
+                        pos += len;
+                        m = comma + 1;
+                    }
+                }
+                return result;
+            }
+
+            // Rank 3-9.
+            if (!allowNesting) throw new InvalidOperationException("Excel cannot display arrays with more than 2 dimensions");
+            int[] dims = ParseDims(wire, 3, p1, rank);
+            int total = 1;
+            foreach (int d in dims)
+            {
+                if (d <= 0) throw new InvalidOperationException("Cannot create array of size zero");
+                total *= d;
+            }
+
+            Array nd = Array.CreateInstance(typeof(object), dims);
+            var idx = new int[rank];
+            int mPos = p1 + 1;
+            int payloadPos = p2 + 1;
+            for (int count = 0; count < total; count++)
+            {
+                int comma = wire.IndexOf(',', mPos);
+                int len = ParseIntFast(wire, mPos, comma);
+                object val = Decode(wire.Substring(payloadPos, len), allowNesting, stringLengthLimit, vectorToColumn, depth);
+                nd.SetValue(val, idx);
+                payloadPos += len;
+                mPos = comma + 1;
+                AdvanceIndex(idx, dims, rank);
+            }
+            return nd;
+        }
+
+        private static object DecodeDictionary(string wire, bool allowNesting, int stringLengthLimit, bool vectorToColumn, int depth)
+        {
+            if (!allowNesting) throw new InvalidOperationException("Excel cannot display variables of type Dictionary");
+            int p1 = wire.IndexOf(';');
+            int p2 = wire.IndexOf(';', p1 + 1);
+            int n = int.Parse(wire.Substring(1, p1 - 1), CultureInfo.InvariantCulture);
+
+            var dict = new JuliaDictionary();
+            int m = p1 + 1;
+            int pos = p2 + 1;
+            for (int i = 0; i < n; i++)
+            {
+                int comma1 = wire.IndexOf(',', m);
+                int keyLen = ParseIntFast(wire, m, comma1);
+                int comma2 = wire.IndexOf(',', comma1 + 1);
+                int valueLen = ParseIntFast(wire, comma1 + 1, comma2);
+
+                object key = Decode(wire.Substring(pos, keyLen), allowNesting, stringLengthLimit, vectorToColumn, depth);
+                pos += keyLen;
+                object val = Decode(wire.Substring(pos, valueLen), allowNesting, stringLengthLimit, vectorToColumn, depth);
+                pos += valueLen;
+                m = comma2 + 1;
+
+                dict.Add(key, val);
+            }
+            return dict;
+        }
+
+        private static object DecodeV(string wire, bool vectorToColumn)
+        {
+            int p1 = wire.IndexOf(';');
+            if (wire[2] != ',') throw new FormatException("Cannot unserialise 'V'-format arrays with more than 9 dimensions");
+            int rank = wire[1] - '0';
+            int payloadStart = p1 + 1;
+            const int bytesPerElement = 16;
+
+            if (rank == 1)
+            {
+                int n = int.Parse(wire.Substring(3, p1 - 3), CultureInfo.InvariantCulture);
+                if (wire.Length - payloadStart != n * bytesPerElement)
+                    throw new FormatException("'V'-format string has the wrong number of hex characters for a 1-D array of " + n + " element(s)");
+                double[] buf = Hex.ReadBulkHex(wire, payloadStart, n);
+                if (!vectorToColumn) return ToObjectArray(buf);
+                var column = new object[n, 1];
+                for (int i = 0; i < n; i++) column[i, 0] = buf[i];
+                return column;
+            }
+
+            if (rank == 2)
+            {
+                int commaPos = wire.IndexOf(',', 3);
+                int nr = int.Parse(wire.Substring(3, commaPos - 3), CultureInfo.InvariantCulture);
+                int nc = int.Parse(wire.Substring(commaPos + 1, p1 - commaPos - 1), CultureInfo.InvariantCulture);
+                if (wire.Length - payloadStart != nr * nc * bytesPerElement)
+                    throw new FormatException("'V'-format string has the wrong number of hex characters for a " + nr + "x" + nc + " array");
+                double[] buf = Hex.ReadBulkHex(wire, payloadStart, nr * nc);
+                var result = new object[nr, nc];
+                int k = 0;
+                for (int j = 0; j < nc; j++)
+                    for (int i = 0; i < nr; i++)
+                        result[i, j] = buf[k++];
+                return result;
+            }
+
+            // Rank 3-9.
+            int[] dims = ParseDims(wire, 3, p1, rank);
+            int total = 1;
+            foreach (int d in dims)
+            {
+                if (d <= 0) throw new InvalidOperationException("Cannot create array of size zero");
+                total *= d;
+            }
+            if (wire.Length - payloadStart != total * bytesPerElement)
+                throw new FormatException("'V'-format string has the wrong number of hex characters for a " + rank + "-D array");
+            double[] flatBuf = Hex.ReadBulkHex(wire, payloadStart, total);
+
+            Array nd = Array.CreateInstance(typeof(object), dims);
+            var idx = new int[rank];
+            for (int count = 0; count < total; count++)
+            {
+                nd.SetValue(flatBuf[count], idx);
+                AdvanceIndex(idx, dims, rank);
+            }
+            return nd;
+        }
+
+        private static object DecodeRange(string wire, bool vectorToColumn)
+        {
+            int p1 = wire.IndexOf(';');
+            int n;
+            double first, step;
+            bool isInteger = wire[1] == 'I';
+            if (isInteger)
+            {
+                string[] parts = wire.Substring(3, p1 - 3).Split(',');
+                n = int.Parse(parts[0], CultureInfo.InvariantCulture);
+                first = long.Parse(parts[1], CultureInfo.InvariantCulture);
+                step = long.Parse(parts[2], CultureInfo.InvariantCulture);
+            }
+            else if (wire[1] == 'F')
+            {
+                n = int.Parse(wire.Substring(3, p1 - 3), CultureInfo.InvariantCulture);
+                first = Hex.HexToDouble(wire, p1 + 1);
+                step = Hex.HexToDouble(wire, p1 + 17);
+            }
+            else
+            {
+                throw new FormatException("Character '" + wire[1] + "' is not a recognised 'R'-format sub-type (expected 'I' or 'F')");
+            }
+
+            var flat = new object[n];
+            for (int i = 0; i < n; i++)
+            {
+                double v = first + i * step;
+                flat[i] = isInteger ? (object)(long)v : v;
+            }
+            if (!vectorToColumn) return flat;
+            var column = new object[n, 1];
+            for (int i = 0; i < n; i++) column[i, 0] = flat[i];
+            return column;
+        }
+
+        private static object[] ToObjectArray(double[] buf)
+        {
+            var result = new object[buf.Length];
+            for (int i = 0; i < buf.Length; i++) result[i] = buf[i];
+            return result;
+        }
+
+        private static int[] ParseDims(string wire, int start, int end, int rank)
+        {
+            string[] parts = wire.Substring(start, end - start).Split(',');
+            if (parts.Length != rank) throw new FormatException("Malformed array header: expected " + rank + " dimensions, found " + parts.Length);
+            var dims = new int[rank];
+            for (int i = 0; i < rank; i++) dims[i] = int.Parse(parts[i], CultureInfo.InvariantCulture);
+            return dims;
+        }
+
+        private static void AdvanceIndex(int[] idx, int[] dims, int rank)
+        {
+            for (int d = 0; d < rank; d++)
+            {
+                idx[d]++;
+                if (idx[d] < dims[d]) return;
+                idx[d] = 0;
+            }
+        }
+
+        // Parses digits between [start, end) without allocating a substring.
+        private static int ParseIntFast(string s, int start, int end)
+        {
+            int v = 0;
+            for (int i = start; i < end; i++) v = v * 10 + (s[i] - '0');
+            return v;
+        }
+    }
+}

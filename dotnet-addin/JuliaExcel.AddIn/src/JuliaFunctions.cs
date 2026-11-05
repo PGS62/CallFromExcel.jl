@@ -58,6 +58,53 @@ namespace JuliaExcel.AddIn
             [ExcelArgument(Name = "JuliaFunction", Description = "The name of a Julia function visible from the Julia REPL.")] string juliaFunction,
             [ExcelArgument(Name = "Args", Description = "Zero or more arguments: a number, string, Boolean, empty cell, or array/range.")] params object[] args)
         {
+            return CallCore(juliaFunction, args, "/call");
+        }
+
+        [ExcelFunction(Description = "Call a named Julia function, passing positional and named arguments from the worksheet. The argument \";\" marks where the named arguments start, given as name-value pairs. A named argument whose value is \";\" must be the last pair.", IsThreadSafe = true)]
+        public static object JuliaCallNamedArgs(
+            [ExcelArgument(Name = "JuliaFunction", Description = "The name of a Julia function visible from the Julia REPL.")] string juliaFunction,
+            [ExcelArgument(Name = "Args", Description = "Positional arguments, then \";\", then name/value pairs for keyword arguments.")] params object[] args)
+        {
+            return CallCore(juliaFunction, args, "/callkw");
+        }
+
+        [ExcelFunction(Description = "Returns TRUE if a Julia session is running and listening to this Excel session.", IsThreadSafe = false)]
+        public static bool JuliaIsRunning()
+        {
+            // Improves on the VBA original's approach (matching a console window titled
+            // "serving Excel PID <n>"): this project's own investigation found that
+            // window-title matching never works when Windows Terminal is the default
+            // terminal host (see JuliaLaunch.cs's own notes), so this checks the thing
+            // that actually matters -- is something listening on the cached port -- same
+            // signal JuliaLaunch itself already relies on.
+            int port = JuliaPort.GetJuliaPortOrZero();
+            return port != 0 && JuliaHttpClient.IsListening(port);
+        }
+
+        [ExcelFunction(Description = "Returns the process id of the current Excel session. Only needed if more than one Excel instance is running - pass it to serve_xl(pid) to say which one to attach to.", IsThreadSafe = false)]
+        public static int JuliaExcelPID()
+        {
+            return System.Diagnostics.Process.GetCurrentProcess().Id;
+        }
+
+        [ExcelFunction(Description = "Set a global variable in the Julia process.", IsThreadSafe = true)]
+        public static object JuliaSetVar(
+            [ExcelArgument(Name = "VariableName", Description = "The name of the variable to be set. Must follow Julia's rules for allowed variable names.")] string variableName,
+            [ExcelArgument(Name = "RefersTo", Description = "An Excel range, or a number, string, Boolean, empty cell or array of such types.")] object refersTo)
+        {
+            return CallCore("JuliaExcel.setvar", new[] { (object)variableName, refersTo }, "/call");
+        }
+
+        [ExcelFunction(Description = "Load a Julia source file into the Julia process, to make additional functions available via JuliaEval and JuliaCall.", IsThreadSafe = true)]
+        public static object JuliaInclude(
+            [ExcelArgument(Name = "FileName", Description = "The full name of the file to be included.")] string fileName)
+        {
+            return CallCore("JuliaExcel.include", new object[] { fileName.Replace("\\", "/") }, "/call");
+        }
+
+        private static object CallCore(string juliaFunction, object[] args, string endpoint)
+        {
             try
             {
                 if (JuliaPort.GetJuliaPortOrZero() == 0)
@@ -66,7 +113,7 @@ namespace JuliaExcel.AddIn
                 }
 
                 string payload = BuildCallPayload(juliaFunction, args);
-                string responseWire = JuliaHttpClient.Post(payload, "/call");
+                string responseWire = JuliaHttpClient.Post(payload, endpoint);
                 return WireFormatDecode.Decode(responseWire, allowNesting: false, stringLengthLimit: StringLengthLimit(), vectorToColumn: true);
             }
             catch (Exception ex)

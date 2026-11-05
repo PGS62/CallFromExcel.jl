@@ -23,6 +23,7 @@ namespace JuliaExcel.AddIn
         // only ever called from VBA, never bound to a worksheet cell.
         object JuliaCallVBA(string juliaFunction, params object[] args);
         object JuliaEvalVBA(object juliaExpression);
+        object JuliaCallNamedArgsVBA(string juliaFunction, params object[] args);
     }
 
     [ComVisible(true)]
@@ -54,6 +55,23 @@ namespace JuliaExcel.AddIn
 
         public object JuliaCallVBA(string juliaFunction, params object[] args)
         {
+            return CallVBACore(juliaFunction, args, "/call");
+        }
+
+        public object JuliaCallNamedArgsVBA(string juliaFunction, params object[] args)
+        {
+            return CallVBACore(juliaFunction, args, "/callkw");
+        }
+
+        public object JuliaEvalVBA(object juliaExpression)
+        {
+            string expression = JuliaExpressionToString(juliaExpression);
+            string responseWire = JuliaHttpClient.Post(expression, "/eval");
+            return WireFormatDecode.Decode(responseWire, allowNesting: true, stringLengthLimit: 0, vectorToColumn: false);
+        }
+
+        private static object CallVBACore(string juliaFunction, object[] args, string endpoint)
+        {
             string fnEncoded = WireFormatEncode.Encode(juliaFunction);
             var encoded = new string[1 + args.Length];
             encoded[0] = fnEncoded;
@@ -65,14 +83,7 @@ namespace JuliaExcel.AddIn
             foreach (string e in encoded) { lens.Append(e.Length); lens.Append(','); }
             string payload = "*1," + encoded.Length + ";" + lens + ";" + string.Concat(encoded);
 
-            string responseWire = JuliaHttpClient.Post(payload, "/call");
-            return WireFormatDecode.Decode(responseWire, allowNesting: true, stringLengthLimit: 0, vectorToColumn: false);
-        }
-
-        public object JuliaEvalVBA(object juliaExpression)
-        {
-            string expression = JuliaExpressionToString(juliaExpression);
-            string responseWire = JuliaHttpClient.Post(expression, "/eval");
+            string responseWire = JuliaHttpClient.Post(payload, endpoint);
             return WireFormatDecode.Decode(responseWire, allowNesting: true, stringLengthLimit: 0, vectorToColumn: false);
         }
 

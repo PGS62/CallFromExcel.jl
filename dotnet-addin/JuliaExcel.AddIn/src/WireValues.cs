@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 
 namespace JuliaExcel.AddIn
 {
@@ -14,16 +16,41 @@ namespace JuliaExcel.AddIn
         public override string ToString() { return "Error " + Code; }
     }
 
-    // C# stand-in for VBA's Scripting.Dictionary, used internally for wire-format
-    // round-tripping. Preserves insertion order (matching Dictionary's own enumeration
-    // order) via a simple ordered list rather than a hash-based collection, since Add
-    // order (not lookup speed) is what matters for encode/decode fidelity testing.
-    // Whether this should instead be a real COM-visible type exposed to VBA (e.g.
-    // wrapping an actual Scripting.Dictionary, or a bespoke COM class with
-    // Add/Item/Keys/Exists members) is a decision for when JuliaCallVBA/JuliaEvalVBA are
-    // wired up (the August plan's step 5) -- not needed for the wire-format codec itself.
-    public class JuliaDictionary
+    // C# stand-in for VBA's Scripting.Dictionary, returned from JuliaCallVBA/JuliaEvalVBA
+    // (step 5 of the plan) when Julia sends back a Dictionary -- the whole reason that path
+    // needs to go through a COM-visible class rather than an XLL function in the first
+    // place (Application.Run/XLL return types can't carry a live object reference).
+    // COM-visible with the same member names VBA users already know from
+    // Scripting.Dictionary (Item as the default property, Keys/Items/Exists/Count/Remove),
+    // rather than wrapping an actual Scripting.Dictionary COM object -- avoids a dependency
+    // on that library being registered, and keeps this self-contained.
+    [ComVisible(true)]
+    [Guid("2b6e8a1d-4c7f-4e2a-9b3d-5f8e6a1c2d4b")]
+    [InterfaceType(ComInterfaceType.InterfaceIsDual)]
+    public interface IJuliaDictionary
     {
+        [DispId(0)]
+        object Item(object key);
+        int Count { get; }
+        object[] Keys();
+        object[] Items();
+        bool Exists(object key);
+        void Add(object key, object value);
+        bool Remove(object key);
+    }
+
+    [ComVisible(true)]
+    [Guid("7e4c9f2a-1b8d-4a6e-8c3f-9d2b5a7e1f6c")]
+    [ProgId("JuliaExcel.AddIn.JuliaDictionary")]
+    [ClassInterface(ClassInterfaceType.None)]
+    [ComDefaultInterface(typeof(IJuliaDictionary))]
+    public class JuliaDictionary : IJuliaDictionary
+    {
+        // Preserves insertion order (matching Scripting.Dictionary's own enumeration
+        // order) via a simple ordered list rather than a hash-based collection -- lookup
+        // speed doesn't matter here; round-trip/enumeration fidelity does. Keyed lookups
+        // (Item/Exists/Remove) do a linear scan using object.Equals, which is fine for the
+        // realistic sizes a worksheet-facing Dictionary result would have.
         private readonly List<KeyValuePair<object, object>> _entries = new List<KeyValuePair<object, object>>();
 
         public int Count { get { return _entries.Count; } }
@@ -33,6 +60,49 @@ namespace JuliaExcel.AddIn
             _entries.Add(new KeyValuePair<object, object>(key, value));
         }
 
+        public object Item(object key)
+        {
+            int i = IndexOf(key);
+            if (i < 0) throw new KeyNotFoundException("Key not found in JuliaDictionary: " + key);
+            return _entries[i].Value;
+        }
+
+        public object[] Keys()
+        {
+            var result = new object[_entries.Count];
+            for (int i = 0; i < _entries.Count; i++) result[i] = _entries[i].Key;
+            return result;
+        }
+
+        public object[] Items()
+        {
+            var result = new object[_entries.Count];
+            for (int i = 0; i < _entries.Count; i++) result[i] = _entries[i].Value;
+            return result;
+        }
+
+        public bool Exists(object key)
+        {
+            return IndexOf(key) >= 0;
+        }
+
+        public bool Remove(object key)
+        {
+            int i = IndexOf(key);
+            if (i < 0) return false;
+            _entries.RemoveAt(i);
+            return true;
+        }
+
         public IEnumerable<KeyValuePair<object, object>> Entries { get { return _entries; } }
+
+        private int IndexOf(object key)
+        {
+            for (int i = 0; i < _entries.Count; i++)
+            {
+                if (Equals(_entries[i].Key, key)) return i;
+            }
+            return -1;
+        }
     }
 }

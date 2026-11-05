@@ -38,6 +38,19 @@ namespace JuliaExcel.AddIn
             return "received " + count + " elements (marshaling-in time is NOT included here - it happens before this function body starts)";
         }
 
+        // Tested: double[,] (~210-220ms) vs object (~240ms) for the same 1,000,000-element
+        // input -- only a modest ~10-15% improvement, not a path to eliminating the
+        // marshaling cost. And not applicable to JuliaCall specifically anyway, since its
+        // arguments must support arbitrary mixed types (numbers, strings, arrays) decided
+        // at runtime, not a fixed numeric type declared at compile time. Confirms the
+        // ~435ms is substantially inherent to Excel-DNA's own XLOPER-array-walking, not
+        // mostly a boxing cost that a more specific type could skip.
+        [ExcelFunction(Description = "Diagnostic: same as JuliaDiagInputOnly but with a double[,] parameter type instead of object -- tests whether a specific numeric type marshals faster than generic object.")]
+        public static object JuliaDiagInputOnlyTyped(double[,] arg)
+        {
+            return "received " + arg.Length + " elements (typed double[,] parameter)";
+        }
+
         [ExcelFunction(Description = "Diagnostic: takes a trivial argument but returns a large array -- isolates Excel-DNA's output-side CLR->XLOPER marshaling cost.")]
         public static object JuliaDiagOutputOnly(int n)
         {

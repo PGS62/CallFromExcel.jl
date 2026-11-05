@@ -61,6 +61,18 @@ namespace JuliaExcel.AddIn
             throw new InvalidOperationException(NoConnectionMessage);
         }
 
+        // Non-throwing variant used by JuliaCall/JuliaEval's own "please call JuliaLaunch
+        // first" check (modMain.bas's JuliaCall_LowLevel checks "GetJuliaPort() = 0"
+        // directly in VBA, which works there because VBA's Err mechanism is separate from
+        // a function's return value -- GetJuliaPort's C# port throws instead, so that
+        // check needs its own non-throwing path here).
+        public static int GetJuliaPortOrZero()
+        {
+            if (_cachedPort != 0) return _cachedPort;
+            _cachedPort = ReadJuliaPortFromFile();
+            return _cachedPort;
+        }
+
         public static string NoConnectionErrorMessage
         {
             get { return NoConnectionMessage; }

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Reflection;
 using System.Text;
 
 namespace JuliaExcel.AddIn
@@ -33,7 +34,24 @@ namespace JuliaExcel.AddIn
             if (value is bool) return ((bool)value) ? "T" : "F";
             if (value is DBNull) return "N";
             if (value is short) return "%" + ((short)value).ToString(CultureInfo.InvariantCulture);
-            if (value is int) return "&" + ((int)value).ToString(CultureInfo.InvariantCulture);
+            if (value is int)
+            {
+                // A VBA CVErr(code) Variant (VT_ERROR) crossing COM into .NET arrives boxed
+                // as a plain Int32, not as ExcelErrorValue - .NET's default Variant<->Object
+                // marshaling has no distinct managed type for VT_ERROR. The underlying SCODE
+                // is exactly 0x800A0000 | code (see ComServer.MapToComError's own note on
+                // this, which performs the reverse conversion for results going the other
+                // way), so an incoming int with that upper-16-bits pattern can only
+                // plausibly be a disguised CVErr value - a genuine Long data value landing on
+                // one of these exact facility-code bit patterns is not a realistic
+                // collision. Checked ahead of the plain "&" Long encoding below.
+                int iv = (int)value;
+                if (((uint)iv & 0xFFFF0000u) == 0x800A0000u)
+                {
+                    return "!" + ((uint)iv & 0xFFFFu).ToString(CultureInfo.InvariantCulture);
+                }
+                return "&" + iv.ToString(CultureInfo.InvariantCulture);
+            }
             if (value is byte) return "B" + ((byte)value).ToString(CultureInfo.InvariantCulture);
             if (value is float) return "S" + Hex.SingleToHex((float)value);
             if (value is long) return "^" + ((long)value).ToString(CultureInfo.InvariantCulture);
@@ -56,15 +74,51 @@ namespace JuliaExcel.AddIn
                 throw new NotSupportedException("Cannot serialise Currency/Decimal values - reserved, not implemented (matches SerialiseElement's own omission)");
             }
 
+            // A genuine foreign COM object (e.g. a real VBA Scripting.Dictionary passed as an
+            // input argument over COM) is never a JuliaDictionary - that type only ever
+            // appears as a *result* of our own decode. Scripting.Dictionary isn't referenced
+            // by this project, so it arrives as a generic __ComObject RCW; late-bound
+            // reflection (the same mechanism VBA's own late binding uses) duck-types it by
+            // the same Count/Keys()/Item() members JuliaDictionary itself exposes.
+            if (value.GetType().IsCOMObject) return EncodeComDictionary(value);
+
             throw new NotSupportedException("Cannot serialise value of type " + value.GetType().Name);
         }
 
         private static string EncodeDictionary(JuliaDictionary dict)
         {
-            int n = dict.Count;
+            return EncodeDictionaryEntries(dict.Entries, dict.Count);
+        }
+
+        private static string EncodeComDictionary(object comObj)
+        {
+            Type t = comObj.GetType();
+            int n;
+            try
+            {
+                n = Convert.ToInt32(t.InvokeMember("Count", BindingFlags.GetProperty, null, comObj, null));
+            }
+            catch (Exception)
+            {
+                throw new NotSupportedException("Cannot serialise value of type " + t.Name);
+            }
+            if (n == 0) return "H0;;";
+
+            Array keys = (Array)t.InvokeMember("Keys", BindingFlags.InvokeMethod, null, comObj, null);
+            var entries = new List<KeyValuePair<object, object>>(n);
+            foreach (object key in keys)
+            {
+                object val = t.InvokeMember("Item", BindingFlags.GetProperty, null, comObj, new[] { key });
+                entries.Add(new KeyValuePair<object, object>(key, val));
+            }
+            return EncodeDictionaryEntries(entries, n);
+        }
+
+        private static string EncodeDictionaryEntries(IEnumerable<KeyValuePair<object, object>> entries, int n)
+        {
             if (n == 0) return "H0;;";
             var encoded = new List<string>(n * 2);
-            foreach (var kv in dict.Entries)
+            foreach (var kv in entries)
             {
                 encoded.Add(Encode(kv.Key));
                 encoded.Add(Encode(kv.Value));
@@ -109,24 +163,38 @@ namespace JuliaExcel.AddIn
             }
 
             var encoded = new string[total];
-            // Fast paths for rank 1/2 (by far the common case: Excel always hands worksheet
-            // ranges to Excel-DNA as object[]/object[,]) use direct typed indexer access.
-            // Array.GetValue(int[]) -- needed for the generic rank-3+ path -- measured as a
-            // dominant cost for large arrays (a real regression found via this project's own
-            // end-to-end JuliaCall("sort", ...) timing: ~800-1750ms through this path versus
-            // ~330-450ms through the csharp-prototype's rank-specific VFormat.cs, for the
-            // same 1,000,000-element input) -- generic per-element Array.GetValue/SetValue is
-            // measurably slower than direct [,] indexing, consistent with .NET's own
-            // well-known multi-dimensional-array performance characteristics.
-            if (rank == 1)
+            // Fast paths for a genuine (zero-based) object[]/object[,] -- by far the common
+            // case: Excel always hands worksheet ranges to Excel-DNA this way -- use direct
+            // typed indexer access. Array.GetValue(int[]) -- needed for everything else,
+            // including any non-zero-lower-bound array (e.g. a VBA Dim x(1 To n) array
+            // arriving over COM, which is a *different* runtime type from object[]/object[,]
+            // and cannot be cast to either, whatever its rank -- .NET's own "[*]" suffix on
+            // such a type's name denotes exactly this) and any genuinely-typed array (a VBA
+            // Double()/Long() array arrives as double[]/int[], never boxed into object[]) --
+            // measured as a dominant cost for large arrays (a real regression found via this
+            // project's own end-to-end JuliaCall("sort", ...) timing: ~800-1750ms through
+            // this path versus ~330-450ms through the csharp-prototype's rank-specific
+            // VFormat.cs, for the same 1,000,000-element input) -- generic per-element
+            // Array.GetValue/SetValue is measurably slower than direct [,] indexing,
+            // consistent with .NET's own well-known multi-dimensional-array performance
+            // characteristics. That cost only matters for the XLL path though (Excel-DNA
+            // always hands over a zero-based object[]/object[,]), so the slower fallback
+            // being used for every COM/VBA-sourced array is an acceptable trade, not a
+            // regression.
+            //
+            // Note: object[] is always zero-based (a CLR SZArray guarantee - a non-zero-
+            // lower-bound 1-D array is a genuinely different runtime type, never matching
+            // "is object[]"), so lb[0] is always 0 here. object[,] has no such guarantee
+            // though - a COM-marshaled VBA 2-D array (almost always 1-based in this
+            // codebase's own convention) still matches "is object[,]" while having non-zero
+            // bounds, so this still has to index via lb[], not from 0.
+            if (arr is object[] a1)
             {
-                var a1 = (object[])arr;
                 int k = 0;
                 for (int i = lb[0]; i <= lb[0] + dims[0] - 1; i++) encoded[k++] = Encode(a1[i]);
             }
-            else if (rank == 2)
+            else if (arr is object[,] a2)
             {
-                var a2 = (object[,])arr;
                 int k = 0;
                 for (int j = lb[1]; j <= lb[1] + dims[1] - 1; j++)
                     for (int i = lb[0]; i <= lb[0] + dims[0] - 1; i++)
@@ -158,9 +226,14 @@ namespace JuliaExcel.AddIn
             result = null;
             var buf = new double[total];
 
-            if (rank == 1)
+            // See EncodeArray's fast-path note: object[] is always zero-based, but object[,]
+            // is not (a COM-marshaled VBA 2-D array still matches "is object[,]" while having
+            // non-zero bounds), so both still have to index via lb[]. Anything that isn't one
+            // of these two types (non-zero-lower-bound 1-D, or a genuinely-typed
+            // double[]/double[,] etc. - either possible from a VBA array arriving over COM)
+            // falls back to Array.GetValue, which handles both correctly.
+            if (arr is object[] a1)
             {
-                var a1 = (object[])arr;
                 int k = 0;
                 for (int i = lb[0]; i <= lb[0] + dims[0] - 1; i++)
                 {
@@ -169,9 +242,8 @@ namespace JuliaExcel.AddIn
                     buf[k++] = (double)element;
                 }
             }
-            else if (rank == 2)
+            else if (arr is object[,] a2)
             {
-                var a2 = (object[,])arr;
                 int k = 0;
                 for (int j = lb[1]; j <= lb[1] + dims[1] - 1; j++)
                 {

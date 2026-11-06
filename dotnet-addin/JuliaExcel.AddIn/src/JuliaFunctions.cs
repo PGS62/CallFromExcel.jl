@@ -114,7 +114,8 @@ namespace JuliaExcel.AddIn
 
                 string payload = BuildCallPayload(juliaFunction, args);
                 string responseWire = JuliaHttpClient.Post(payload, endpoint);
-                return WireFormatDecode.Decode(responseWire, allowNesting: false, stringLengthLimit: StringLengthLimit(), vectorToColumn: true);
+                object result = WireFormatDecode.Decode(responseWire, allowNesting: false, stringLengthLimit: StringLengthLimit(), vectorToColumn: true);
+                return WireFormatDecode.MapErrorValues(result, MapToExcelDnaError);
             }
             catch (Exception ex)
             {
@@ -135,7 +136,8 @@ namespace JuliaExcel.AddIn
 
                 string expression = ConcatenateExpressions(juliaExpression);
                 string responseWire = JuliaHttpClient.Post(expression, "/eval");
-                return WireFormatDecode.Decode(responseWire, allowNesting: false, stringLengthLimit: StringLengthLimit(), vectorToColumn: true);
+                object result = WireFormatDecode.Decode(responseWire, allowNesting: false, stringLengthLimit: StringLengthLimit(), vectorToColumn: true);
+                return WireFormatDecode.MapErrorValues(result, MapToExcelDnaError);
             }
             catch (Exception ex)
             {
@@ -169,24 +171,60 @@ namespace JuliaExcel.AddIn
             return "*1," + encoded.Length + ";" + lens + ";" + string.Concat(encoded);
         }
 
-        // Port of ConcatenateExpressions (modPrivateMethods.bas).
+        // Maps a wire-format error code (VBA's own XlCVError UI numbering, e.g. 2042 for
+        // #N/A) to Excel-DNA's ExcelError enum, which Excel-DNA recognises and converts to a
+        // genuine XLOPER error in a worksheet cell. VBA's numbering is exactly 2000 + the
+        // underlying xlerror code Excel-DNA itself uses (confirmed empirically: 2007-2000=7=
+        // ExcelErrorDiv0's own value, etc.), but this Excel-DNA version (1.9.0) only defines
+        // enum members for the 8 "classic" errors - the 6 newer dynamic-array-era codes
+        // (#SPILL!, #CALC!, #BLOCKED!, #CONNECT!, #FIELD!, #UNKNOWN!, codes 2045-2050) have
+        // no native XLOPER error representation here, so they fall back to a text
+        // approximation rather than losing the value entirely.
+        private static object MapToExcelDnaError(int code)
+        {
+            switch (code)
+            {
+                case 2000: return ExcelError.ExcelErrorNull;
+                case 2007: return ExcelError.ExcelErrorDiv0;
+                case 2015: return ExcelError.ExcelErrorValue;
+                case 2023: return ExcelError.ExcelErrorRef;
+                case 2029: return ExcelError.ExcelErrorName;
+                case 2036: return ExcelError.ExcelErrorNum;
+                case 2042: return ExcelError.ExcelErrorNA;
+                case 2043: return ExcelError.ExcelErrorGettingData;
+                default: return "#ERR" + code + "!";
+            }
+        }
+
+        // Port of ConcatenateExpressions (modPrivateMethods.bas). Uses Array.GetLowerBound/
+        // GetValue rather than casting to object[]/object[,] directly - see ComServer.cs's
+        // own copy of this method for why a direct cast isn't safe in general (a non-zero-
+        // lower-bound 1-D array isn't an object[] at all).
         private static string ConcatenateExpressions(object juliaExpression)
         {
-            if (juliaExpression is object[,] arr2)
+            var arr = juliaExpression as Array;
+            if (arr != null)
             {
-                int nc = arr2.GetUpperBound(1) - arr2.GetLowerBound(1) + 1;
-                if (nc > 1) throw new ArgumentException("When passed as an array or a Range, JuliaExpression should have only one column, but got " + nc + " columns");
-                int lo = arr2.GetLowerBound(0);
-                int hi = arr2.GetUpperBound(0);
-                var parts = new string[hi - lo + 1];
-                for (int i = lo; i <= hi; i++) parts[i - lo] = Convert.ToString(arr2[i, arr2.GetLowerBound(1)]);
-                return string.Join("\n", parts);
-            }
-            if (juliaExpression is object[] arr1)
-            {
-                var parts = new string[arr1.Length];
-                for (int i = 0; i < arr1.Length; i++) parts[i] = Convert.ToString(arr1[i]);
-                return string.Join("\n", parts);
+                if (arr.Rank == 1)
+                {
+                    int lb = arr.GetLowerBound(0);
+                    int ub = arr.GetUpperBound(0);
+                    var parts = new string[ub - lb + 1];
+                    for (int i = lb; i <= ub; i++) parts[i - lb] = Convert.ToString(arr.GetValue(i));
+                    return string.Join("\n", parts);
+                }
+                if (arr.Rank == 2)
+                {
+                    int lb0 = arr.GetLowerBound(0);
+                    int ub0 = arr.GetUpperBound(0);
+                    int lb1 = arr.GetLowerBound(1);
+                    int nc = arr.GetUpperBound(1) - lb1 + 1;
+                    if (nc > 1) throw new ArgumentException("When passed as an array or a Range, JuliaExpression should have only one column, but got " + nc + " columns");
+                    var parts = new string[ub0 - lb0 + 1];
+                    for (int i = lb0; i <= ub0; i++) parts[i - lb0] = Convert.ToString(arr.GetValue(i, lb1));
+                    return string.Join("\n", parts);
+                }
+                throw new ArgumentException("Too many dimensions");
             }
             return Convert.ToString(juliaExpression);
         }

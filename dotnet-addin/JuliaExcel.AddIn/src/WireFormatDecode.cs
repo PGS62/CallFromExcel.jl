@@ -294,6 +294,60 @@ namespace JuliaExcel.AddIn
             return column;
         }
 
+        // Walks a decoded result tree, replacing every ExcelErrorValue with mapper(Code).
+        // Needed because ExcelErrorValue is a plain struct with no COM or Excel-DNA
+        // significance of its own - .NET cannot marshal it to a VBA Variant over COM, nor
+        // does Excel-DNA recognise it as a worksheet error - each return path supplies its
+        // own conversion (JuliaFunctions.cs -> ExcelDna.Integration.ExcelError for a real
+        // XLOPER error; ComServer.cs -> System.Runtime.InteropServices.ErrorWrapper for a
+        // genuine COM VT_ERROR Variant). A genuinely-typed double[]/double[,]/... (the "V"
+        // fast path) can never contain one by construction, so only object-element arrays
+        // and dictionaries need walking.
+        public static object MapErrorValues(object value, Func<int, object> mapper)
+        {
+            if (value is ExcelErrorValue) return mapper(((ExcelErrorValue)value).Code);
+
+            var dict = value as JuliaDictionary;
+            if (dict != null)
+            {
+                var mapped = new JuliaDictionary();
+                foreach (var kv in dict.Entries)
+                {
+                    mapped.Add(MapErrorValues(kv.Key, mapper), MapErrorValues(kv.Value, mapper));
+                }
+                return mapped;
+            }
+
+            var arr = value as Array;
+            if (arr != null && arr.GetType().GetElementType() == typeof(object))
+            {
+                int rank = arr.Rank;
+                var lb = new int[rank];
+                var idx = new int[rank];
+                for (int d = 0; d < rank; d++)
+                {
+                    lb[d] = arr.GetLowerBound(d);
+                    idx[d] = lb[d];
+                }
+                int total = arr.Length;
+                for (int count = 0; count < total; count++)
+                {
+                    object element = arr.GetValue(idx);
+                    object mappedElement = MapErrorValues(element, mapper);
+                    if (!ReferenceEquals(mappedElement, element)) arr.SetValue(mappedElement, idx);
+                    for (int d = 0; d < rank; d++)
+                    {
+                        idx[d]++;
+                        if (idx[d] <= arr.GetUpperBound(d)) break;
+                        idx[d] = lb[d];
+                    }
+                }
+                return arr;
+            }
+
+            return value;
+        }
+
         private static int[] ParseDims(string wire, int start, int end, int rank)
         {
             string[] parts = wire.Substring(start, end - start).Split(',');

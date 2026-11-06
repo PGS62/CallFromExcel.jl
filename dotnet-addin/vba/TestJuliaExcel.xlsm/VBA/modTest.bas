@@ -1170,7 +1170,6 @@ Function WsTest_Scalar() As Boolean
           Set ws = ScratchSheet()
           ws.Range("A1").Value2 = Application.WorksheetFunction.Pi()
           ws.Range("B1").Formula2 = "=JuliaCall(""identity"",A1)"
-          Application.CalculateFullRebuild
           WsTest_Scalar = ws.Range("B1").Value2 = Application.WorksheetFunction.Pi()
           Exit Function
 ErrHandler:
@@ -1184,7 +1183,6 @@ Function WsTest_String() As Boolean
           Set ws = ScratchSheet()
           ws.Range("A1").Value2 = "FooBar"
           ws.Range("B1").Formula2 = "=JuliaCall(""identity"",A1)"
-          Application.CalculateFullRebuild
           WsTest_String = ws.Range("B1").Value2 = "FooBar"
           Exit Function
 ErrHandler:
@@ -1208,7 +1206,6 @@ Function WsTest_OneDArrayBecomesColumn() As Boolean
           Set ws = ScratchSheet()
           ws.Range("A1:A3").Value2 = Application.WorksheetFunction.Transpose(Array(1, 2, 3))
           ws.Range("E1").Formula2 = "=JuliaCall(""identity"",A1:A3)"
-          Application.CalculateFullRebuild
           Expected = ws.Range("E1:E3").Value2
           WsTest_OneDArrayBecomesColumn = NumDimensions(Expected) = 2 And _
               Expected(1, 1) = 1 And Expected(2, 1) = 2 And Expected(3, 1) = 3
@@ -1227,7 +1224,6 @@ Function WsTest_TwoDArray() As Boolean
           ws.Range("A1").Value2 = 1: ws.Range("B1").Value2 = 2
           ws.Range("A2").Value2 = 3: ws.Range("B2").Value2 = 4
           ws.Range("D1").Formula2 = "=JuliaCall(""identity"",A1:B2)"
-          Application.CalculateFullRebuild
           Observed = ws.Range("D1:E2").Value2
           WsTest_TwoDArray = Observed(1, 1) = 1 And Observed(1, 2) = 2 And _
               Observed(2, 1) = 3 And Observed(2, 2) = 4
@@ -1242,7 +1238,6 @@ Function WsTest_JuliaEvalScalar() As Boolean
           On Error GoTo ErrHandler
           Set ws = ScratchSheet()
           ws.Range("A1").Formula2 = "=JuliaEval(""1+1"")"
-          Application.CalculateFullRebuild
           WsTest_JuliaEvalScalar = ws.Range("A1").Value2 = 2
           Exit Function
 ErrHandler:
@@ -1264,7 +1259,6 @@ Function WsTest_EmptyResult() As Boolean
           ws.Range("A1").Formula2 = "=JuliaEval(""nothing"")"
           ws.Range("A2").Formula2 = "=JuliaEval(""missing"")"
           ws.Range("A3").Formula2 = "=ISBLANK(A1)"
-          Application.CalculateFullRebuild
           WsTest_EmptyResult = ws.Range("A1").Value2 = 0 And ws.Range("A2").Value2 = 0 And ws.Range("A3").Value2 = False
           Exit Function
 ErrHandler:
@@ -1291,7 +1285,6 @@ Function WsTest_JuliaLaunchArgOrder() As Boolean
           On Error GoTo ErrHandler
           Set ws = ScratchSheet()
           ws.Range("A1").Formula2 = "=JuliaLaunch(,,""-q"")"
-          Application.CalculateFullRebuild
           Result = ws.Range("A1").Text
           WsTest_JuliaLaunchArgOrder = Left$(Result, 1) <> "#"
           Exit Function
@@ -1314,7 +1307,6 @@ Function WsTest_RelaunchAfterExit() As Boolean
           Set ws = ScratchSheet()
           JuliaExcel.JuliaEval "exit()"
           ws.Range("A1").Formula2 = "=JuliaLaunch()"
-          Application.CalculateFullRebuild
           Result = ws.Range("A1").Text
           WsTest_RelaunchAfterExit = Left$(Result, 1) <> "#" And JuliaExcel.JuliaIsRunning()
           Exit Function
@@ -1333,7 +1325,6 @@ Function WsTest_JuliaIsRunningAndPID() As Boolean
           Set ws = ScratchSheet()
           ws.Range("A1").Formula2 = "=JuliaIsRunning()"
           ws.Range("A2").Formula2 = "=JuliaExcelPID()"
-          Application.CalculateFullRebuild
           WsTest_JuliaIsRunningAndPID = (ws.Range("A1").Value2 = True) And _
               (ws.Range("A2").Value2 = JuliaExcel.JuliaExcelPID())
           Exit Function
@@ -1347,7 +1338,6 @@ Function WsTest_ErrorString() As Boolean
           On Error GoTo ErrHandler
           Set ws = ScratchSheet()
           ws.Range("A1").Formula2 = "=JuliaCall(""thisFunctionDoesNotExist12345"")"
-          Application.CalculateFullRebuild
           WsTest_ErrorString = Left$(ws.Range("A1").Value2, 1) = "#"
           Exit Function
 ErrHandler:
@@ -1367,7 +1357,6 @@ Function WsTest_SortRoundTrip() As Boolean
           ws.Range("A1:A5").Value2 = Application.WorksheetFunction.Transpose(Array(5, 3, 1, 4, 2))
           ws.Range("C1").Formula2 = "=SORT(A1:A5)"
           ws.Range("E1").Formula2 = "=JuliaCall(""sort"",A1:A5)"
-          Application.CalculateFullRebuild
           Expected = ws.Range("C1:C5").Value2
           Observed = ws.Range("E1:E5").Value2
           WsTest_SortRoundTrip = ArraysIdentical(Expected, Observed)

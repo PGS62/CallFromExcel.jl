@@ -53,9 +53,33 @@ namespace JuliaExcel.AddIn
             string windowPartialTitle = "serving Excel PID " + pid; // must match Julia's JuliaExcel.settitle
 
             bool foundWindow = WindowUtils.TryGetHandleFromPartialCaption(windowPartialTitle, out IntPtr hwndJulia);
-
             int existingPort = JuliaPort.ReadJuliaPortFromFile();
             bool isListening = existingPort > 0 && JuliaHttpClient.IsListening(existingPort);
+
+            // A window matching this Excel session can still be found, and still fail to
+            // respond over HTTP, for a little while after JuliaEval("exit()") - confirmed
+            // (via temporary diagnostics while fixing this) that Julia's own shutdown tears
+            // things down in stages: its HTTP server stops responding and its window title
+            // goes blank before the OS process itself has actually exited, so checking
+            // whether the process has exited doesn't help - it genuinely hasn't yet. Without
+            // retrying briefly here, that normal, transient state was indistinguishable from
+            // a genuinely stuck/crashed session (e.g. sitting at a "julia>" prompt with a
+            // dead HTTP server) and raised a scary "already running but not responding" error
+            // for a session that was actually just finishing closing. Only engages in this
+            // specific ambiguous state, so it costs nothing in the common case where Julia is
+            // either already responding (isListening true) or genuinely not running at all
+            // (foundWindow false).
+            if (foundWindow && !isListening)
+            {
+                var retryStopwatch = Stopwatch.StartNew();
+                while (foundWindow && !isListening && retryStopwatch.Elapsed.TotalSeconds < 5)
+                {
+                    Thread.Sleep(250);
+                    foundWindow = WindowUtils.TryGetHandleFromPartialCaption(windowPartialTitle, out hwndJulia);
+                    existingPort = JuliaPort.ReadJuliaPortFromFile();
+                    isListening = existingPort > 0 && JuliaHttpClient.IsListening(existingPort);
+                }
+            }
 
             if (isListening && foundWindow && WindowUtils.WindowTitleFromHandle(hwndJulia).Contains(", port " + existingPort))
             {

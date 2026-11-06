@@ -149,6 +149,7 @@ Function RunTests(Optional SilentMode As Boolean = False, Optional CommandLineOp
           AccResult "WsTest_JuliaEvalScalar", WsTest_JuliaEvalScalar, NumPassed, NumFailed
           AccResult "WsTest_EmptyResult", WsTest_EmptyResult, NumPassed, NumFailed
           AccResult "WsTest_JuliaLaunchArgOrder", WsTest_JuliaLaunchArgOrder, NumPassed, NumFailed
+          AccResult "WsTest_RelaunchAfterExit", WsTest_RelaunchAfterExit, NumPassed, NumFailed
           AccResult "WsTest_JuliaIsRunningAndPID", WsTest_JuliaIsRunningAndPID, NumPassed, NumFailed
           AccResult "WsTest_ErrorString", WsTest_ErrorString, NumPassed, NumFailed
           AccResult "WsTest_SortRoundTrip", WsTest_SortRoundTrip, NumPassed, NumFailed
@@ -1297,6 +1298,29 @@ Function WsTest_JuliaLaunchArgOrder() As Boolean
 ErrHandler:
           PrintTwice ReThrow("WsTest_JuliaLaunchArgOrder", Err, True)
           WsTest_JuliaLaunchArgOrder = False
+End Function
+
+' Regression test: JuliaLaunch must succeed when called immediately after JuliaEval("exit()"),
+' with no delay at all. Julia's own shutdown tears things down in stages - its HTTP server
+' stops responding and its console window's title goes blank before the OS process has
+' actually exited - so a relaunch attempt in that window used to be indistinguishable from a
+' genuinely stuck/crashed session (JuliaLaunch.cs's own "already running but not responding"
+' error), even though it was really just a session finishing a normal, requested exit. Fixed
+' by a short retry loop in JuliaLaunch.cs that only engages in that specific ambiguous state.
+Function WsTest_RelaunchAfterExit() As Boolean
+          Dim ws As Worksheet
+          Dim Result As String
+          On Error GoTo ErrHandler
+          Set ws = ScratchSheet()
+          JuliaExcel.JuliaEval "exit()"
+          ws.Range("A1").Formula2 = "=JuliaLaunch()"
+          Application.CalculateFullRebuild
+          Result = ws.Range("A1").Text
+          WsTest_RelaunchAfterExit = Left$(Result, 1) <> "#" And JuliaExcel.JuliaIsRunning()
+          Exit Function
+ErrHandler:
+          PrintTwice ReThrow("WsTest_RelaunchAfterExit", Err, True)
+          WsTest_RelaunchAfterExit = False
 End Function
 
 ' Cross-path consistency check: JuliaIsRunning/JuliaExcelPID as real worksheet formulas

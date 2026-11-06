@@ -7,6 +7,14 @@ namespace JuliaExcel.AddIn
     // live object reference, so results JuliaCall/JuliaEval can't display on a worksheet
     // (Dictionaries, nested arrays) go through here instead. Also still carries the
     // JuliaLaunch/JuliaHttpClient test-harness methods used while validating those ports.
+    // Dual, not IDispatch-only: IDispatch-only was tried to get COM VARARG export for the
+    // "params object[]" methods below (which would give JuliaCall/JuliaEval a ParamArray-style
+    // IntelliSense tooltip in the VBA editor, like Application.Run has) - but the combination
+    // of IDispatch-only + a vararg "object" (VARIANT)-returning method crashes the VBA editor's
+    // IntelliSense outright when typing e.g. "j.JuliaCall(" with an early-bound reference to
+    // this type library. Dual is stable; late-bound CreateObject/As Object callers (everything
+    // in this codebase) go through IDispatch either way, so this only costs the early-bound
+    // IntelliSense tooltip for the params-array methods, not any functionality.
     [ComVisible(true)]
     [Guid("6a6e3e0a-6f3a-4b9a-8a2a-1d6f7c9a2b4e")]
     [InterfaceType(ComInterfaceType.InterfaceIsDual)]

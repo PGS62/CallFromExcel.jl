@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<DnaLibrary Name="JuliaExcel.AddIn Add-In" RuntimeVersion="v4.0" xmlns="http://schemas.excel-dna.net/addin/2020/07/dnalibrary">
+  <ExternalLibrary Path="JuliaExcel.AddIn.dll" ExplicitExports="false" LoadFromBytes="true" Pack="true" IncludePdb="false" />
+
+  <!-- Embeds the IntelliSense display server (see src/AddIn.cs) so formula-bar IntelliSense
+       works without a separately installed ExcelDna.IntelliSense*.xll add-in. -->
+  <Reference Path="ExcelDna.IntelliSense.dll" Pack="true" />
+</DnaLibrary>

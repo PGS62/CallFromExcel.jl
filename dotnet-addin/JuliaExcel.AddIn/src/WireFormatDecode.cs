@@ -294,26 +294,23 @@ namespace JuliaExcel.AddIn
             return column;
         }
 
-        // Walks a decoded result tree, replacing every ExcelErrorValue with mapper(Code).
-        // Needed because ExcelErrorValue is a plain struct with no COM or Excel-DNA
-        // significance of its own - .NET cannot marshal it to a VBA Variant over COM, nor
-        // does Excel-DNA recognise it as a worksheet error - each return path supplies its
-        // own conversion (JuliaFunctions.cs -> ExcelDna.Integration.ExcelError for a real
-        // XLOPER error; ComServer.cs -> System.Runtime.InteropServices.ErrorWrapper for a
-        // genuine COM VT_ERROR Variant). A genuinely-typed double[]/double[,]/... (the "V"
-        // fast path) can never contain one by construction, so only object-element arrays
-        // and dictionaries need walking.
-        public static object MapErrorValues(object value, Func<int, object> mapper)
+        // Walks a decoded result tree structurally (into object-element arrays of any rank
+        // and JuliaDictionary entries), applying `mapper` to every leaf value - a leaf being
+        // anything that isn't itself one of those two container shapes. `mapper` should
+        // return its argument unchanged for any value it doesn't want to transform. A
+        // genuinely-typed double[]/double[,]/... (the "V" fast path) is never walked into
+        // (its element type isn't `object`), which is always correct: neither of this
+        // method's two current uses (MapErrorValues, JuliaFunctions.cs's null->ExcelEmpty
+        // mapping) can ever apply to a plain Double.
+        public static object MapLeaves(object value, Func<object, object> mapper)
         {
-            if (value is ExcelErrorValue) return mapper(((ExcelErrorValue)value).Code);
-
             var dict = value as JuliaDictionary;
             if (dict != null)
             {
                 var mapped = new JuliaDictionary();
                 foreach (var kv in dict.Entries)
                 {
-                    mapped.Add(MapErrorValues(kv.Key, mapper), MapErrorValues(kv.Value, mapper));
+                    mapped.Add(MapLeaves(kv.Key, mapper), MapLeaves(kv.Value, mapper));
                 }
                 return mapped;
             }
@@ -333,7 +330,7 @@ namespace JuliaExcel.AddIn
                 for (int count = 0; count < total; count++)
                 {
                     object element = arr.GetValue(idx);
-                    object mappedElement = MapErrorValues(element, mapper);
+                    object mappedElement = MapLeaves(element, mapper);
                     if (!ReferenceEquals(mappedElement, element)) arr.SetValue(mappedElement, idx);
                     for (int d = 0; d < rank; d++)
                     {
@@ -345,7 +342,19 @@ namespace JuliaExcel.AddIn
                 return arr;
             }
 
-            return value;
+            return mapper(value);
+        }
+
+        // Replaces every ExcelErrorValue in a decoded result tree with mapper(Code). Needed
+        // because ExcelErrorValue is a plain struct with no COM or Excel-DNA significance of
+        // its own - .NET cannot marshal it to a VBA Variant over COM, nor does Excel-DNA
+        // recognise it as a worksheet error - each return path supplies its own conversion
+        // (JuliaFunctions.cs -> ExcelDna.Integration.ExcelError for a real XLOPER error;
+        // ComServer.cs -> System.Runtime.InteropServices.ErrorWrapper for a genuine COM
+        // VT_ERROR Variant).
+        public static object MapErrorValues(object value, Func<int, object> mapper)
+        {
+            return MapLeaves(value, v => v is ExcelErrorValue ev ? mapper(ev.Code) : v);
         }
 
         private static int[] ParseDims(string wire, int start, int end, int rank)

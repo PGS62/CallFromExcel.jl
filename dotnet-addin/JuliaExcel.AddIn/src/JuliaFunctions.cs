@@ -115,7 +115,8 @@ namespace JuliaExcel.AddIn
                 string payload = BuildCallPayload(juliaFunction, args);
                 string responseWire = JuliaHttpClient.Post(payload, endpoint);
                 object result = WireFormatDecode.Decode(responseWire, allowNesting: false, stringLengthLimit: StringLengthLimit(), vectorToColumn: true);
-                return WireFormatDecode.MapErrorValues(result, MapToExcelDnaError);
+                result = WireFormatDecode.MapErrorValues(result, MapToExcelDnaError);
+                return WireFormatDecode.MapLeaves(result, v => v ?? ExcelEmpty.Value);
             }
             catch (Exception ex)
             {
@@ -137,7 +138,8 @@ namespace JuliaExcel.AddIn
                 string expression = ConcatenateExpressions(juliaExpression);
                 string responseWire = JuliaHttpClient.Post(expression, "/eval");
                 object result = WireFormatDecode.Decode(responseWire, allowNesting: false, stringLengthLimit: StringLengthLimit(), vectorToColumn: true);
-                return WireFormatDecode.MapErrorValues(result, MapToExcelDnaError);
+                result = WireFormatDecode.MapErrorValues(result, MapToExcelDnaError);
+                return WireFormatDecode.MapLeaves(result, v => v ?? ExcelEmpty.Value);
             }
             catch (Exception ex)
             {

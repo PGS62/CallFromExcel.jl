@@ -76,7 +76,7 @@ Function RunTests(Optional SilentMode As Boolean = False, Optional CommandLineOp
 
           Set JuliaExcel = CreateObject("JuliaExcel.AddIn.ComServer")
 
-          XllPath = ThisWorkbook.Path & "\..\..\JuliaExcel.AddIn\bin\Release\net48\publish\JuliaExcel.AddIn-AddIn64-packed.xll"
+          XllPath = ThisWorkbook.Path & "\..\..\JuliaExcel.AddIn\bin\Release\net48\publish\JuliaExcel.AddIn64-packed.xll"
           If Dir(XllPath) = vbNullString Then
               Throw "Cannot find the add-in at " & XllPath & _
                   " - build it first (dotnet build -c Release in dotnet-addin\JuliaExcel.AddIn)."
@@ -147,6 +147,7 @@ Function RunTests(Optional SilentMode As Boolean = False, Optional CommandLineOp
           AccResult "WsTest_OneDArrayBecomesColumn", WsTest_OneDArrayBecomesColumn, NumPassed, NumFailed
           AccResult "WsTest_TwoDArray", WsTest_TwoDArray, NumPassed, NumFailed
           AccResult "WsTest_JuliaEvalScalar", WsTest_JuliaEvalScalar, NumPassed, NumFailed
+          AccResult "WsTest_EmptyResult", WsTest_EmptyResult, NumPassed, NumFailed
           AccResult "WsTest_JuliaIsRunningAndPID", WsTest_JuliaIsRunningAndPID, NumPassed, NumFailed
           AccResult "WsTest_ErrorString", WsTest_ErrorString, NumPassed, NumFailed
           AccResult "WsTest_SortRoundTrip", WsTest_SortRoundTrip, NumPassed, NumFailed
@@ -1245,6 +1246,28 @@ Function WsTest_JuliaEvalScalar() As Boolean
 ErrHandler:
           PrintTwice ReThrow("WsTest_JuliaEvalScalar", Err, True)
           WsTest_JuliaEvalScalar = False
+End Function
+
+' Regression test: a bare .NET null (decoded from Julia's "nothing"/"missing") returned
+' unconverted from an XLL worksheet function used to display as #NUM! - Excel-DNA's own
+' XLOPER marshaling apparently falls back to that error for a plain null reference it
+' doesn't recognise, rather than blank/0. Fixed by converting to ExcelEmpty.Value before
+' returning (JuliaFunctions.cs). Matches old VBA's own behaviour: a UDF returning Empty
+' displays as 0 on the worksheet (not a literal blank - ISBLANK on it is FALSE, since the
+' cell holds a computed formula, not nothing at all).
+Function WsTest_EmptyResult() As Boolean
+          Dim ws As Worksheet
+          On Error GoTo ErrHandler
+          Set ws = ScratchSheet()
+          ws.Range("A1").Formula2 = "=JuliaEval(""nothing"")"
+          ws.Range("A2").Formula2 = "=JuliaEval(""missing"")"
+          ws.Range("A3").Formula2 = "=ISBLANK(A1)"
+          Application.CalculateFullRebuild
+          WsTest_EmptyResult = ws.Range("A1").Value2 = 0 And ws.Range("A2").Value2 = 0 And ws.Range("A3").Value2 = False
+          Exit Function
+ErrHandler:
+          PrintTwice ReThrow("WsTest_EmptyResult", Err, True)
+          WsTest_EmptyResult = False
 End Function
 
 ' Cross-path consistency check: JuliaIsRunning/JuliaExcelPID as real worksheet formulas

@@ -9,7 +9,7 @@ Option Explicit
 ' Setup (one-time):
 ' 1. Build: cd dotnet-addin\JuliaExcel.AddIn && dotnet build -c Release
 ' 2. Load the add-in: Excel > File > Options > Add-ins > Manage Excel Add-ins > Go... >
-'    Browse... > select bin\Release\net48\publish\JuliaExcel.AddIn-AddIn64-packed.xll
+'    Browse... > select bin\Release\net48\publish\JuliaExcel.AddIn64-packed.xll
 ' 3. COM registration for JuliaCallVBA/JuliaEvalVBA (via ComServer): this session
 '    registered JuliaExcel.AddIn.ComServer under HKCU:\Software\Classes (no admin
 '    needed) pointing at bin\Release\net48\JuliaExcel.AddIn.dll. If you rebuild and the

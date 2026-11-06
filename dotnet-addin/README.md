@@ -118,7 +118,7 @@ cd dotnet-addin\JuliaExcel.AddIn
 dotnet build -c Release
 ```
 
-Produces `bin\Release\net48\publish\JuliaExcel.AddIn-AddIn64-packed.xll`
+Produces `bin\Release\net48\publish\JuliaExcel.AddIn64-packed.xll`
 (load via Excel > File > Options > Add-ins > Manage Excel Add-ins >
 Go... > Browse...).
 
@@ -135,19 +135,41 @@ For manual testing from real VBA: see `vba\TestRealAddin.bas`.
 
 ## Suggested next steps
 
-1. Investigate whether the ~435ms XLOPER marshaling cost can be reduced
-   for the common case (e.g. detecting an all-numeric incoming range and
-   using a more specific parameter type, if Excel-DNA supports that
-   without losing the ability to accept mixed-type arguments generally).
-2. A real installer/distribution story (replacing the dev-session HKCU
-   COM registration workaround here) -- e.g. Excel-DNA's own COM-server
-   self-registration (the plan's original note: no admin rights, no
-   regsvr32 needed), rather than the manual HKCU registry writes used for
-   this session's testing.
-3. Decide whether to still pursue the Julia-side ZMQ swap, now that real
-   numbers exist for where time actually goes.
-4. `modRegister.bas`'s Function-Wizard/IntelliSense mechanism: confirm
-   Excel-DNA's own declarative IntelliSense (via `ExcelDna.IntelliSense`)
-   picks up the `ExcelFunction`/`ExcelArgument` descriptions already on
-   every function, with no new code needed.
-5. WSL/Linux Julia launch support, if still wanted.
+1. A real installer script - needs deciding where it puts the packed
+   `.xll` and the registered `.tlb`.
+2. Remove folders from the repo that are no longer needed (not yet
+   decided which - likely candidates: `csharp-prototype/` now that this
+   folder supersedes it, and/or the old VBA xlam-based folder once
+   migration guidance is written).
+3. README pass: Shortcomings section rewrite, an honest JuliaInXL
+   comparison, and a migration guide covering the no-xlam architecture,
+   the `JuliaExcel.JuliaXxx(...)` call-site edit pattern, the early-
+   binding gotchas (a `params object[]` method like `JuliaCall` can't be
+   called early-bound at all - always use late-bound `Dim j As Object`),
+   and the `OneBasedArray`/0-based-`Array()`-spreading gotcha.
+4. WSL/Linux Julia launch support, if still wanted.
+5. Planned breaking change (once released under the new package name,
+   see below): give `JuliaLaunch` a dedicated `project` parameter
+   instead of requiring `--project=...` to be embedded in
+   `CommandLineOptions`.
+
+**Resolved since the status above was written:**
+- IntelliSense (`modRegister.bas`'s old Function-Wizard mechanism) is
+  done - `ExcelDna.IntelliSense` is now embedded directly in this add-in
+  (see `src/AddIn.cs`), no separate IntelliSense add-in needed.
+- ZMQ-vs-HTTP.jl transport: investigated and decided against. Fixed
+  per-call latency is ~0.5-0.9ms (already negligible); for a
+  1,000,000-element `sort`, the dominant cost is Julia's own wire-format
+  en/decode work and genuine ~32MB hex-text data transfer, not HTTP
+  protocol overhead - so a transport swap wouldn't meaningfully help
+  either a "few large calls" or "many small calls" usage pattern.
+
+**Naming/release plan:** this rewrite will be released as a new Julia
+package, `CallFromExcel.jl`, not a new version of `JuliaExcel.jl` -
+Julia's compat/SemVer system can't protect existing VBA users from a
+breaking update (the "dependent" is invisible VBA code, not a Julia
+package), and `JuliaExcel.jl`'s own registration has separately been
+stalled on the Julia General registry's "no 'julia' in the name" rule
+with no maintainer engagement. The existing `JuliaExcel.jl` repo stays
+as-is for existing users, with its README updated to point at the new
+package once released.

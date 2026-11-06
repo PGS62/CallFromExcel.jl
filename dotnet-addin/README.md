@@ -135,10 +135,13 @@ For manual testing from real VBA: see `vba\TestRealAddin.bas`.
 
 ## Suggested next steps
 
-1. Remove the old VBA xlam-based folders (`vba/`, `workbooks/` - the
-   latter also used by `test/runtests.jl`'s own tests, so that needs
-   updating too) once migration guidance is written and the old world
-   is actually retired.
+1. Remove `workbooks/`, `scripts/` (old-world demo/tooling workbooks and
+   the old xlam's manual VBA test runner - `vba/JuliaExcel.xlam/` itself
+   is already gone from this branch) and the rest of `vba/`'s sibling
+   workbooks, once migration guidance is written and the old world is
+   actually retired. As of now, `workbooks/` and `scripts/` only
+   reference each other - nothing in the active build/test pipeline
+   touches either any more, since `test/runtests.jl` no longer does.
 2. README pass: Shortcomings section rewrite, an honest JuliaInXL
    comparison, and a migration guide covering the no-xlam architecture,
    the `JuliaExcel.JuliaXxx(...)` call-site edit pattern, the early-
@@ -159,9 +162,22 @@ For manual testing from real VBA: see `vba\TestRealAddin.bas`.
   `HKCU:\Software\Classes\` rather than shelling out to `RegAsm`.
   `src/comms.jl`'s `installme()` and `deps/build.jl` both now point at
   it instead of the old repo-root `installer/Install.ps1`, which - along
-  with `csharp-prototype/` and `ExcelDNA/` (both only ever used by that
-  old installer/prototype) - has been removed from this branch (still
-  on `master`, for anyone who hasn't upgraded).
+  with `csharp-prototype/`, `ExcelDNA/` and `vba/JuliaExcel.xlam/` (all
+  only ever used by that old installer/prototype/xlam) - has been
+  removed from this branch (still on `master`, for anyone who hasn't
+  upgraded).
+- `test/runtests.jl`'s local VBA testset now runs this folder's own
+  `vba/Run-VbaTests.ps1` suite (the one with real worksheet/XLL-path
+  coverage, see above), not the old xlam's.
+- Excel-DNA was silently registering every public static method of
+  every public static class in the assembly as a worksheet function
+  (its own default, `ExplicitExports="false"`) - not just the intended
+  API, but internal plumbing like `JuliaPort.SetJuliaPort`, directly
+  callable and able to corrupt the add-in's own state from any cell.
+  Fixed with `ExplicitExports="true"` in the `.dna`; the 4 genuinely-
+  intentional diagnostic functions (`JuliaCallDiag.cs`) got
+  `IsHidden = true` instead, keeping them callable but out of the
+  Function Wizard/IntelliSense.
 - IntelliSense (`modRegister.bas`'s old Function-Wizard mechanism) is
   done - `ExcelDna.IntelliSense` is now embedded directly in this add-in
   (see `src/AddIn.cs`), no separate IntelliSense add-in needed.

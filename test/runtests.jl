@@ -389,12 +389,20 @@ end
 
 end
 
-# The VBA-side test suite (modTest.RunTests) needs a live Excel/VBA session (via COM automation),
-# which GitHub Actions doesn't have - so this is skipped in CI (detected via the "CI" environment
-# variable GitHub Actions sets, not the OS: the CI matrix in .github/workflows/Runtests.yml
-# currently runs on windows-latest, so checking Sys.iswindows() alone wouldn't distinguish CI from
-# a local run). Locally, run scripts\Run-VbaTests.ps1, which expects workbooks\JuliaExcel.xlam to
-# already be open in Excel and fails clearly (rather than skipping silently) if it isn't.
+# The VBA-side test suite (modTest.RunTests, in dotnet-addin\vba\TestJuliaExcel.xlsm) exercises
+# both call paths against a real Excel/Julia session (via COM automation): JuliaExcel.JuliaCall/
+# JuliaEval called from VBA code (the ComServer COM class), and =JuliaCall(...)/=JuliaEval(...)
+# called from a genuine worksheet formula (the XLL) - these are separate implementations with
+# their own real bugs found only by testing the worksheet-formula path directly (see that suite's
+# own WsTest_* functions and dotnet-addin\README.md), unlike the old xlam-only world where a bare
+# JuliaCall behaved identically either way. This needs a live Excel session, which GitHub Actions
+# doesn't have - so this is skipped in CI (detected via the "CI" environment variable GitHub
+# Actions sets, not the OS: the CI matrix in .github/workflows/Runtests.yml currently runs on
+# windows-latest, so checking Sys.iswindows() alone wouldn't distinguish CI from a local run).
+# Locally, this also needs the C# add-in already built (dotnet build -c Release in
+# dotnet-addin\JuliaExcel.AddIn) and registered for COM (dotnet-addin\installer\Install.ps1) -
+# dotnet-addin\vba\Run-VbaTests.ps1 itself fails clearly (rather than skipping silently) if either
+# precondition isn't met.
 #
 # Passes "--project=" & pkgdir(JuliaExcel) through to RunTests (and from there to JuliaLaunch), so
 # the Julia process RunTests launches to actually serve the VBA-side tests is always this exact
@@ -402,8 +410,8 @@ end
 # environment, which could silently differ from the code under test here. pkgdir gives the correct
 # folder on any machine, unlike a hard-coded path.
 if get(ENV, "CI", "false") != "true" && Sys.iswindows()
-    @testset "VBA test suite (modTest.RunTests, requires Excel open locally)" begin
-        script = joinpath(@__DIR__, "..", "scripts", "Run-VbaTests.ps1")
+    @testset "VBA test suite (dotnet-addin's modTest.RunTests, requires Excel + the C# add-in built/registered locally)" begin
+        script = joinpath(@__DIR__, "..", "dotnet-addin", "vba", "Run-VbaTests.ps1")
         project_options = "--project=$(pkgdir(JuliaExcel))"
         proc = run(ignorestatus(`powershell -ExecutionPolicy Bypass -File $script -CommandLineOptions $project_options`))
         @test proc.exitcode == 0

@@ -148,6 +148,7 @@ Function RunTests(Optional SilentMode As Boolean = False, Optional CommandLineOp
           AccResult "WsTest_TwoDArray", WsTest_TwoDArray, NumPassed, NumFailed
           AccResult "WsTest_JuliaEvalScalar", WsTest_JuliaEvalScalar, NumPassed, NumFailed
           AccResult "WsTest_EmptyResult", WsTest_EmptyResult, NumPassed, NumFailed
+          AccResult "WsTest_JuliaLaunchArgOrder", WsTest_JuliaLaunchArgOrder, NumPassed, NumFailed
           AccResult "WsTest_JuliaIsRunningAndPID", WsTest_JuliaIsRunningAndPID, NumPassed, NumFailed
           AccResult "WsTest_ErrorString", WsTest_ErrorString, NumPassed, NumFailed
           AccResult "WsTest_SortRoundTrip", WsTest_SortRoundTrip, NumPassed, NumFailed
@@ -1268,6 +1269,34 @@ Function WsTest_EmptyResult() As Boolean
 ErrHandler:
           PrintTwice ReThrow("WsTest_EmptyResult", Err, True)
           WsTest_EmptyResult = False
+End Function
+
+' Regression test: the worksheet JuliaLaunch function's parameter order must exactly match
+' the old VBA worksheet function (modMain.bas): UseLinux, MinimiseWindow, CommandLineOptions,
+' Packages, BashStatements, TimeOut. An earlier version of the C# port's XLL wrapper dropped
+' UseLinux/MinimiseWindow/BashStatements from the signature entirely, silently shifting a
+' formula like =JuliaLaunch(,,"-q") (skipping the first two positional args to set
+' CommandLineOptions third, exactly as old formulas do) onto the wrong parameter (TimeOut),
+' raising "Input string was not in a correct format." That TimeOut-parsing happens in
+' JuliaFunctions.cs's wrapper itself, before JuliaLaunch.Launch() even checks whether Julia
+' is already running - so this is tested with Julia already running (relying on an earlier
+' test having launched it), deliberately avoiding any exit()-then-relaunch timing race
+' (Julia's HTTP server can stop responding slightly before its console window actually
+' closes, which can make a genuine relaunch attempt immediately afterwards flaky - a real
+' but separate concern from the argument-order bug this test targets).
+Function WsTest_JuliaLaunchArgOrder() As Boolean
+          Dim ws As Worksheet
+          Dim Result As String
+          On Error GoTo ErrHandler
+          Set ws = ScratchSheet()
+          ws.Range("A1").Formula2 = "=JuliaLaunch(,,""-q"")"
+          Application.CalculateFullRebuild
+          Result = ws.Range("A1").Text
+          WsTest_JuliaLaunchArgOrder = Left$(Result, 1) <> "#"
+          Exit Function
+ErrHandler:
+          PrintTwice ReThrow("WsTest_JuliaLaunchArgOrder", Err, True)
+          WsTest_JuliaLaunchArgOrder = False
 End Function
 
 ' Cross-path consistency check: JuliaIsRunning/JuliaExcelPID as real worksheet formulas

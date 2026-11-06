@@ -135,25 +135,28 @@ For manual testing from real VBA: see `vba\TestRealAddin.bas`.
 
 ## Suggested next steps
 
-1. A real installer script - needs deciding where it puts the packed
-   `.xll` and the registered `.tlb`.
-2. Remove folders from the repo that are no longer needed (not yet
+1. Remove folders from the repo that are no longer needed (not yet
    decided which - likely candidates: `csharp-prototype/` now that this
    folder supersedes it, and/or the old VBA xlam-based folder once
    migration guidance is written).
-3. README pass: Shortcomings section rewrite, an honest JuliaInXL
+2. README pass: Shortcomings section rewrite, an honest JuliaInXL
    comparison, and a migration guide covering the no-xlam architecture,
    the `JuliaExcel.JuliaXxx(...)` call-site edit pattern, the early-
    binding gotchas (a `params object[]` method like `JuliaCall` can't be
    called early-bound at all - always use late-bound `Dim j As Object`),
    and the `OneBasedArray`/0-based-`Array()`-spreading gotcha.
-4. WSL/Linux Julia launch support, if still wanted.
-5. Planned breaking change (once released under the new package name,
+3. WSL/Linux Julia launch support, if still wanted.
+4. Planned breaking change (once released under the new package name,
    see below): give `JuliaLaunch` a dedicated `project` parameter
    instead of requiring `--project=...` to be embedded in
    `CommandLineOptions`.
 
 **Resolved since the status above was written:**
+- A real installer: `installer/Install.ps1` (in this folder) - installs
+  to `%APPDATA%\Microsoft\AddIns\JuliaExcel` (no admin needed),
+  uninstalls the old xlam if present, no interactive prompts. See its
+  own comments for why it writes COM registration directly to
+  `HKCU:\Software\Classes\` rather than shelling out to `RegAsm`.
 - IntelliSense (`modRegister.bas`'s old Function-Wizard mechanism) is
   done - `ExcelDna.IntelliSense` is now embedded directly in this add-in
   (see `src/AddIn.cs`), no separate IntelliSense add-in needed.

@@ -31,7 +31,7 @@ namespace JuliaExcel.AddIn
     // evidently cheaper) marshaling path than a genuine Excel-DNA XLL function return.
     public static class JuliaCallDiag
     {
-        [ExcelFunction(Description = "Diagnostic: takes a large array argument but returns a trivial result -- isolates Excel-DNA's input-side XLOPER->CLR marshaling cost.")]
+        [ExcelFunction(IsHidden = true, Description = "Diagnostic: takes a large array argument but returns a trivial result -- isolates Excel-DNA's input-side XLOPER->CLR marshaling cost.")]
         public static object JuliaDiagInputOnly(object arg)
         {
             int count = (arg is object[,] a2) ? a2.Length : 1;
@@ -45,13 +45,13 @@ namespace JuliaExcel.AddIn
         // at runtime, not a fixed numeric type declared at compile time. Confirms the
         // ~435ms is substantially inherent to Excel-DNA's own XLOPER-array-walking, not
         // mostly a boxing cost that a more specific type could skip.
-        [ExcelFunction(Description = "Diagnostic: same as JuliaDiagInputOnly but with a double[,] parameter type instead of object -- tests whether a specific numeric type marshals faster than generic object.")]
+        [ExcelFunction(IsHidden = true, Description = "Diagnostic: same as JuliaDiagInputOnly but with a double[,] parameter type instead of object -- tests whether a specific numeric type marshals faster than generic object.")]
         public static object JuliaDiagInputOnlyTyped(double[,] arg)
         {
             return "received " + arg.Length + " elements (typed double[,] parameter)";
         }
 
-        [ExcelFunction(Description = "Diagnostic: takes a trivial argument but returns a large array -- isolates Excel-DNA's output-side CLR->XLOPER marshaling cost.")]
+        [ExcelFunction(IsHidden = true, Description = "Diagnostic: takes a trivial argument but returns a large array -- isolates Excel-DNA's output-side CLR->XLOPER marshaling cost.")]
         public static object JuliaDiagOutputOnly(int n)
         {
             var result = new double[n, 1];
@@ -59,7 +59,7 @@ namespace JuliaExcel.AddIn
             return result;
         }
 
-        [ExcelFunction(Description = "Diagnostic: times JuliaCall's own encode/HTTP/decode phases (excludes Excel-DNA's XLOPER marshaling of the argument/result, which happens outside this function body).")]
+        [ExcelFunction(IsHidden = true, Description = "Diagnostic: times JuliaCall's own encode/HTTP/decode phases (excludes Excel-DNA's XLOPER marshaling of the argument/result, which happens outside this function body).")]
         public static object JuliaCallDiagTimed(string juliaFunction, object arg)
         {
             var sw = Stopwatch.StartNew();

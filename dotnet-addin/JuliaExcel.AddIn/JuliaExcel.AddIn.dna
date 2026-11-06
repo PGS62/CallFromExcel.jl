@@ -1,6 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <DnaLibrary Name="JuliaExcel.AddIn Add-In" RuntimeVersion="v4.0" xmlns="http://schemas.excel-dna.net/addin/2020/07/dnalibrary">
-  <ExternalLibrary Path="JuliaExcel.AddIn.dll" ExplicitExports="false" LoadFromBytes="true" Pack="true" IncludePdb="false" />
+  <!-- ExplicitExports="true" (not Excel-DNA's own default of "false"): without it, EVERY
+       public static method of EVERY public static class in this assembly is registered as a
+       worksheet function automatically, regardless of [ExcelFunction] - found via a user
+       screenshot showing JuliaPort.cs's internal GetJuliaPort/GetJuliaPortOrZero appearing in
+       the formula-bar IntelliSense autocomplete. With this set, only methods actually carrying
+       [ExcelFunction] (JuliaFunctions.cs's public API, JuliaCallDiag.cs's diagnostics) get
+       registered - everything else (FileUtils, Hex, JuliaExeLocation, JuliaHttpClient,
+       JuliaLaunch, JuliaLiteral, JuliaPort, WindowUtils, WireFormatDecode, WireFormatEncode,
+       Placeholder) stays purely internal, as intended. -->
+  <ExternalLibrary Path="JuliaExcel.AddIn.dll" ExplicitExports="true" LoadFromBytes="true" Pack="true" IncludePdb="false" />
 
   <!-- Embeds the IntelliSense display server (see src/AddIn.cs) so formula-bar IntelliSense
        works without a separately installed ExcelDna.IntelliSense*.xll add-in. -->

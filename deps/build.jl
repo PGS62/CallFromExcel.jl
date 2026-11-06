@@ -1,3 +1,9 @@
+# Do not run this file directly in an interactive REPL (e.g. VS Code's "Julia: Execute File in
+# REPL") - it calls exit() on failure, which is correct for the short-lived, disposable Julia
+# process Pkg.build runs this in, but kills your actual REPL session stone dead if run there
+# directly. To install/re-install manually, use `using JuliaExcel; JuliaExcel.installme()`
+# instead (or just `Pkg.build("JuliaExcel")`, which runs this file the way it's meant to be run).
+#
 # Launches dotnet-addin/installer/Install.ps1 to register the C#/Excel-DNA JuliaExcel add-in,
 # so that `Pkg.add("JuliaExcel")` alone is enough to install it - no separate manual call to
 # JuliaExcel.installme() needed. Pkg runs this script automatically right after add/build.

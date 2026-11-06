@@ -62,8 +62,8 @@ wired up, but shouldn't need new logic, just `ExcelArgument`/
 
 ## Performance: a real, nuanced finding worth reading before quoting a number
 
-Earlier in this project (see `csharp-prototype/README.md`), a hand-wired
-COM-method demo (`SortViaJulia`) measured `JuliaCall("sort",
+Earlier in this project, a hand-wired COM-method demo (`SortViaJulia`, in a
+`csharp-prototype` folder now removed - see git history) measured `JuliaCall("sort",
 RANDARRAY(1000000))`-equivalent at ~330-450ms, beating Excel's native
 `SORT()` (~667ms). **That comparison does not hold for the real, fully-wired
 XLL-based `JuliaCall`.**
@@ -135,10 +135,10 @@ For manual testing from real VBA: see `vba\TestRealAddin.bas`.
 
 ## Suggested next steps
 
-1. Remove folders from the repo that are no longer needed (not yet
-   decided which - likely candidates: `csharp-prototype/` now that this
-   folder supersedes it, and/or the old VBA xlam-based folder once
-   migration guidance is written).
+1. Remove the old VBA xlam-based folders (`vba/`, `workbooks/` - the
+   latter also used by `test/runtests.jl`'s own tests, so that needs
+   updating too) once migration guidance is written and the old world
+   is actually retired.
 2. README pass: Shortcomings section rewrite, an honest JuliaInXL
    comparison, and a migration guide covering the no-xlam architecture,
    the `JuliaExcel.JuliaXxx(...)` call-site edit pattern, the early-
@@ -157,6 +157,11 @@ For manual testing from real VBA: see `vba\TestRealAddin.bas`.
   uninstalls the old xlam if present, no interactive prompts. See its
   own comments for why it writes COM registration directly to
   `HKCU:\Software\Classes\` rather than shelling out to `RegAsm`.
+  `src/comms.jl`'s `installme()` and `deps/build.jl` both now point at
+  it instead of the old repo-root `installer/Install.ps1`, which - along
+  with `csharp-prototype/` and `ExcelDNA/` (both only ever used by that
+  old installer/prototype) - has been removed from this branch (still
+  on `master`, for anyone who hasn't upgraded).
 - IntelliSense (`modRegister.bas`'s old Function-Wizard mechanism) is
   done - `ExcelDna.IntelliSense` is now embedded directly in this add-in
   (see `src/AddIn.cs`), no separate IntelliSense add-in needed.

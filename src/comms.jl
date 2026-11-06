@@ -178,12 +178,16 @@ end
 function installme()
     Sys.iswindows() || throw("JuliaExcel.installme (which installs a Microsoft Excel \
         addin) can only be run from Julia on Windows")
-    installscript = normpath(joinpath(@__DIR__, "..", "installer", "Install.ps1"))
+    installscript = normpath(joinpath(@__DIR__, "..", "dotnet-addin", "installer", "Install.ps1"))
     exefile = "C:/Windows/System32/WindowsPowerShell/v1.0/powershell.exe"
     isfile(exefile) || throw("Cannot find PowerShell at '$exefile'")
     isfile(installscript) || throw("Cannot find install script at '$installscript'")
-    run(`$exefile -ExecutionPolicy Bypass -NoProfile -File $installscript`, wait=false)
-    println("Installer script has been launched, please respond to the dialogs there.")
+    # Blocking (unlike the old xlam-era installer this replaced, which ran non-blocking so an
+    # interactive REPL session stayed responsive while the user clicked through its dialogs) -
+    # the new installer is non-interactive and fast, so there's nothing to stay responsive for,
+    # and blocking lets any failure (e.g. the add-in not built yet, or Excel still running)
+    # surface immediately here rather than silently in a detached background process.
+    run(`$exefile -ExecutionPolicy Bypass -NoProfile -File $installscript`)
     nothing
 end
 

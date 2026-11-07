@@ -8,7 +8,7 @@ Compatible with Excel's [dynamic array formulas](https://support.microsoft.com/e
 
 Supports 64-bit Excel for Windows (not Mac, not 32-bit Excel). Julia can be run under Windows or Linux (via [WSL](https://docs.microsoft.com/en-us/windows/wsl/about)).
 
-CallFromExcel is the successor to [JuliaExcel](https://github.com/PGS62/JuliaExcel.jl), rewritten in C# for speed. Worksheet formulas written for JuliaExcel work unchanged.
+CallFromExcel is the successor to [JuliaExcel](https://github.com/PGS62/JuliaExcel.jl), rewritten in C# for speed. Its worksheet functions have the same names as JuliaExcel's, but in workbooks saved with JuliaExcel, Excel records the path of JuliaExcel's add-in in each formula - e.g. `='C:\Users\Public\JuliaExcel\JuliaExcel.xlam'!JuliaLaunch()` - so that path must be removed. Use Find and Replace (Ctrl+H), with "Within" set to Workbook and "Look in" set to Formulas, to replace the exact text - here `'C:\Users\Public\JuliaExcel\JuliaExcel.xlam'!` (JuliaExcel's default install location) - with nothing.
 
 ## Contents
 [Demo](#demo)  

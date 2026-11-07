@@ -78,11 +78,11 @@ end
     @test CallFromExcel.encode_for_xl(DateTime("2021-11-8T12:00:00")) == "G40E5BB9000000000"
     @test CallFromExcel.encode_for_xl(Int64) == "£Int64"
     @test CallFromExcel.encode_for_xl(v"1.2.3") == "£1.2.3"
-    @test CallFromExcel.encode_for_xl((1, 2)) == "*1,2;2,2,;^1^2"
-    @test CallFromExcel.encode_for_xl([1, 2, 3]) == "*1,3;2,2,2,;^1^2^3"
+    @test CallFromExcel.encode_for_xl((1, 2)) == "L1,2;00000000000000010000000000000002"
+    @test CallFromExcel.encode_for_xl([1, 2, 3]) == "L1,3;000000000000000100000000000000020000000000000003"
     @test CallFromExcel.encode_for_xl(Any[1, 2, 3.0, π]) == "*1,4;2,2,17,17,;^1^2#4008000000000000#400921FB54442D18"
     @test CallFromExcel.encode_for_xl([1, true, "x"]) == "*1,3;2,1,2,;^1T£x"
-    @test CallFromExcel.encode_for_xl([1, [2, 3]]) == "*1,2;2,14,;^1*1,2;2,2,;^2^3"
+    @test CallFromExcel.encode_for_xl([1, [2, 3]]) == "*1,2;2,37,;^1L1,2;00000000000000020000000000000003"
     # Dict key order isn't guaranteed by the language, and can differ between Julia versions/hash
     # seeds - accept either encoding order rather than hardcoding one.
     @test CallFromExcel.encode_for_xl(Dict("a" => 1, "b" => 2)) in
@@ -222,6 +222,15 @@ end
         manual3d = "V3,2,3,4;" * join(be_hex.(vals3d))
         @test CallFromExcel.decode_from_xl(manual3d) == reshape(vals3d, 2, 3, 4)
     end
+
+    # "L" format - Int64 arrays, the Int64 counterpart of "V".
+    @test CallFromExcel.encode_for_xl([1, -1]) == "L1,2;0000000000000001ffffffffffffffff"
+    @test round_trip([1, 2, 3])
+    @test round_trip([typemin(Int64) -1; 0 typemax(Int64)])
+    @test round_trip(collect(reshape(1:24, 2, 3, 4)))
+    @test startswith(CallFromExcel.encode_for_xl((1:3)'), "L2,1,3;")  # an AbstractArray with eltype Int64
+    @test startswith(CallFromExcel.encode_for_xl(Int64[]), "*")      # empty arrays use the general format
+    @test startswith(CallFromExcel.encode_for_xl(Int32[1, 2]), "*")  # only Int64 gets "L"
 
     # "R" format - compact encoding for Ranges (UnitRange/StepRange/StepRangeLen/LinRange etc.):
     # encodes only first/step/length, not every element, so wire size is O(1) regardless of the

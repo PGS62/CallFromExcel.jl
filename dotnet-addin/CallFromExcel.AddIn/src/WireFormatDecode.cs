@@ -26,12 +26,12 @@ namespace CallFromExcel.AddIn
     //     "RF,<n>;<hex first><hex step>" (float), reconstructed via arithmetic
     public static class WireFormatDecode
     {
-        public static object Decode(string wire, bool allowNesting = true, int stringLengthLimit = 0, bool vectorToColumn = false)
+        public static object Decode(string wire, bool allowNesting = true, int stringLengthLimit = 0, bool vectorToColumn = false, bool forWorksheet = false)
         {
-            return Decode(wire, allowNesting, stringLengthLimit, vectorToColumn, 0);
+            return Decode(wire, allowNesting, stringLengthLimit, vectorToColumn, forWorksheet, 0);
         }
 
-        private static object Decode(string wire, bool allowNesting, int stringLengthLimit, bool vectorToColumn, int depth)
+        private static object Decode(string wire, bool allowNesting, int stringLengthLimit, bool vectorToColumn, bool forWorksheet, int depth)
         {
             depth++;
             char tag = wire[0];
@@ -66,15 +66,16 @@ namespace CallFromExcel.AddIn
                 case 'C': return decimal.Parse(wire.Substring(1), CultureInfo.InvariantCulture);
                 case '@': return decimal.Parse(wire.Substring(1), CultureInfo.InvariantCulture);
                 case '!': return new ExcelErrorValue(int.Parse(wire.Substring(1), CultureInfo.InvariantCulture));
-                case '*': return DecodeArray(wire, allowNesting, stringLengthLimit, vectorToColumn, depth);
-                case 'H': return DecodeDictionary(wire, allowNesting, stringLengthLimit, vectorToColumn, depth);
+                case '*': return DecodeArray(wire, allowNesting, stringLengthLimit, vectorToColumn, forWorksheet, depth);
+                case 'H': return DecodeDictionary(wire, allowNesting, stringLengthLimit, vectorToColumn, forWorksheet, depth);
                 case 'V': return DecodeV(wire, vectorToColumn);
-                case 'R': return DecodeRange(wire, vectorToColumn);
+                case 'L': return DecodeL(wire, allowNesting, vectorToColumn, forWorksheet);
+                case 'R': return DecodeRange(wire, vectorToColumn, forWorksheet);
                 default: throw new FormatException("Character '" + tag + "' is not recognised as a type identifier");
             }
         }
 
-        private static object DecodeArray(string wire, bool allowNesting, int stringLengthLimit, bool vectorToColumn, int depth)
+        private static object DecodeArray(string wire, bool allowNesting, int stringLengthLimit, bool vectorToColumn, bool forWorksheet, int depth)
         {
             if (depth > 1 && !allowNesting) throw new InvalidOperationException("Excel cannot display arrays containing arrays");
 
@@ -99,7 +100,7 @@ namespace CallFromExcel.AddIn
                 {
                     int comma = wire.IndexOf(',', m);
                     int len = ParseIntFast(wire, m, comma);
-                    flat[i] = Decode(wire.Substring(pos, len), allowNesting, stringLengthLimit, vectorToColumn, depth);
+                    flat[i] = Decode(wire.Substring(pos, len), allowNesting, stringLengthLimit, vectorToColumn, forWorksheet, depth);
                     pos += len;
                     m = comma + 1;
                 }
@@ -126,7 +127,7 @@ namespace CallFromExcel.AddIn
                     {
                         int comma = wire.IndexOf(',', m);
                         int len = ParseIntFast(wire, m, comma);
-                        result[i, j] = Decode(wire.Substring(pos, len), allowNesting, stringLengthLimit, vectorToColumn, depth);
+                        result[i, j] = Decode(wire.Substring(pos, len), allowNesting, stringLengthLimit, vectorToColumn, forWorksheet, depth);
                         pos += len;
                         m = comma + 1;
                     }
@@ -152,7 +153,7 @@ namespace CallFromExcel.AddIn
             {
                 int comma = wire.IndexOf(',', mPos);
                 int len = ParseIntFast(wire, mPos, comma);
-                object val = Decode(wire.Substring(payloadPos, len), allowNesting, stringLengthLimit, vectorToColumn, depth);
+                object val = Decode(wire.Substring(payloadPos, len), allowNesting, stringLengthLimit, vectorToColumn, forWorksheet, depth);
                 nd.SetValue(val, idx);
                 payloadPos += len;
                 mPos = comma + 1;
@@ -161,7 +162,7 @@ namespace CallFromExcel.AddIn
             return nd;
         }
 
-        private static object DecodeDictionary(string wire, bool allowNesting, int stringLengthLimit, bool vectorToColumn, int depth)
+        private static object DecodeDictionary(string wire, bool allowNesting, int stringLengthLimit, bool vectorToColumn, bool forWorksheet, int depth)
         {
             if (!allowNesting) throw new InvalidOperationException("Excel cannot display variables of type Dictionary");
             int p1 = wire.IndexOf(';');
@@ -178,9 +179,9 @@ namespace CallFromExcel.AddIn
                 int comma2 = wire.IndexOf(',', comma1 + 1);
                 int valueLen = ParseIntFast(wire, comma1 + 1, comma2);
 
-                object key = Decode(wire.Substring(pos, keyLen), allowNesting, stringLengthLimit, vectorToColumn, depth);
+                object key = Decode(wire.Substring(pos, keyLen), allowNesting, stringLengthLimit, vectorToColumn, forWorksheet, depth);
                 pos += keyLen;
-                object val = Decode(wire.Substring(pos, valueLen), allowNesting, stringLengthLimit, vectorToColumn, depth);
+                object val = Decode(wire.Substring(pos, valueLen), allowNesting, stringLengthLimit, vectorToColumn, forWorksheet, depth);
                 pos += valueLen;
                 m = comma2 + 1;
 
@@ -258,7 +259,73 @@ namespace CallFromExcel.AddIn
             return nd;
         }
 
-        private static object DecodeRange(string wire, bool vectorToColumn)
+        // "L<rank>,<dims>;<hex>": Int64 array, 16 hex chars per element. For a worksheet the
+        // values become a double array, since Excel holds every number as a Double anyway and
+        // Excel-DNA converts a double array to Excel's format much faster than boxed values.
+        // For VBA they stay Int64 (LongLong), boxed in a Variant array, exactly as the general
+        // "*" format has always delivered an array of Int64.
+        private static object DecodeL(string wire, bool allowNesting, bool vectorToColumn, bool forWorksheet)
+        {
+            int p1 = wire.IndexOf(';');
+            if (wire[2] != ',') throw new FormatException("Cannot unserialise 'L'-format arrays with more than 9 dimensions");
+            int rank = wire[1] - '0';
+            if (rank > 2 && !allowNesting) throw new InvalidOperationException("Excel cannot display arrays with more than 2 dimensions");
+            int[] dims = ParseDims(wire, 3, p1, rank);
+            int total = 1;
+            foreach (int d in dims)
+            {
+                if (d <= 0) throw new InvalidOperationException("Cannot create array of size zero");
+                total *= d;
+            }
+            if (wire.Length - (p1 + 1) != total * 16)
+                throw new FormatException("'L'-format string has the wrong number of hex characters for its dimensions");
+            long[] flat = Hex.ReadBulkHexInt64(wire, p1 + 1, total);
+
+            if (rank == 1 && !vectorToColumn)
+            {
+                if (forWorksheet)
+                {
+                    var doubles = new double[total];
+                    for (int i = 0; i < total; i++) doubles[i] = flat[i];
+                    return doubles;
+                }
+                var boxed = new object[total];
+                for (int i = 0; i < total; i++) boxed[i] = flat[i];
+                return boxed;
+            }
+
+            if (rank <= 2)
+            {
+                int nr = dims[0];
+                int nc = rank == 1 ? 1 : dims[1];
+                if (forWorksheet)
+                {
+                    var doubles = new double[nr, nc];
+                    int k = 0;
+                    for (int j = 0; j < nc; j++)
+                        for (int i = 0; i < nr; i++)
+                            doubles[i, j] = flat[k++];
+                    return doubles;
+                }
+                var boxed = new object[nr, nc];
+                int m = 0;
+                for (int j = 0; j < nc; j++)
+                    for (int i = 0; i < nr; i++)
+                        boxed[i, j] = flat[m++];
+                return boxed;
+            }
+
+            Array nd = Array.CreateInstance(typeof(object), dims);
+            var idx = new int[rank];
+            for (int count = 0; count < total; count++)
+            {
+                nd.SetValue(flat[count], idx);
+                AdvanceIndex(idx, dims, rank);
+            }
+            return nd;
+        }
+
+        private static object DecodeRange(string wire, bool vectorToColumn, bool forWorksheet)
         {
             int p1 = wire.IndexOf(';');
             int n;
@@ -282,6 +349,21 @@ namespace CallFromExcel.AddIn
                 throw new FormatException("Character '" + wire[1] + "' is not a recognised 'R'-format sub-type (expected 'I' or 'F')");
             }
 
+            if (forWorksheet)
+            {
+                // A worksheet holds every number as a Double, so build a double array directly,
+                // which Excel-DNA converts to Excel's format much faster than boxed values.
+                if (!vectorToColumn)
+                {
+                    var doubles = new double[n];
+                    for (int i = 0; i < n; i++) doubles[i] = first + i * step;
+                    return doubles;
+                }
+                var doubleColumn = new double[n, 1];
+                for (int i = 0; i < n; i++) doubleColumn[i, 0] = first + i * step;
+                return doubleColumn;
+            }
+
             var flat = new object[n];
             for (int i = 0; i < n; i++)
             {
@@ -298,10 +380,9 @@ namespace CallFromExcel.AddIn
         // and JuliaDictionary entries), applying `mapper` to every leaf value - a leaf being
         // anything that isn't itself one of those two container shapes. `mapper` should
         // return its argument unchanged for any value it doesn't want to transform. A
-        // genuinely-typed double[]/double[,]/... (the "V" fast path) is never walked into
-        // (its element type isn't `object`), which is always correct: neither of this
-        // method's two current uses (MapErrorValues, JuliaFunctions.cs's null->ExcelEmpty
-        // mapping) can ever apply to a plain Double.
+        // genuinely-typed double[]/double[,]/... ("V", or "L"/"R" decoded for a worksheet) is
+        // never walked into (its element type isn't `object`), which is always correct: the
+        // mappers used (error values, and nothing/missing -> empty) never apply to a number.
         public static object MapLeaves(object value, Func<object, object> mapper)
         {
             var dict = value as JuliaDictionary;
@@ -313,6 +394,36 @@ namespace CallFromExcel.AddIn
                     mapped.Add(MapLeaves(kv.Key, mapper), MapLeaves(kv.Value, mapper));
                 }
                 return mapped;
+            }
+
+            // Direct indexing for the two shapes the decoder produces, rather than the
+            // GetValue/SetValue path below, which is several times slower per element.
+            var vector = value as object[];
+            if (vector != null)
+            {
+                for (int i = 0; i < vector.Length; i++)
+                {
+                    object element = vector[i];
+                    object mappedElement = MapLeaves(element, mapper);
+                    if (!ReferenceEquals(mappedElement, element)) vector[i] = mappedElement;
+                }
+                return vector;
+            }
+            var matrix = value as object[,];
+            if (matrix != null && matrix.GetLowerBound(0) == 0 && matrix.GetLowerBound(1) == 0)
+            {
+                int nr = matrix.GetLength(0);
+                int nc = matrix.GetLength(1);
+                for (int i = 0; i < nr; i++)
+                {
+                    for (int j = 0; j < nc; j++)
+                    {
+                        object element = matrix[i, j];
+                        object mappedElement = MapLeaves(element, mapper);
+                        if (!ReferenceEquals(mappedElement, element)) matrix[i, j] = mappedElement;
+                    }
+                }
+                return matrix;
             }
 
             var arr = value as Array;

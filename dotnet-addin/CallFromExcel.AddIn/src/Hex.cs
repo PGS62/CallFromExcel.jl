@@ -45,6 +45,11 @@ namespace CallFromExcel.AddIn
 
         public static double HexToDouble(string s, int start)
         {
+            return BitConverter.Int64BitsToDouble(HexToInt64(s, start));
+        }
+
+        public static long HexToInt64(string s, int start)
+        {
             long bits = 0;
             for (int b = 0; b < 8; b++)
             {
@@ -52,7 +57,7 @@ namespace CallFromExcel.AddIn
                 char lo = s[start + b * 2 + 1];
                 bits = (bits << 8) | ByteOfHexPair[(hi << 7) | lo];
             }
-            return BitConverter.Int64BitsToDouble(bits);
+            return bits;
         }
 
         public static string SingleToHex(float x)
@@ -99,6 +104,17 @@ namespace CallFromExcel.AddIn
             for (int i = 0; i < n; i++)
             {
                 result[i] = HexToDouble(wire, start + i * 16);
+            }
+            return result;
+        }
+
+        // The "L"-format (Int64) counterpart of ReadBulkHex.
+        public static long[] ReadBulkHexInt64(string wire, int start, int n)
+        {
+            var result = new long[n];
+            for (int i = 0; i < n; i++)
+            {
+                result[i] = HexToInt64(wire, start + i * 16);
             }
             return result;
         }

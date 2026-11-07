@@ -81,6 +81,7 @@ namespace CallFromExcel.AddIn.TestHarness
             TestVFormatLargeArray();
             TestDictionaryRoundTrip();
             TestRangeDecode();
+            TestLFormatDecode();
 
             Console.WriteLine();
             Console.WriteLine(_pass + " passed, " + _fail + " failed.");
@@ -200,6 +201,36 @@ namespace CallFromExcel.AddIn.TestHarness
             object rfDecoded = WireFormatDecode.Decode("RF,4;" + first + step); // 1.0, 1.5, 2.0, 2.5
             var rfArr = (object[])rfDecoded;
             CheckTrue("RF range decode", rfArr.Length == 4 && Equals(rfArr[0], 1.0) && Equals(rfArr[3], 2.5));
+
+            var riSheet = WireFormatDecode.Decode("RI,5,10,2;", allowNesting: false, vectorToColumn: true, forWorksheet: true) as double[,];
+            CheckTrue("RI range decode for a worksheet is a double column", riSheet != null && riSheet.GetLength(0) == 5 && riSheet[0, 0] == 10 && riSheet[4, 0] == 18);
+        }
+
+        // "L" format: Int64 arrays, 16 hex chars per element (Julia's encode_for_xl(::Array{Int64})).
+        private static void TestLFormatDecode()
+        {
+            string vector = "L1,3;" + Hex64(1) + Hex64(-1) + Hex64(long.MaxValue);
+            var forVba = WireFormatDecode.Decode(vector, allowNesting: true) as object[];
+            CheckTrue("L vector for VBA is boxed Int64", forVba != null && Equals(forVba[0], 1L) && Equals(forVba[1], -1L) && Equals(forVba[2], long.MaxValue));
+
+            var forSheet = WireFormatDecode.Decode(vector, allowNesting: false, vectorToColumn: true, forWorksheet: true) as double[,];
+            CheckTrue("L vector for a worksheet is a double column", forSheet != null && forSheet.GetLength(0) == 3 && forSheet.GetLength(1) == 1 && forSheet[1, 0] == -1.0);
+
+            // Column-major: [1 3; 2 4]
+            string matrix = "L2,2,2;" + Hex64(1) + Hex64(2) + Hex64(3) + Hex64(4);
+            var m = WireFormatDecode.Decode(matrix, allowNesting: false, forWorksheet: true) as double[,];
+            CheckTrue("L matrix for a worksheet", m != null && m[0, 0] == 1 && m[1, 0] == 2 && m[0, 1] == 3 && m[1, 1] == 4);
+            var mVba = WireFormatDecode.Decode(matrix, allowNesting: true) as object[,];
+            CheckTrue("L matrix for VBA", mVba != null && Equals(mVba[0, 1], 3L));
+
+            bool threw = false;
+            try { WireFormatDecode.Decode("L1,3;" + Hex64(1), allowNesting: true); } catch (FormatException) { threw = true; }
+            CheckTrue("L with too few hex characters is rejected", threw);
+        }
+
+        private static string Hex64(long v)
+        {
+            return v.ToString("X16", System.Globalization.CultureInfo.InvariantCulture);
         }
 
         private static void RoundTrip(string label, object value)

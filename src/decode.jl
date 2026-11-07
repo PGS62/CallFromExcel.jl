@@ -71,6 +71,8 @@ function decode_from_xl(s::String)
         decode_xl_dict(s)
     elseif c == 'V'                #Array of Doubles (compact) -> Array{Float64,N}
         decode_xl_array_v(s)
+    elseif c == 'L'                #Array of LongLongs (compact) -> Array{Int64,N}
+        decode_xl_array_l(s)
     else
         error("decode_from_xl: unknown type indicator $(repr(c)) in '$(first(s, 50))'")
     end
@@ -176,6 +178,24 @@ function decode_xl_array_v(s::String)
     raw = hex2bytes(s[p1+1:end])
     vals = reinterpret(Float64, bswap.(reinterpret(UInt64, raw)))
     rank == 1 ? collect(vals) : reshape(collect(vals), dims)
+end
+
+"""
+    decode_xl_array_l(s::String)
+
+Decode an "L"-format array-of-Int64 string - the Int64 counterpart of "V", produced by
+`encode_for_xl(x::Array{Int64,N})`. Only Julia ever produces this format, so this exists so
+that `decode_from_xl` remains the inverse of `encode_for_xl`.
+"""
+function decode_xl_array_l(s::String)
+    # Format: L<rank>,<d1>[,<d2>];<hex, no delimiters, 16 hex chars per Int64>
+    p1 = findfirst(isequal(';'), s)::Int
+    parts = split(s[2:p1-1], ',')
+    rank = parse(Int, parts[1])
+    dims = tuple(parse.(Int, parts[2:end])...)
+
+    vals = bswap.(reinterpret(Int64, hex2bytes(s[p1+1:end])))
+    rank == 1 ? vals : reshape(vals, dims)
 end
 
 """

@@ -101,6 +101,7 @@ Function RunTests(Optional SilentMode As Boolean = False, Optional CommandLineOp
           AccResult "TestDictionaryOfArrays", TestDictionaryOfArrays, NumPassed, NumFailed
           AccResult "TestDictionaryOfTypes", TestDictionaryOfTypes, NumPassed, NumFailed
           AccResult "TestDictionaryIsScriptingDictionary", TestDictionaryIsScriptingDictionary, NumPassed, NumFailed
+          AccResult "TestIntegerArrayIsLongLong", TestIntegerArrayIsLongLong, NumPassed, NumFailed
           AccResult "TestOneDArraysDisplayAsOneColumnOnSheet", TestOneDArraysDisplayAsOneColumnOnSheet, NumPassed, NumFailed
           AccResult "TestElType", TestElType, NumPassed, NumFailed
           AccResult "TestBroadcasting", TestBroadcasting, NumPassed, NumFailed
@@ -134,6 +135,7 @@ Function RunTests(Optional SilentMode As Boolean = False, Optional CommandLineOp
           AccResult "WsTest_String", WsTest_String, NumPassed, NumFailed
           AccResult "WsTest_OneDArrayBecomesColumn", WsTest_OneDArrayBecomesColumn, NumPassed, NumFailed
           AccResult "WsTest_TwoDArray", WsTest_TwoDArray, NumPassed, NumFailed
+          AccResult "WsTest_IntegerArrays", WsTest_IntegerArrays, NumPassed, NumFailed
           AccResult "WsTest_JuliaEvalScalar", WsTest_JuliaEvalScalar, NumPassed, NumFailed
           AccResult "WsTest_EmptyResult", WsTest_EmptyResult, NumPassed, NumFailed
           AccResult "WsTest_JuliaLaunchArgOrder", WsTest_JuliaLaunchArgOrder, NumPassed, NumFailed
@@ -566,6 +568,20 @@ Function TestDictionaryOfTypes()
 ErrHandler:
           PrintTwice ReThrow("TestDictionaryOfTypes", Err, True)
           TestDictionaryOfTypes = False
+End Function
+
+' Int64 arrays travel in the compact "L" format, but VBA must still receive LongLong elements, as
+' it did with JuliaExcel.
+Function TestIntegerArrayIsLongLong() As Boolean
+          Dim y As Variant
+          On Error GoTo ErrHandler
+          y = CallFromExcel.JuliaEvalVBA("[1, -2, typemax(Int64)]")
+          TestIntegerArrayIsLongLong = LBound(y) = 1 And UBound(y) = 3 And VarType(y(1)) = vbLongLong And _
+              y(2) = -2 And y(3) = 9223372036854775807^
+          Exit Function
+ErrHandler:
+          PrintTwice ReThrow("TestIntegerArrayIsLongLong", Err, True)
+          TestIntegerArrayIsLongLong = False
 End Function
 
 ' Dictionaries returned to VBA must be real Scripting.Dictionary objects, as they were with
@@ -1249,6 +1265,22 @@ Function WsTest_TwoDArray() As Boolean
 ErrHandler:
           PrintTwice ReThrow("WsTest_TwoDArray", Err, True)
           WsTest_TwoDArray = False
+End Function
+
+' Int64 arrays travel in the compact "L" format, decoded to Doubles for a worksheet.
+Function WsTest_IntegerArrays() As Boolean
+          Dim ws As Worksheet
+          On Error GoTo ErrHandler
+          Set ws = ScratchSheet()
+          ws.Range("A1").Formula2 = "=JuliaEval(""[10, -20, 30]"")"
+          ws.Range("C1").Formula2 = "=JuliaEval(""[1 2; 3 4]"")"
+          WsTest_IntegerArrays = ws.Range("A1").Value2 = 10 And ws.Range("A2").Value2 = -20 And _
+              ws.Range("A3").Value2 = 30 And IsEmpty(ws.Range("A4").Value2) And IsEmpty(ws.Range("B1").Value2) And _
+              ws.Range("C1").Value2 = 1 And ws.Range("D1").Value2 = 2 And ws.Range("C2").Value2 = 3 And ws.Range("D2").Value2 = 4
+          Exit Function
+ErrHandler:
+          PrintTwice ReThrow("WsTest_IntegerArrays", Err, True)
+          WsTest_IntegerArrays = False
 End Function
 
 Function WsTest_JuliaEvalScalar() As Boolean

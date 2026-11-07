@@ -127,14 +127,20 @@ namespace CallFromExcel.AddIn
 
                 string payload = BuildCallPayload(juliaFunction, args);
                 string responseWire = JuliaHttpClient.Post(payload, endpoint);
-                object result = WireFormatDecode.Decode(responseWire, allowNesting: false, stringLengthLimit: StringLengthLimit(), vectorToColumn: true);
-                result = WireFormatDecode.MapErrorValues(result, MapToExcelDnaError);
-                return WireFormatDecode.MapLeaves(result, v => v ?? ExcelEmpty.Value);
+                return DecodeForWorksheet(responseWire);
             }
             catch (Exception ex)
             {
                 return "#" + ex.Message;
             }
+        }
+
+        // One pass over the result: Julia's Excel errors become worksheet errors, and
+        // nothing/missing an empty cell.
+        private static object DecodeForWorksheet(string responseWire)
+        {
+            object result = WireFormatDecode.Decode(responseWire, allowNesting: false, stringLengthLimit: StringLengthLimit(), vectorToColumn: true, forWorksheet: true);
+            return WireFormatDecode.MapLeaves(result, v => v is ExcelErrorValue ev ? MapToExcelDnaError(ev.Code) : v ?? ExcelEmpty.Value);
         }
 
         [ExcelFunction(Description = "Evaluate a Julia expression and return the result to an Excel worksheet.", IsThreadSafe = true)]
@@ -150,9 +156,7 @@ namespace CallFromExcel.AddIn
 
                 string expression = ConcatenateExpressions(juliaExpression);
                 string responseWire = JuliaHttpClient.Post(expression, "/eval");
-                object result = WireFormatDecode.Decode(responseWire, allowNesting: false, stringLengthLimit: StringLengthLimit(), vectorToColumn: true);
-                result = WireFormatDecode.MapErrorValues(result, MapToExcelDnaError);
-                return WireFormatDecode.MapLeaves(result, v => v ?? ExcelEmpty.Value);
+                return DecodeForWorksheet(responseWire);
             }
             catch (Exception ex)
             {

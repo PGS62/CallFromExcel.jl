@@ -1,12 +1,14 @@
-# JuliaExcel - call Julia from Excel
+# CallFromExcel - call Julia from Excel
 
 Call [Julia](https://julialang.org/) from Microsoft Excel worksheets and from VBA.  
 
-JuliaExcel is an Excel add-in that lets you use any Julia function in a worksheet formula. For example, `=JuliaEval("using LinearAlgebra")` loads one of Julia's standard libraries, then `=JuliaCall("eigvals", A1:J10)` passes a range to Julia as a matrix and returns its eigenvalues to the worksheet (as complex numbers, if the matrix isn't symmetric) - something Excel has no built-in function for. Keep your front end in Excel, and do the heavy computation in Julia. Installation doesn't need admin rights.
+CallFromExcel is an Excel add-in that lets you use any Julia function in a worksheet formula. For example, `=JuliaEval("using LinearAlgebra")` loads one of Julia's standard libraries, then `=JuliaCall("eigvals", A1:J10)` passes a range to Julia as a matrix and returns its eigenvalues to the worksheet (as complex numbers, if the matrix isn't symmetric) - something Excel has no built-in function for. Keep your front end in Excel, and do the heavy computation in Julia. Installation doesn't need admin rights.
 
 Compatible with Excel's [dynamic array formulas](https://support.microsoft.com/en-us/office/dynamic-array-formulas-and-spilled-array-behavior-205c6b06-03ba-4151-89a1-87a7eb36e531).
 
 Supports 64-bit Excel for Windows (not Mac, not 32-bit Excel). Julia can be run under Windows or Linux (via [WSL](https://docs.microsoft.com/en-us/windows/wsl/about)).
+
+CallFromExcel is the successor to [JuliaExcel](https://github.com/PGS62/JuliaExcel.jl), rewritten in C# for speed. Worksheet formulas written for JuliaExcel work unchanged.
 
 ## Contents
 [Demo](#demo)  
@@ -21,13 +23,13 @@ Supports 64-bit Excel for Windows (not Mac, not 32-bit Excel). Julia can be run 
 [Alternatives](#alternatives)  
 [Compatibility](#compatibility)  
 [Viewing the code](#viewing-the-code)  
-[How JuliaExcel works](#how-juliaexcel-works)  
+[How CallFromExcel works](#how-callfromexcel-works)  
 [Shortcomings](#shortcomings)  
 
 ## Demo
-Here's a quick demonstration of JuliaExcel's functions in action.
+Here's a quick demonstration of CallFromExcel's functions in action.
  * See how the Julia session on the left responds to the action in Excel on the right, once `display_results(true)` has been called (the formula at B6 does this).
- * The annotations in brown text ("Formula at...") are to make what's happening in the demo clearer. They won't appear when you try JuliaExcel for yourself!
+ * The annotations in brown text ("Formula at...") are to make what's happening in the demo clearer. They won't appear when you try CallFromExcel for yourself!
  * Replay the GIF by refreshing your browser (F5).
 
 <a href="#no-click">
@@ -42,29 +44,29 @@ Installation does not require admin rights on the PC.
 <!-- CHANGING THE INSTRUCTIONS BELOW? DON'T FORGET TO ALSO CHANGE THE "Installation (Linux)" SECTION -->
    ```
    using Pkg
-   Pkg.add(url="https://github.com/PGS62/JuliaExcel.jl", rev="dev_csharp_port")
-   Pkg.build("JuliaExcel")
+   Pkg.add(url="https://github.com/PGS62/CallFromExcel.jl")
+   Pkg.build("CallFromExcel")
    ```
    (paste into the REPL is via mouse right-click).<br/>
-   `Pkg.build` is what installs the Excel add-in. `Pkg.add` usually does that too, but only the first time a given version of JuliaExcel is added to your PC - so if you've since removed the add-in from Excel, `Pkg.add` alone won't put it back.
- * Launch Excel. Check that the JuliaExcel functions are available by typing `=Julia` into a worksheet cell and checking that the auto-complete offers `JuliaCall`, `JuliaEval`, `JuliaInclude` etc.
- * Functions missing in Excel, or need to reinstall? Close Excel and run `Pkg.build("JuliaExcel")` again.
+   `Pkg.build` is what installs the Excel add-in. `Pkg.add` usually does that too, but only the first time a given version of CallFromExcel is added to your PC - so if you've since removed the add-in from Excel, `Pkg.add` alone won't put it back.
+ * Launch Excel. Check that the CallFromExcel functions are available by typing `=Julia` into a worksheet cell and checking that the auto-complete offers `JuliaCall`, `JuliaEval`, `JuliaInclude` etc.
+ * Functions missing in Excel, or need to reinstall? Close Excel and run `Pkg.build("CallFromExcel")` again.
 
 The process is illustrated in the GIF below. F5 to replay.
 
 <a href="#no-click">
-  <img src="images/install-take4.gif" alt="Installing the JuliaExcel Excel add-in from the Julia REPL with Pkg.add, then checking the Julia functions appear in Excel" />
+  <img src="images/install-take4.gif" alt="Installing the CallFromExcel Excel add-in from the Julia REPL with Pkg.add, then checking the Julia functions appear in Excel" />
 </a>
 
 ## Installation (Linux)
-As an alternative to calling Julia running in a Windows process, JuliaExcel can call Julia running in a Linux process under Windows Subsystem for Linux (WSL). If that's your preference, then in addition to the steps described above, you need to:
+As an alternative to calling Julia running in a Windows process, CallFromExcel can call Julia running in a Linux process under Windows Subsystem for Linux (WSL). If that's your preference, then in addition to the steps described above, you need to:
  * If necessary, install [WSL](https://docs.microsoft.com/en-us/windows/wsl/install) with the default Linux distribution, Ubuntu.
  * Install Julia under WSL by running `curl -fsSL https://install.julialang.org | sh` at the Ubuntu prompt, per the [official instructions](https://julialang.org/downloads/). This installs `juliaup`, which puts `julia` on the PATH automatically.
- * At the Julia prompt (under WSL) install JuliaExcel by copy-pasting   
-  `using Pkg; Pkg.add(url="https://github.com/PGS62/JuliaExcel.jl", rev="dev_csharp_port")` into the REPL. 
+ * At the Julia prompt (under WSL) install CallFromExcel by copy-pasting   
+  `using Pkg; Pkg.add(url="https://github.com/PGS62/CallFromExcel.jl")` into the REPL. 
 
 ## Functions
-JuliaExcel makes the following functions available from Excel worksheets and from VBA:
+CallFromExcel makes the following functions available from Excel worksheets and from VBA:
 
 |Name|Description|
 |----|-----------|
@@ -81,16 +83,17 @@ JuliaExcel makes the following functions available from Excel worksheets and fro
 |[JuliaExcelPID](#juliaexcelpid)|Returns the process id of the current Excel session. Only needed if more than one Excel instance is running - pass it to `serve_xl` to say which one to attach to.|
 
 ## Example VBA
-The VBA code below makes a call to `JuliaLaunch` and `JuliaEvalVBA` and then pastes the result to range A1:J10 in a new worksheet. To run it, make sure that the project has a reference to JuliaExcel (VBA editor, Tools menu -> References).
+The VBA code below makes a call to `JuliaLaunch` and `JuliaEvalVBA` and then pastes the result to range A1:J10 in a new worksheet. VBA reaches CallFromExcel's functions through an object created with `CreateObject("CallFromExcel.ComServer")` - no reference (VBA editor, Tools menu -> References) is needed. Declare that object `As Object`, as below: functions such as `JuliaCall` that take a variable number of arguments can only be called that way.
 
 ```vba
 Sub DemoCallVBA()
 
-    Dim ResultFromJulia As Variant, PasteHere As Range
+    Dim CallFromExcel As Object, ResultFromJulia As Variant, PasteHere As Range
     
-    JuliaLaunch
+    Set CallFromExcel = CreateObject("CallFromExcel.ComServer")
+    CallFromExcel.JuliaLaunch
     
-    ResultFromJulia = JuliaEvalVBA("(1:10).^(1:10)'")
+    ResultFromJulia = CallFromExcel.JuliaEvalVBA("(1:10).^(1:10)'")
 
     Set PasteHere = Application.Workbooks.Add.Worksheets(1) _
         .Cells(1, 1).Resize(UBound(ResultFromJulia, 1), _
@@ -218,7 +221,7 @@ Public Function JuliaIsRunning() As Boolean
 ```
 
 ### `JuliaExcelPID`
-Returns the process id of the current Excel session. You'll rarely need this directly: `JuliaExcel.serve_xl()` finds the running Excel process automatically when only one is open. It's only when more than one Excel instance is running that you need it, to tell `JuliaExcel.serve_xl` explicitly which one to attach to - see [Attaching to a Julia session already running elsewhere](#attaching-to-a-julia-session-already-running-elsewhere).
+Returns the process id of the current Excel session. You'll rarely need this directly: `CallFromExcel.serve_xl()` finds the running Excel process automatically when only one is open. It's only when more than one Excel instance is running that you need it, to tell `CallFromExcel.serve_xl` explicitly which one to attach to - see [Attaching to a Julia session already running elsewhere](#attaching-to-a-julia-session-already-running-elsewhere).
 ```vba
 Public Function JuliaExcelPID() As Long
 ```
@@ -227,7 +230,7 @@ Public Function JuliaExcelPID() As Long
 Normally `JuliaLaunch` starts its own dedicated Julia process. If you'd rather use a Julia session you already have open - for example one running inside VS Code, where you can set breakpoints and step through code - you can attach that session to Excel instead:
 
 ```julia
-using JuliaExcel
+using CallFromExcel
 serve_xl()
 ```
 
@@ -240,18 +243,18 @@ Back in Excel, `JuliaCall`/`JuliaEval`/etc. now talk to the attached session dir
 If Excel is already being served by another Julia session (e.g. one launched via `JuliaLaunch`, or attached earlier with `serve_xl` itself), `serve_xl` throws rather than starting a second, useless listener - stop the other session first (e.g. call `stop_server()` there, or close it).
 
 Other functions for managing a session started this way:
-* `JuliaExcel.stop_server()` stops the session listening to Excel, without closing Julia itself.
-* `JuliaExcel.server_status()` reports whether a server is currently running, which Excel process id it's serving, on which port, and the current `display_results` setting.
+* `CallFromExcel.stop_server()` stops the session listening to Excel, without closing Julia itself.
+* `CallFromExcel.server_status()` reports whether a server is currently running, which Excel process id it's serving, on which port, and the current `display_results` setting.
 
 ## Debugging
 Every call to `JuliaCall`/`JuliaCallVBA`/`JuliaEval`/`JuliaEvalVBA` leaves a trace behind in Julia, so a problem can be debugged at the REPL without needing to repeat the call from Excel:
 
-* `JuliaExcel.last_question` is the expression that was evaluated - either the exact string passed to `JuliaEval`/`JuliaEvalVBA`, or, for `JuliaCall`/`JuliaCallVBA`, a reconstructed call such as `myfunction(JuliaExcel.args_from_xl...)`.
-* `JuliaExcel.last_answer` is the value that was returned to Excel.
-* `JuliaExcel.args_from_xl` holds the arguments most recently passed from Excel to `JuliaCall`/`JuliaCallVBA`, or the positional arguments for `JuliaCallNamedArgs`/`JuliaCallNamedArgsVBA`. For those, `JuliaExcel.kwargs_from_xl` holds the named arguments as a `NamedTuple`, and `last_question` is a call such as `myfunction(args_from_xl...; kwargs_from_xl...)`.
-* `JuliaExcel.answer_again()` evaluates `last_question` again, and you can wrap it with `@enter` or your own debugging tools.
+* `CallFromExcel.last_question` is the expression that was evaluated - either the exact string passed to `JuliaEval`/`JuliaEvalVBA`, or, for `JuliaCall`/`JuliaCallVBA`, a reconstructed call such as `myfunction(CallFromExcel.args_from_xl...)`.
+* `CallFromExcel.last_answer` is the value that was returned to Excel.
+* `CallFromExcel.args_from_xl` holds the arguments most recently passed from Excel to `JuliaCall`/`JuliaCallVBA`, or the positional arguments for `JuliaCallNamedArgs`/`JuliaCallNamedArgsVBA`. For those, `CallFromExcel.kwargs_from_xl` holds the named arguments as a `NamedTuple`, and `last_question` is a call such as `myfunction(args_from_xl...; kwargs_from_xl...)`.
+* `CallFromExcel.answer_again()` evaluates `last_question` again, and you can wrap it with `@enter` or your own debugging tools.
 
-All of these only reflect the most recent call, so debug before making another one. Call `JuliaExcel.display_results(true)` to also have each call and its result echoed to the Julia console as it happens.
+All of these only reflect the most recent call, so debug before making another one. Call `CallFromExcel.display_results(true)` to also have each call and its result echoed to the Julia console as it happens.
 
 ## Marshalling
 Two question arose during implementation:
@@ -317,15 +320,15 @@ There is one alternative method of calling Julia from Excel of which I am aware:
 
 https://github.com/JuliaComputing/JuliaInXL.jl  
 
-JuliaComputing made JuliaInXL open source in October 2021; it previously required a licence for commercial use. As of August 2026, JuliaInXL is not compatible with dynamic array formulas, and does not permit calling Julia from VBA. My tests indicate that JuliaInXL and JuliaExcel have broadly similar performance in terms of latency and speed of data transfer.
+JuliaComputing made JuliaInXL open source in October 2021; it previously required a licence for commercial use. As of August 2026, JuliaInXL is not compatible with dynamic array formulas, and does not permit calling Julia from VBA. My tests of CallFromExcel's VBA-based predecessor, JuliaExcel, indicated that it and JuliaInXL had broadly similar performance in terms of latency and speed of data transfer.
 
 ## Compatibility
-JuliaExcel requires 64-bit Excel for Windows - the default for Microsoft 365 - and has been tested on Excel under Microsoft 365. It is not compatible with 32-bit Excel: the installer checks, and stops with an error if Excel is 32-bit. It _should_ work on earlier 64-bit versions of Excel (perhaps back to Excel 2016) but it has not been tested on them.
+CallFromExcel requires 64-bit Excel for Windows - the default for Microsoft 365 - and has been tested on Excel under Microsoft 365. It is not compatible with 32-bit Excel: the installer checks, and stops with an error if Excel is 32-bit. It _should_ work on earlier 64-bit versions of Excel (perhaps back to Excel 2016) but it has not been tested on them.
 
-## How JuliaExcel works
-JuliaExcel communicates between Excel and Julia over a local HTTP connection:
-1) `JuliaLaunch` starts a Julia process (as a normal Windows process, or under WSL) running a small HTTP server (`JuliaExcel.start_server()`) on a free local port, and writes that port number to a file so VBA can discover it. If a session for the current Excel process already appears to be running, `JuliaLaunch` checks that it's actually responding before reusing it, rather than starting a duplicate.
-2) `JuliaEval` POSTs the Julia expression as plain text to the server's `/eval` endpoint. The Julia function `srv_eval_inner` (in `comms.jl`) evaluates it with `Meta.parseall`/`eval` and returns the result - encoded in JuliaExcel's own wire format - in the HTTP response body.
+## How CallFromExcel works
+CallFromExcel communicates between Excel and Julia over a local HTTP connection:
+1) `JuliaLaunch` starts a Julia process (as a normal Windows process, or under WSL) running a small HTTP server (`CallFromExcel.start_server()`) on a free local port, and writes that port number to a file so VBA can discover it. If a session for the current Excel process already appears to be running, `JuliaLaunch` checks that it's actually responding before reusing it, rather than starting a duplicate.
+2) `JuliaEval` POSTs the Julia expression as plain text to the server's `/eval` endpoint. The Julia function `srv_eval_inner` (in `comms.jl`) evaluates it with `Meta.parseall`/`eval` and returns the result - encoded in CallFromExcel's own wire format - in the HTTP response body.
 3) `JuliaCall` and `JuliaCallVBA` instead encode the function name and its arguments (marshalled per the rules described in [Marshalling](#marshalling)) into that same wire format and POST it to the `/call` endpoint. `srv_call_inner` decodes it and invokes the named function directly, returning the result the same way. This avoids `Meta.parse`ing a literal expression, which is slow for calls passing large arrays. `JuliaCallNamedArgs` and `JuliaCallNamedArgsVBA` encode their arguments the same way but POST them to the `/callkw` endpoint, where Julia splits them at the `";"` into positional and named arguments.
 4) VBA unserialises the response body back into worksheet values or VBA variables.
 
@@ -335,10 +338,10 @@ Other points to note:
  * Best performance would still be achieved using C via the [Excel SDK](https://docs.microsoft.com/en-us/office/client-developer/excel/welcome-to-the-excel-software-development-kit) and [Julia Embedding](https://docs.julialang.org/en/v1/manual/embedding/).
 
 ## Viewing the code
-The VBA project is password protected to prevent accidental changes. You can view it in JuliaExcel.xlam by unprotecting with the password "JuliaExcel" (its exported VBA source lives at `vba/JuliaExcel.xlam/VBA` on `master` - removed on this branch, see git history). Julia source code is always visible on your PC, and the [@functionloc](https://docs.julialang.org/en/v1/stdlib/InteractiveUtils/#InteractiveUtils.@functionloc) macro is an easy way to locate the code of any function you're interested in.
+The Excel add-in is written in C#, using [Excel-DNA](https://excel-dna.net/); its source is in the `dotnet-addin` folder of this repository. Julia source code is always visible on your PC, and the [@functionloc](https://docs.julialang.org/en/v1/stdlib/InteractiveUtils/#InteractiveUtils.@functionloc) macro is an easy way to locate the code of any function you're interested in.
 
 ## Shortcomings
-Given how JuliaExcel works, with serialisation done in VBA - an interpreted language - the most obvious shortcoming is the performance of data transfer between Excel and Julia for large arrays. In practice this is rarely a problem: latency for a simple call is a couple of milliseconds, and marshalling even a 100,000-element array takes a few tenths of a second - typically small compared with the execution time of the Julia code doing the actual work. I wrote JuliaExcel for a project where latency and marshalling time were indeed much smaller than Julia execution time.
+The most obvious shortcoming is the time taken to transfer large arrays between Excel and Julia. In practice this is rarely a problem: latency for a simple call is around a millisecond, and `=JuliaCall("sort", A1:A1000000)` on a million numbers takes about 0.75 seconds in total - roughly half the time taken by CallFromExcel's VBA-based predecessor, JuliaExcel. Most of what remains is the conversion of the array to and from the form an Excel add-in receives and returns, which is outside CallFromExcel's control. For most uses, transfer time is small compared with the execution time of the Julia code doing the actual work.
 
 &nbsp;
 
@@ -346,4 +349,4 @@ Given how JuliaExcel works, with serialisation done in VBA - an interpreted lang
 
 Philip Swannell  
 8 December 2021  
-Last updated 31 October 2026
+Last updated 7 November 2026

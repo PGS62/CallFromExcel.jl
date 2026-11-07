@@ -1,8 +1,10 @@
-# JuliaExcel C#/Excel-DNA add-in (dev_csharp_port branch)
+# CallFromExcel C#/Excel-DNA add-in
 
 Real, SDK-based (not the `csharp-prototype` folder's hand-rolled csc.exe
 build) implementation of the VBA-to-C# port described in the August plan.
-Lives entirely on `dev_csharp_port`; master is untouched.
+Developed on JuliaExcel.jl's `dev_csharp_port` branch (never pushed there),
+then renamed CallFromExcel and moved to the CallFromExcel.jl repo as `main`.
+JuliaExcel.jl's `master` still holds the old VBA/xlam version.
 
 ## Status as of 2026-11-07
 
@@ -30,10 +32,10 @@ formula-bar IntelliSense embedded in the add-in itself (replacing
 
 ## Validated
 
-- **55/55** VBA tests in `vba/TestJuliaExcel.xlsm` (`vba/Run-VbaTests.ps1`,
+- **55/55** VBA tests in `vba/TestCallFromExcel.xlsm` (`vba/Run-VbaTests.ps1`,
   also run by `test/runtests.jl` locally), covering both the COM and the
   worksheet/XLL surfaces. WSL: `modTest.RunWSLTest`, run by hand.
-- **58/58** self-contained wire-format tests (`JuliaExcel.AddIn.TestHarness`,
+- **58/58** self-contained wire-format tests (`CallFromExcel.AddIn.TestHarness`,
   `WireFormatTests.cs`), including the exact example strings hand-transcribed
   from `modUnserialise.bas`'s own wire-format spec comment.
 - **18/18** cross-validation tests against a real, freshly-launched Julia
@@ -101,21 +103,21 @@ worksheet-formula path.
   each), but check Task Manager if you want to clear them. One of them
   (PID varies, the one with no corresponding recent Excel/test activity)
   is your own VS Code Julia session, left untouched throughout.
-- `JuliaExcel.AddIn.ComServer` is registered for COM under
+- `CallFromExcel.ComServer` is registered for COM under
   `HKCU:\Software\Classes` (user-level, no admin needed), pointing at this
   session's build output path
-  (`dotnet-addin\JuliaExcel.AddIn\bin\Release\net48\JuliaExcel.AddIn.dll`).
+  (`dotnet-addin\CallFromExcel.AddIn\bin\Release\net48\CallFromExcel.AddIn.dll`).
   If you rebuild to a different path, or on a different machine/account,
   re-register (see `vba\TestRealAddin.bas`'s own setup notes).
 
 ## How to build and test
 
 ```powershell
-cd dotnet-addin\JuliaExcel.AddIn
+cd dotnet-addin\CallFromExcel.AddIn
 dotnet build -c Release
 ```
 
-Produces `bin\Release\net48\publish\JuliaExcel.AddIn64-packed.xll`
+Produces `bin\Release\net48\publish\CallFromExcel.AddIn64-packed.xll`
 (load via Excel > File > Options > Add-ins > Manage Excel Add-ins >
 Go... > Browse...). A Release build also refreshes `dist\` (via
 `Update-Dist.ps1`) - the committed copy that `installer\Install.ps1`
@@ -125,10 +127,10 @@ with any source change; `test/runtests.jl` fails if it's out of date.
 For the wire-format test suite (no Excel/COM needed at all):
 
 ```powershell
-cd dotnet-addin\JuliaExcel.AddIn.TestHarness
+cd dotnet-addin\CallFromExcel.AddIn.TestHarness
 dotnet build -c Release
-.\bin\Release\net48\JuliaExcel.AddIn.TestHarness.exe        # self-tests + Julia cross-validation
-.\bin\Release\net48\JuliaExcel.AddIn.TestHarness.exe nojulia # self-tests only, no Julia needed
+.\bin\Release\net48\CallFromExcel.AddIn.TestHarness.exe        # self-tests + Julia cross-validation
+.\bin\Release\net48\CallFromExcel.AddIn.TestHarness.exe nojulia # self-tests only, no Julia needed
 ```
 
 For manual testing from real VBA: see `vba\TestRealAddin.bas`.
@@ -137,7 +139,7 @@ For manual testing from real VBA: see `vba\TestRealAddin.bas`.
 
 1. README pass: Shortcomings section rewrite, an honest JuliaInXL
    comparison, and a migration guide covering the no-xlam architecture,
-   the `JuliaExcel.JuliaXxx(...)` call-site edit pattern, the early-
+   the `CallFromExcel.JuliaXxx(...)` call-site edit pattern, the early-
    binding gotchas (a `params object[]` method like `JuliaCall` can't be
    called early-bound at all - always use late-bound `Dim j As Object`),
    and the `OneBasedArray`/0-based-`Array()`-spreading gotcha.
@@ -156,7 +158,7 @@ For manual testing from real VBA: see `vba\TestRealAddin.bas`.
   forwarding quirk that doesn't arise at human pace). WSL's Julia needs
   this repo's dependencies instantiated once before first use.
 - A real installer: `installer/Install.ps1` (in this folder) - installs
-  to `%APPDATA%\Microsoft\AddIns\JuliaExcel` (no admin needed),
+  to `%APPDATA%\Microsoft\AddIns\CallFromExcel` (no admin needed),
   uninstalls the old xlam if present, no interactive prompts. See its
   own comments for why it writes COM registration directly to
   `HKCU:\Software\Classes\` rather than shelling out to `RegAsm`.
@@ -164,8 +166,8 @@ For manual testing from real VBA: see `vba\TestRealAddin.bas`.
   it instead of the old repo-root `installer/Install.ps1`, which - along
   with `csharp-prototype/`, `ExcelDNA/` and `vba/JuliaExcel.xlam/` (all
   only ever used by that old installer/prototype/xlam) - has been
-  removed from this branch (still on `master`, for anyone who hasn't
-  upgraded).
+  removed here (still on JuliaExcel.jl's `master`, for anyone who
+  hasn't upgraded).
 - `test/runtests.jl`'s local VBA testset now runs this folder's own
   `vba/Run-VbaTests.ps1` suite (the one with real worksheet/XLL-path
   coverage, see above), not the old xlam's.

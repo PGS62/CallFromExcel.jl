@@ -4,9 +4,7 @@ Call [Julia](https://julialang.org/) from Microsoft Excel worksheets and from VB
 
 CallFromExcel is an Excel add-in that lets you use any Julia function in a worksheet formula. For example, `=JuliaEval("using LinearAlgebra")` loads one of Julia's standard libraries, then `=JuliaCall("eigvals", A1:J10)` passes a range to Julia as a matrix and returns its eigenvalues to the worksheet (as complex numbers, if the matrix isn't symmetric) - something Excel has no built-in function for. Keep your front end in Excel, and do the heavy computation in Julia. Installation doesn't need admin rights.
 
-Compatible with Excel's [dynamic array formulas](https://support.microsoft.com/en-us/office/dynamic-array-formulas-and-spilled-array-behavior-205c6b06-03ba-4151-89a1-87a7eb36e531).
-
-Supports 64-bit Excel for Windows (not Mac, not 32-bit Excel). Julia can be run under Windows or Linux (via [WSL](https://docs.microsoft.com/en-us/windows/wsl/about)).
+CallFromExcel is compatible with Excel's [dynamic array formulas](https://support.microsoft.com/en-us/office/dynamic-array-formulas-and-spilled-array-behavior-205c6b06-03ba-4151-89a1-87a7eb36e531), it supports 64-bit Excel for Windows (not Mac, not 32-bit Excel). It works with Julia running under either Windows or Linux (via [WSL](https://docs.microsoft.com/en-us/windows/wsl/about)).
 
 CallFromExcel is the successor to [JuliaExcel](https://github.com/PGS62/JuliaExcel.jl), rewritten in C# for speed. See [Upgrading from JuliaExcel](#upgrading-from-juliaexcel).
 

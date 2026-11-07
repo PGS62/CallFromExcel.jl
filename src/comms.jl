@@ -141,7 +141,7 @@ display_results() = _display_results[]
 
 """
     comms_folder()
-Returns the name of the comms folder used by JuliaExcel. See also `comms_folder(folder)`.
+Returns the name of the comms folder used by CallFromExcel. See also `comms_folder(folder)`.
 """
 function comms_folder()
     commsfolder[] == "" && throw("commsfolder has not been set")
@@ -150,23 +150,23 @@ end
 
 """
     comms_folder(folder::String)
-Sets the name of the comms folder used by JuliaExcel to `folder`. See also `comms_folder()`.
+Sets the name of the comms folder used by CallFromExcel to `folder`. See also `comms_folder()`.
 """
 comms_folder(folder::String) = (commsfolder[] = folder)
 
 """
     _default_commsfolder()::String
-Guesses the comms folder JuliaExcel should use when none has been set explicitly - on Windows,
+Guesses the comms folder CallFromExcel should use when none has been set explicitly - on Windows,
 matches the folder VBA's LocalTemp() computes for a native (non-WSL) session. Used by `serve_xl`,
 as a convenience when developing this package.
 """
 function _default_commsfolder()
     if Sys.iswindows()
-        joinpath(ENV["TEMP"], "@JuliaExcel")
+        joinpath(ENV["TEMP"], "@CallFromExcel")
     elseif Sys.islinux()
         trythese = ["phili", "philip", "PhilipSwannell"]
         for trythis = trythese
-            f = joinpath("/mnt/c/Users", trythis, "AppData/Local/Temp/@JuliaExcel")
+            f = joinpath("/mnt/c/Users", trythis, "AppData/Local/Temp/@CallFromExcel")
             isdir(f) && return f
         end
         throw("Cannot find commsfolder")
@@ -176,7 +176,7 @@ function _default_commsfolder()
 end
 
 function installme()
-    Sys.iswindows() || throw("JuliaExcel.installme (which installs a Microsoft Excel \
+    Sys.iswindows() || throw("CallFromExcel.installme (which installs a Microsoft Excel \
         addin) can only be run from Julia on Windows")
     installscript = normpath(joinpath(@__DIR__, "..", "dotnet-addin", "installer", "Install.ps1"))
     exefile = "C:/Windows/System32/WindowsPowerShell/v1.0/powershell.exe"
@@ -345,7 +345,7 @@ end
 """
     srv_call_inner(payload::String; named_args::Bool=false)::String
 
-Decode `payload` (in the JuliaExcel wire format - a 1D array whose first element is a
+Decode `payload` (in the CallFromExcel wire format - a 1D array whose first element is a
 function name and remaining elements are its arguments), call the named function, and
 return the encoded result as a string. Called by the HTTP request handler in `start_server`
 for requests to `/call`, originating from VBA calls to functions JuliaCall and JuliaCallVBA,
@@ -455,7 +455,7 @@ function start_server(start::Int=2700)
                 result = req.target == "/eval" ? srv_eval_inner(body) :
                          req.target == "/call" ? srv_call_inner(body) :
                          req.target == "/callkw" ? srv_call_inner(body; named_args=true) :
-                         return HTTP.Response(404, "Unknown JuliaExcel endpoint $(req.target)")
+                         return HTTP.Response(404, "Unknown CallFromExcel endpoint $(req.target)")
 
                 # The explicit Content-Length is vital for performance, not just correctness. Without
                 # it, HTTP.jl falls back to chunked transfer-encoding (since it never inspects the
@@ -481,7 +481,7 @@ function start_server(start::Int=2700)
     end
     xlport[] = port
     settitle()
-    println("JuliaExcel HTTP server listening on port $port")
+    println("CallFromExcel HTTP server listening on port $port")
     nothing
 end
 

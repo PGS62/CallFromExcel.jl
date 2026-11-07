@@ -1,6 +1,6 @@
 #=
 decode_from_xl is the inverse of encode_for_xl (in encode.jl). It decodes a string in the
-JuliaExcel wire format back to a Julia value. The same format is used by VBA's
+CallFromExcel wire format back to a Julia value. The same format is used by VBA's
 SerialiseElement function (in modSerialise.bas) to encode arguments before POSTing them to
 the /call HTTP endpoint, handled by srv_call_inner (in comms.jl).
 
@@ -30,7 +30,7 @@ See also VBA function SerialiseElement (modSerialise.bas) which serialises i.e. 
 """
     decode_from_xl(s::String)
 
-Decode a string in the JuliaExcel wire format and return the corresponding Julia value.
+Decode a string in the CallFromExcel wire format and return the corresponding Julia value.
 Inverse of `encode_for_xl`.
 """
 function decode_from_xl(s::String)
@@ -101,7 +101,7 @@ end
 """
     decode_xl_array(s::String)
 
-Decode an array-encoded string (starting with `*`) from the JuliaExcel wire format.
+Decode an array-encoded string (starting with `*`) from the CallFromExcel wire format.
 Returns a typed array when all elements share the same type, otherwise `Array{Any}`.
 """
 function decode_xl_array(s::String)
@@ -181,7 +181,7 @@ end
 """
     decode_xl_dict(s::String)
 
-Decode a dict-encoded string (starting with `H`) from the JuliaExcel wire format, with keys and
+Decode a dict-encoded string (starting with `H`) from the CallFromExcel wire format, with keys and
 values decoded by `decode_from_xl`. Returns a typed `Dict{K,V}` when every key shares a concrete
 type `K` and every value shares a concrete type `V` (see `_maybe_typed` below - the same treatment
 `decode_xl_array` already gives arrays), otherwise `Dict{Any,Any}`.

@@ -46,25 +46,25 @@ interpreted as follows:
      Decoded by the 'R' branch of the production VBA decoder (modUnserialise.bas).
 
   Examples:
-  julia> JuliaExcel.encode_for_xl(1.0)
+  julia> CallFromExcel.encode_for_xl(1.0)
 "#3FF0000000000000"
 
-julia> JuliaExcel.encode_for_xl(1)
+julia> CallFromExcel.encode_for_xl(1)
 "&1"
 
-julia> JuliaExcel.encode_for_xl("Hello")
+julia> CallFromExcel.encode_for_xl("Hello")
 "£Hello"
 
-julia> JuliaExcel.encode_for_xl(true)
+julia> CallFromExcel.encode_for_xl(true)
 "T"
 
-julia> JuliaExcel.encode_for_xl(false)
+julia> CallFromExcel.encode_for_xl(false)
 "F"
 
-julia> JuliaExcel.encode_for_xl(Date(2021,3,11))
+julia> CallFromExcel.encode_for_xl(Date(2021,3,11))
 "D44266"
 
-julia> JuliaExcel.encode_for_xl([1 2;true π;"Hello" "World"])
+julia> CallFromExcel.encode_for_xl([1 2;true π;"Hello" "World"])
 "*2,3,2;2,1,6,2,18,6,;&1T£Hello&2#3.141592653589793£World" =#
 
 # See also VBA method Unserialise which unserialises i.e. inverts this function

@@ -22,4 +22,9 @@
     <PackageReference Include="ExcelDna.IntelliSense" Version="1.9.0" />
   </ItemGroup>
 
+  <!-- dist\ is committed, so Pkg.add users get a built add-in; test/runtests.jl checks it is current. -->
+  <Target Name="UpdateDist" AfterTargets="Build" Condition="'$(Configuration)' == 'Release'">
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\Update-Dist.ps1&quot;" />
+  </Target>
+
 </Project>

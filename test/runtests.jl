@@ -1,6 +1,30 @@
 using JuliaExcel
 using Dates
+using SHA
 using Test
+
+# Must match the hash definition in dotnet-addin/Update-Dist.ps1 exactly.
+function source_hash(projectdir)
+    relpaths = String[]
+    for (root, _, files) in walkdir(projectdir), f in files
+        rel = replace(relpath(joinpath(root, f), projectdir), '\\' => '/')
+        startswith(rel, "bin/") || startswith(rel, "obj/") || push!(relpaths, rel)
+    end
+    buf = IOBuffer()
+    for rel in sort(relpaths)
+        write(buf, rel, '\n', filter(!=(0x0d), read(joinpath(projectdir, rel))), '\n')
+    end
+    bytes2hex(sha256(take!(buf)))
+end
+
+@testset "dotnet-addin/dist is up to date with the add-in's source" begin
+    addin = joinpath(@__DIR__, "..", "dotnet-addin")
+    @test isfile(joinpath(addin, "dist", "JuliaExcel.AddIn64-packed.xll"))
+    @test isfile(joinpath(addin, "dist", "JuliaExcel.AddIn.dll"))
+    # On failure: run `dotnet build -c Release` in dotnet-addin/JuliaExcel.AddIn, then commit dist/.
+    @test source_hash(joinpath(addin, "JuliaExcel.AddIn")) ==
+          strip(read(joinpath(addin, "dist", "source-hash.txt"), String))
+end
 
 # isequal alone is type-blind (isequal(2, 2.0) is true), so it would miss a type morph introduced
 # on the wire (e.g. decode returning Int32 where the input was Int64). === is too strict the other

@@ -42,9 +42,10 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-if ($XllSourcePath -eq "") { $XllSourcePath = Join-Path $PSScriptRoot "..\JuliaExcel.AddIn\bin\Release\net48\publish\JuliaExcel.AddIn64-packed.xll" }
-if ($DllSourcePath -eq "") { $DllSourcePath = Join-Path $PSScriptRoot "..\JuliaExcel.AddIn\bin\Release\net48\JuliaExcel.AddIn.dll" }
-if ($TlbSourcePath -eq "") { $TlbSourcePath = Join-Path $PSScriptRoot "..\JuliaExcel.AddIn\bin\Release\net48\JuliaExcel.AddIn.tlb" }
+# dist\ is the committed copy of the Release build (see ..\Update-Dist.ps1).
+if ($XllSourcePath -eq "") { $XllSourcePath = Join-Path $PSScriptRoot "..\dist\JuliaExcel.AddIn64-packed.xll" }
+if ($DllSourcePath -eq "") { $DllSourcePath = Join-Path $PSScriptRoot "..\dist\JuliaExcel.AddIn.dll" }
+if ($TlbSourcePath -eq "") { $TlbSourcePath = Join-Path $PSScriptRoot "..\dist\JuliaExcel.AddIn.tlb" }
 
 $XllDestFileName = "JuliaExcel.AddIn64-packed.xll"
 $DllDestFileName = "JuliaExcel.AddIn.dll"
@@ -210,10 +211,28 @@ function Register-ComServer {
     }
 }
 
+# Returns the PE "Machine" field of EXCEL.EXE (0x014C = 32-bit x86, 0x8664 = x64, 0xAA64 =
+# ARM64), or $null if EXCEL.EXE can't be located. Reads the executable itself because Office's
+# own bitness registry values aren't stored consistently across versions/install types.
+function Get-ExcelMachineType {
+    $appPathKey = "Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\excel.exe"
+    $excelPath = Get-RegValue -Path $appPathKey -Name "(Default)"
+    if ($excelPath -eq "" -or -not (Test-Path -Path $excelPath -PathType Leaf)) { return $null }
+    $stream = [System.IO.File]::OpenRead($excelPath)
+    try {
+        $reader = New-Object System.IO.BinaryReader($stream)
+        $stream.Position = 0x3C
+        $stream.Position = $reader.ReadInt32() + 4
+        return $reader.ReadUInt16()
+    } finally {
+        $stream.Dispose()
+    }
+}
+
 function Copy-RequiredFile {
     param([string]$SourcePath, [string]$DestPath)
     if (-not (Test-Path -Path $SourcePath -PathType Leaf)) {
-        throw "Cannot find file: $SourcePath - build the add-in first (dotnet build -c Release in dotnet-addin\JuliaExcel.AddIn)."
+        throw "Cannot find file: $SourcePath - it should be committed in dotnet-addin\dist\ (refresh it with dotnet build -c Release in dotnet-addin\JuliaExcel.AddIn)."
     }
     if (Test-Path -Path $DestPath -PathType Leaf) {
         try { Set-ItemProperty -Path $DestPath -Name IsReadOnly -Value $false -ErrorAction Stop } catch {}
@@ -227,6 +246,14 @@ function Copy-RequiredFile {
 
 if (Get-Process -Name "EXCEL" -ErrorAction SilentlyContinue) {
     throw "Excel is currently running. Close every Excel window (check Task Manager for a background EXCEL.EXE process too) and run this script again."
+}
+
+$machineType = Get-ExcelMachineType
+if ($machineType -eq 0x014C) {
+    throw "This is 32-bit Excel. JuliaExcel requires 64-bit Excel (the default for Microsoft 365) - nothing has been installed."
+}
+if ($null -eq $machineType) {
+    Write-Output "Could not locate EXCEL.EXE to check whether Excel is 64-bit - continuing (JuliaExcel requires 64-bit Excel)."
 }
 
 Write-Output "Detecting Office version..."

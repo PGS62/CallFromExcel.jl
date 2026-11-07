@@ -6,7 +6,7 @@ JuliaExcel is an Excel add-in that lets you use any Julia function in a workshee
 
 Compatible with Excel's [dynamic array formulas](https://support.microsoft.com/en-us/office/dynamic-array-formulas-and-spilled-array-behavior-205c6b06-03ba-4151-89a1-87a7eb36e531).
 
-Supports Excel for Windows (not Mac). Julia can be run under Windows or Linux (via [WSL](https://docs.microsoft.com/en-us/windows/wsl/about)).
+Supports 64-bit Excel for Windows (not Mac, not 32-bit Excel). Julia can be run under Windows or Linux (via [WSL](https://docs.microsoft.com/en-us/windows/wsl/about)).
 
 ## Contents
 [Demo](#demo)  
@@ -36,18 +36,19 @@ Here's a quick demonstration of JuliaExcel's functions in action.
 
 ## Installation
 Installation does not require admin rights on the PC.
- * Both Julia and Microsoft Office must be installed on your PC, with Excel not running.
- * Launch Julia, and copy-paste the following command into the REPL:
+ * Both Julia and Microsoft Office must be installed on your PC.
+ * Close Excel - installation fails if Excel is running.
+ * Launch Julia, and copy-paste the following commands into the REPL:
 <!-- CHANGING THE INSTRUCTIONS BELOW? DON'T FORGET TO ALSO CHANGE THE "Installation (Linux)" SECTION -->
    ```
    using Pkg
-   Pkg.add(url="https://github.com/PGS62/JuliaExcel.jl")
+   Pkg.add(url="https://github.com/PGS62/JuliaExcel.jl", rev="dev_csharp_port")
+   Pkg.build("JuliaExcel")
    ```
-   (paste into the REPL is via mouse right-click).
- * Partway through, a Windows dialog will pop up to install the Excel add-in - `Pkg.add` will pause until you've clicked through it.
- * Don't see the Windows dialog?<br/>
-  Pkg only builds a given version of JuliaExcel once per PC. If you've since uninstalled the add-in, run `] build JuliaExcel` at the REPL to reinstall it.
+   (paste into the REPL is via mouse right-click).<br/>
+   `Pkg.build` is what installs the Excel add-in. `Pkg.add` usually does that too, but only the first time a given version of JuliaExcel is added to your PC - so if you've since removed the add-in from Excel, `Pkg.add` alone won't put it back.
  * Launch Excel. Check that the JuliaExcel functions are available by typing `=Julia` into a worksheet cell and checking that the auto-complete offers `JuliaCall`, `JuliaEval`, `JuliaInclude` etc.
+ * Functions missing in Excel, or need to reinstall? Close Excel and run `Pkg.build("JuliaExcel")` again.
 
 The process is illustrated in the GIF below. F5 to replay.
 
@@ -60,7 +61,7 @@ As an alternative to calling Julia running in a Windows process, JuliaExcel can 
  * If necessary, install [WSL](https://docs.microsoft.com/en-us/windows/wsl/install) with the default Linux distribution, Ubuntu.
  * Install Julia under WSL by running `curl -fsSL https://install.julialang.org | sh` at the Ubuntu prompt, per the [official instructions](https://julialang.org/downloads/). This installs `juliaup`, which puts `julia` on the PATH automatically.
  * At the Julia prompt (under WSL) install JuliaExcel by copy-pasting   
-  `using Pkg; Pkg.add(url="https://github.com/PGS62/JuliaExcel.jl")` into the REPL. 
+  `using Pkg; Pkg.add(url="https://github.com/PGS62/JuliaExcel.jl", rev="dev_csharp_port")` into the REPL. 
 
 ## Functions
 JuliaExcel makes the following functions available from Excel worksheets and from VBA:
@@ -319,7 +320,7 @@ https://github.com/JuliaComputing/JuliaInXL.jl
 JuliaComputing made JuliaInXL open source in October 2021; it previously required a licence for commercial use. As of August 2026, JuliaInXL is not compatible with dynamic array formulas, and does not permit calling Julia from VBA. My tests indicate that JuliaInXL and JuliaExcel have broadly similar performance in terms of latency and speed of data transfer.
 
 ## Compatibility
-JuliaExcel has been tested on Excel under Microsoft 365, both 32-bit and 64-bit. It _should_ work on earlier versions of Excel (perhaps back to Excel 2010) but it has not been tested on them.
+JuliaExcel requires 64-bit Excel for Windows - the default for Microsoft 365 - and has been tested on Excel under Microsoft 365. It is not compatible with 32-bit Excel: the installer checks, and stops with an error if Excel is 32-bit. It _should_ work on earlier 64-bit versions of Excel (perhaps back to Excel 2016) but it has not been tested on them.
 
 ## How JuliaExcel works
 JuliaExcel communicates between Excel and Julia over a local HTTP connection:

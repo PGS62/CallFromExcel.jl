@@ -117,7 +117,10 @@ dotnet build -c Release
 
 Produces `bin\Release\net48\publish\JuliaExcel.AddIn64-packed.xll`
 (load via Excel > File > Options > Add-ins > Manage Excel Add-ins >
-Go... > Browse...).
+Go... > Browse...). A Release build also refreshes `dist\` (via
+`Update-Dist.ps1`) - the committed copy that `installer\Install.ps1`
+installs, so `Pkg.add` users get a built add-in. Commit `dist\` along
+with any source change; `test/runtests.jl` fails if it's out of date.
 
 For the wire-format test suite (no Excel/COM needed at all):
 
@@ -132,20 +135,13 @@ For manual testing from real VBA: see `vba\TestRealAddin.bas`.
 
 ## Suggested next steps
 
-1. Remove `workbooks/`, `scripts/` (old-world demo/tooling workbooks and
-   the old xlam's manual VBA test runner - `vba/JuliaExcel.xlam/` itself
-   is already gone from this branch) and the rest of `vba/`'s sibling
-   workbooks, once migration guidance is written and the old world is
-   actually retired. As of now, `workbooks/` and `scripts/` only
-   reference each other - nothing in the active build/test pipeline
-   touches either any more, since `test/runtests.jl` no longer does.
-2. README pass: Shortcomings section rewrite, an honest JuliaInXL
+1. README pass: Shortcomings section rewrite, an honest JuliaInXL
    comparison, and a migration guide covering the no-xlam architecture,
    the `JuliaExcel.JuliaXxx(...)` call-site edit pattern, the early-
    binding gotchas (a `params object[]` method like `JuliaCall` can't be
    called early-bound at all - always use late-bound `Dim j As Object`),
    and the `OneBasedArray`/0-based-`Array()`-spreading gotcha.
-3. Planned breaking change (once released under the new package name,
+2. Planned breaking change (once released under the new package name,
    see below): give `JuliaLaunch` a dedicated `project` parameter
    instead of requiring `--project=...` to be embedded in
    `CommandLineOptions`.

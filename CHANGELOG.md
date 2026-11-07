@@ -1,27 +1,62 @@
 # Changelog
 
+CallFromExcel is the successor to [JuliaExcel](https://github.com/PGS62/JuliaExcel.jl), and its version numbers start again at 0.1.0. The entries from JuliaExcel 2.4.1 down are JuliaExcel's, kept for the record of how it evolved, including its performance.
+
 ## [Unreleased]
 
-## [2.4.1] - 2026-11-01
+## [0.1.0] - (release date)
+
+First release of CallFromExcel. If you're upgrading from JuliaExcel, see [Upgrading from JuliaExcel](README.md#upgrading-from-juliaexcel).
+
+### Changes
+
+- The Excel add-in is rewritten in C#, using [Excel-DNA](https://excel-dna.net/), replacing JuliaExcel's VBA add-in `JuliaExcel.xlam`. The worksheet functions keep their names (`JuliaCall`, `JuliaEval`, `JuliaLaunch` etc.), and data now transfers between Excel and Julia two to three times faster - see Performance below.
+- From VBA, functions are called through an object created with `CreateObject("CallFromExcel.ComServer")`, rather than through a reference to the add-in.
+- The Julia package is renamed `CallFromExcel`, so for example `JuliaExcel.serve_xl()` becomes `CallFromExcel.serve_xl()`.
+- Installation shows no dialogs, needs no admin rights, and uninstalls `JuliaExcel.xlam` if present. Install with `Pkg.add` followed by `Pkg.build("CallFromExcel")` - see [Installation](README.md#installation).
+- CallFromExcel requires 64-bit Excel. JuliaExcel also supported 32-bit Excel.
+- `JuliaLaunch` gives a clear error message, with installation instructions, if the CallFromExcel package isn't installed in Julia's active environment.
+
+### Performance
+
+| Test | JuliaExcel 2.4.1 | CallFromExcel 0.1.0 | Speed-up |
+|------|------------------|---------------------|----------|
+| Latency: `JuliaEval("1+1")` | 0.65 ms | 0.75 ms | - |
+| Two-way: `JuliaCall("identity", column of 100,000 Doubles)` | 0.11 s | 0.043 s | 2.5x |
+| One-way (Excel to Julia): `JuliaCall("sum", column of 100,000 Doubles)` | 0.053 s | 0.019 s | 2.8x |
+| One-way (Julia to Excel): `JuliaEval("collect((1:100000).*pi)")` | 0.057 s | 0.020 s | 2.9x |
+| One-way (Julia to Excel): `JuliaEval("(1:100000).*pi")` | 0.025 s | 0.017 s | 1.5x |
+| Two-way: `JuliaCall("identity", column of 100,000 mixed values)` | 0.30 s | 0.085 s | 3.5x |
+| One-way (Excel to Julia): `JuliaCall("length", column of 100,000 mixed values)` | 0.11 s | 0.034 s | 3.1x |
+| One-way (Julia to Excel): `JuliaEval("[isodd(i) ? i*pi : string(i) for i in 1:100000]")` | 0.27 s | 0.11 s | 2.3x |
+| Two-way: `JuliaCall("sort", column of 1,000,000 Doubles)` | 1.23 s | 0.42 s | 2.9x |
+
+*Each test times the recalculation of a worksheet formula, averaged over several recalculations and two runs. The "mixed values" cycle through a string, a Boolean and a Double. All figures measured on the same machine as JuliaExcel 2.0.0's: Intel Core Ultra 9 288V, 32GB RAM*
+
+## JuliaExcel (predecessor), versions 2.4.1 and earlier
+
+Released as [JuliaExcel.jl](https://github.com/PGS62/JuliaExcel.jl).
+
+## [JuliaExcel 2.4.1] - 2026-11-01
 
 ### Bug fixes
 
 - The add-in's VBA project is named `JuliaExcel` again. In versions 2.3.1 and 2.4.0 it was named `VBAProject` by mistake, which breaks VBA code that calls the add-in's functions as, for example, `JuliaExcel.JuliaCall(...)`, and references to the add-in from a workbook's VBA project.
 - Fixed links to Julia's documentation that had moved, in the README and in `JuliaLaunch`'s error message for invalid `CommandLineOptions`.
 
-## [2.4.0] - 2026-11-01
+## [JuliaExcel 2.4.0] - 2026-11-01
 
 ### Changes
 
 - Complex numbers now return to Excel as text in the format of Excel's `COMPLEX` function, e.g. `"3+4i"`, so that Excel's `IMREAL`, `IMSUM` etc. can work with them. Previously they returned as Julia's display text, e.g. `"3 + 4im"`, which those functions don't accept. Details [here](README.md#complex-numbers-return-as-text).
 
-## [2.3.1] - 2026-11-01
+## [JuliaExcel 2.3.1] - 2026-11-01
 
 ### Bug fixes
 
 - Excel no longer changes the capitalisation of JuliaExcel's worksheet functions, e.g. turning `JuliaCall` into `juliacall`, when they're typed into a formula.
 
-## [2.3.0] - 2026-11-01
+## [JuliaExcel 2.3.0] - 2026-11-01
 
 ### Changes
 
@@ -33,32 +68,32 @@
 - `serve_xl` (and the server it starts) now creates the comms folder (`%TEMP%\@JuliaExcel`) if it doesn't already exist, rather than failing to write its port file. Normally Excel creates that folder, so this only went wrong on a machine where JuliaExcel had never been used from Excel - including the GitHub Actions test runner, where the Julia tests had been failing since `serve_xl` was introduced in 2.1.0.
 - GitHub Actions workflow updated to versions of `actions/checkout` and `julia-actions/setup-julia` that run on Node.js 24, in place of the deprecated Node.js 20.
 
-## [2.2.0] - 2026-10-31
+## [JuliaExcel 2.2.0] - 2026-10-31
 
 ### New features
 
 - New worksheet function `JuliaCallNamedArgs`, and VBA function `JuliaCallNamedArgsVBA`, for calling Julia functions that take named (keyword) arguments. The argument `";"` marks where the named arguments start, mirroring Julia's own call syntax, and they're given as name-value pairs: `=JuliaCallNamedArgs("sort", A1:A10, ";", "rev", TRUE)` calls `sort(A1:A10; rev=true)`. Julia finds the `";"` by searching backwards from the end of the arguments, so a `";"` among the positional arguments is never mistaken for it. A named argument whose value is `";"` must therefore be the last pair. Example [here](README.md#juliacallnamedargs).
 - New `JuliaExcel.kwargs_from_xl`, holding the named arguments most recently passed to `JuliaCallNamedArgs`/`JuliaCallNamedArgsVBA`, alongside `args_from_xl` for the positional ones.
 
-## [2.1.3] - 2026-10-17
+## [JuliaExcel 2.1.3] - 2026-10-17
 
 ### Bug fixes
 
 - Fixed `JuliaEval` of multi-line expressions, i.e. a one-column range with one Julia statement per cell. The cells were previously joined with `;` and parsed with `Meta.parse`, so a `#` comment in one cell commented out the code in every cell after it, and multi-line blocks such as `function ... end` spread across several cells could fail to parse. The cells are now joined with newlines, exactly as typed, and parsed with `Meta.parseall`, so comments and multi-line blocks behave as they would in a Julia script. `JuliaExcel.answer_again()` also now uses `Meta.parseall`.
 
-## [2.1.2] - 2026-09-16
+## [JuliaExcel 2.1.2] - 2026-09-16
 
 ### Performance improvements
 
 - Julia's HTTP responses to Excel now include an explicit `Content-Length` header. Previously, without it, HTTP.jl fell back to chunked transfer-encoding, and the VBA client's `MSXML2.ServerXMLHTTP` appears to reassemble a chunked body by repeatedly growing and copying its buffer - quadratic in the size of the response, so large results returned from `JuliaCall`/`JuliaEval` were far worse than linearly slower than small ones. Setting `Content-Length` lets it read directly into a preallocated buffer instead, restoring linear performance. For example, `JuliaEval("DataFrame(rand(Float64,(5000,1024)),:auto)")` fell from 241 seconds to 10.9 seconds - a 22x speedup - with smaller results also improving (e.g. 128 columns: 3.0s to 1.2s).
 
-## [2.1.1] - 2026-08-25
+## [JuliaExcel 2.1.1] - 2026-08-25
 
 ### Bug fixes
 
 - Fixed a `StringIndexError` when strings terminating in a multi-byte character were passed from Excel to Julia, e.g. `JuliaCall("identity", "xxx£")`. Present since v0.2.17, the first version to use the wire format for the Excel -> Julia direction.
 
-## [2.1.0] - 2026-08-24
+## [JuliaExcel 2.1.0] - 2026-08-24
 
 ### New features
 
@@ -68,7 +103,7 @@
 - New `JuliaExcel.serve_xl` function: attaches a Julia session that's already running (e.g. one open in VS Code) to Excel, instead of always launching a fresh process via `JuliaLaunch`. Call `JuliaExcel.serve_xl()` to attach to the single running Excel process automatically, or give the process id explicitly if more than one is running - get it from Excel's new `JuliaExcelPID()` worksheet function. Also adds `JuliaExcel.stop_server()` and `JuliaExcel.server_status()` for managing a session attached this way.
 - `JuliaLaunch` and `JuliaCall`/`JuliaEval` are more resilient to the Julia session behind them changing or disappearing mid-session, e.g. after `JuliaExcel.stop_server()`, or a session attached via `JuliaExcel.serve_xl` on a different port.
 
-## [2.0.0] - 2026-08-19
+## [JuliaExcel 2.0.0] - 2026-08-19
 
 ### Breaking changes
 
@@ -97,14 +132,14 @@
 
 *All figures measured on the same machine: Intel Core Ultra 9 288V, 32GB RAM*
 
-## [1.0.1] - 2026-08-14
+## [JuliaExcel 1.0.1] - 2026-08-14
 
 ### Changes
 
 * Simplifies installation.
 * Adds a compat entry for DataFrames, to meet registration requirements.
 
-## [1.0.0] - 2026-08-13
+## [JuliaExcel 1.0.0] - 2026-08-13
 
 ### Changes
 
@@ -131,7 +166,7 @@ Other changes in this release:
 
   * Removes the VBA functions `JuliaResultFile` and `JuliaUnserialiseFile` and the previously-exported Julia functions `htd` and `hts`.
 
-## [0.2.17] - 2026-08-07
+## [JuliaExcel 0.2.17] - 2026-08-07
 
 ### Changes
 
@@ -145,7 +180,7 @@ This version has better performance when passing large arrays of data between Ju
 `JuliaCall("sum",RANDARRAY(250000))` executes in 330 milliseconds
 `JuliaCall("sum",RANDARRAY(500000))` executes in 725 milliseconds
 
-## [0.2.16] - 2025-12-28
+## [JuliaExcel 0.2.16] - 2025-12-28
 
 ### Changes
 
@@ -159,13 +194,13 @@ Dictionaries can now be passed in both directions: VBA ↔ Julia. Previously, on
 - **Regional Settings Compatibility**
 JuliaExcel now works correctly when the Windows decimal symbol is not `.`.
 
-## [0.2.15] - 2025-10-30
+## [JuliaExcel 0.2.15] - 2025-10-30
 
 ### Changes
 
 * Communication between Julia and Excel (which is file-based) now has retry logic for better reliability, especially in tight loops or high-frequency calls.
 
-## [0.2.12] - 2025-10-16
+## [JuliaExcel 0.2.12] - 2025-10-16
 
 ### Changes
 
@@ -173,44 +208,44 @@ JuliaExcel now works correctly when the Windows decimal symbol is not `.`.
 - Julia variables of unsupported type are now returned to Excel as their string representation, via `Base.show`.
 - Improved handling of strings containing characters with high code points.
 
-## [0.2.10] - 2023-12-03
+## [JuliaExcel 0.2.10] - 2023-12-03
 
 ### Changes
 
 In prior versions, two functions (`GetCurrentProcessID` and `IsWindow`) were made visible as worksheet functions when they should not have been. This version corrects that.
 
-## [0.2.9] - 2023-09-20
+## [JuliaExcel 0.2.9] - 2023-09-20
 
 ### Changes
 
 Now launches Julia in interactive mode, i.e. with the `-i` command line option. The benefit is that when using [OhMyREPL](https://github.com/KristofferC/OhMyREPL.jl), `Ctrl + R` works correctly to see command history.
 
-## [0.2.8] - 2022-07-12
+## [JuliaExcel 0.2.8] - 2022-07-12
 
 ### Changes
 
 1) When [JuliaLaunch](https://github.com/PGS62/JuliaExcel.jl#julialaunch) is called, `julia.exe` must first be located: if it's on the PATH, the first one found there is used; otherwise, we search for the most recently modified copy of `julia.exe` in the locations where the Windows Julia installer places it. This change adds further such locations, in response to #10.
 2) The value returned to Excel is no longer displayed in the Julia REPL.
 
-## [0.2.7] - 2022-03-07
+## [JuliaExcel 0.2.7] - 2022-03-07
 
 ### Changes
 
 If the Julia code being called from Excel throws an exception, then a stack trace of the error is displayed in the Julia window (uses [showerror](https://docs.julialang.org/en/v1/base/io-network/#Base.showerror)). Particularly helpful when the Julia code is under development.
 
-## [0.2.6] - 2021-12-18
+## [JuliaExcel 0.2.6] - 2021-12-18
 
 ### Changes
 
 Fixes a bug in VBA method JuliaEvalVBA.
 
-## [0.2.5] - 2021-12-15
+## [JuliaExcel 0.2.5] - 2021-12-15
 
 ### Changes
 
 Now compatible with Excel 2013
 
-## [0.2.4] - 2021-12-10
+## [JuliaExcel 0.2.4] - 2021-12-10
 
 ### Changes
 
@@ -218,7 +253,7 @@ Now possible to run Julia on Ubuntu Linux running under Windows Subsystem for Li
 
 The arguments to `JuliaLaunch` have changed in a not backwards-compatible way, so any existing calls to `JuliaLaunch` in workbooks or VBA code will need to be amended when upgrading to this version.
 
-## [0.2.3] - 2021-12-02
+## [JuliaExcel 0.2.3] - 2021-12-02
 
 ### Changes
 
@@ -226,16 +261,16 @@ Dictionaries now handled.
 
 If `JuliaEvalVBA` and `JuliaCallVBA` evaluate on the Julia side to `result` where `typeof(result) <: AbstractDict`, then in VBA the return from the function is of type `Scripting.Dictionary`.
 
-## [0.2.2] - 2021-11-19
+## [JuliaExcel 0.2.2] - 2021-11-19
 
 ### Changes
 
 Now launches Julia with the `--threads=auto` command line option.
 
-## [0.2.1] - 2021-11-17
+## [JuliaExcel 0.2.1] - 2021-11-17
 
 The first documented release.
 
-## [0.1.0] - 2021-11-06
+## [JuliaExcel 0.1.0] - 2021-11-06
 
 First release. No documentation yet!

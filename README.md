@@ -359,7 +359,7 @@ Other points to note:
 The Excel add-in is written in C#, using [Excel-DNA](https://excel-dna.net/); its source is in the `dotnet-addin` folder of this repository. Julia source code is always visible on your PC, and the [@functionloc](https://docs.julialang.org/en/v1/stdlib/InteractiveUtils/#InteractiveUtils.@functionloc) macro is an easy way to locate the code of any function you're interested in.
 
 ## Shortcomings
-The most obvious shortcoming is the time taken to transfer large arrays between Excel and Julia. In practice this is rarely a problem: latency for a simple call is around a millisecond, and `=JuliaCall("sort", A1:A1000000)` on a million numbers takes about 0.75 seconds in total - roughly half the time taken by CallFromExcel's VBA-based predecessor, JuliaExcel. Most of what remains is the conversion of the array to and from the form an Excel add-in receives and returns, which is outside CallFromExcel's control. For most uses, transfer time is small compared with the execution time of the Julia code doing the actual work.
+The most obvious shortcoming is the time taken to transfer large arrays between Excel and Julia. In practice this is rarely a problem: latency for a simple call is under a millisecond, and `=JuliaCall("sort", A1:A1000000)` on a million numbers takes about 0.4 seconds in total - about a third of the time taken by CallFromExcel's VBA-based predecessor, JuliaExcel (see the [changelog](CHANGELOG.md) for more timings). For most uses, transfer time is small compared with the execution time of the Julia code doing the actual work.
 
 &nbsp;
 

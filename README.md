@@ -104,7 +104,7 @@ CallFromExcel makes the following functions available from Excel worksheets and 
 The VBA code below makes a call to `JuliaLaunch` and `JuliaEvalVBA` and then pastes the result to range A1:J10 in a new worksheet. VBA reaches CallFromExcel's functions through an object created with `CreateObject("CallFromExcel.ComServer")` - no reference (VBA editor, Tools menu -> References) is needed. Declare that object `As Object`, as below: functions such as `JuliaCall` that take a variable number of arguments can only be called that way.
 
 ```vba
-Sub DemoCallVBA()
+Sub Demo()
 
     Dim CallFromExcel As Object, ResultFromJulia As Variant, PasteHere As Range
     

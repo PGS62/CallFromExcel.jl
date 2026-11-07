@@ -4,20 +4,20 @@
 ,,,,,,,,,
 ,,,,,,,,,
 ,"CallFromExcel project path","c:/temp/CallFromExcel",,,,,,,
-,"CallFromExcelLaunch","Julia is already running in window ""Julia 1.13.3 on Windows serving Excel PID 47828, port 2700""",,,,,,,
+,"CallFromExcelLaunch","Julia is already running in window ""Julia 1.13.3 on Windows serving Excel PID 56684, port 2702""",,,,,,,
 ,"CallFromExcelTestCell",2,,,,,,,
 ,"JuliaInXLTestCell",2,,,,,,,
 ,"CallFromExcel running under Julia version","1.13.3",,,,,,,
 ,"JuliaInXL running under Julia version","1.13.3",,,,,,,
 ,"Computer","MSI",,,,,,,
-,"Results Identical?",False,,,,,,,
+,"Results Identical?",True,,,,,,,
 ,"MaximumAbsoluteDifference",1.11022302462516E-16,,,,,,,
 ,"LogBase2(MaxAbsDiff)",-53,,,,,,,
 ,,,,,,,,,
 ,"TestSpecWithHeaders",,,,,,,,
 ,"Description","VectorLength","CallFromExcelFormula","JuliaInXLFormula","NumCalls","OneCallPerCell","CallFromExcel (s)","JuliaInXL (s)","JuliaInXL / CallFromExcel"
-,"Latency",1000,"=JuliaEval(""1+1"")","=jleval(""1+1"")",1,True,9.45751200022642E-04,5.61665699991863E-04,0.59388314810324
-,"Transmit UnitRange to Excel",100000,"=JuliaEval(""1:VectorLength"")","{=jleval(""1:VectorLength"")}",5,False,0.015951279993169,5.38077400065958E-02,3.3732553142844
-,"Transmit Vector{Float64} to Excel",100000,"=JuliaEval(""(1:VectorLength).^2"")","{=jleval(""(1:VectorLength).^2"")}",5,False,5.29304399853572E-02,4.44155599921942E-02,0.839130753579252
-,"Roundtrip Vector{Float64}",100000,"=JuliaCall(""identity"",InputData)","{=jlcall(""identity"",InputData)}",5,False,4.01906600105576E-02,0.31325231998926,7.79415714763013
-,"Transmit Vector{Float64} to Julia",100000,"=JuliaCall(""sum"",InputData)","=jlcall(""sum"",InputData)",20,False,2.59511449927231E-02,0.2174159050046,8.37789257720863
+,"Latency",10000,"=JuliaEval(""1+1"")","=jleval(""1+1"")",1,True,1.47472390002804E-04,7.04687780002132E-04,4.77843873004794
+,"Transmit UnitRange to Excel",100000,"=JuliaEval(""1:VectorLength"")","{=jleval(""1:VectorLength"")}",5,False,1.02678999886848E-02,8.87159000034444E-02,8.64012116413376
+,"Transmit Vector{Float64} to Excel",100000,"=JuliaEval(""(1:VectorLength).^2"")","{=jleval(""(1:VectorLength).^2"")}",5,False,0.041022860025987,0.066489859984722,1.6208002060949
+,"Roundtrip Vector{Float64}",100000,"=JuliaCall(""identity"",InputData)","{=jlcall(""identity"",InputData)}",5,False,8.35341800004244E-02,0.749131520010997,8.96796401194326
+,"Transmit Vector{Float64} to Julia",100000,"=JuliaCall(""sum"",InputData)","=jlcall(""sum"",InputData)",20,False,3.45552900020266E-02,0.567048490006709,16.4098894835915

@@ -1,8 +1,10 @@
 ﻿,"Audit",,,,
 ,,,,,
-,"All 3 rows shown.",,,,
+,"All 5 rows shown.",,,,
 ,"Dbl-click","Double-click","Dbl-click","Double-click","Double-click to filter"
 ,"Version","Date","Time","Author","Comment"
+,5,2026-11-07,0.699247685188311,"Philip Swannell","Re-ran following optimisations to C# code of CallFromExcel which is now faster on all tests."
+,4,2026-11-07,0.686643518522033,"Philip Swannell","Re-ran following optimisations to C# code of CallFromExcel which is now faster on all tests."
 ,3,2026-11-07,0.63372685185459,"Philip Swannell","Updated to compare CallFromExcel with JuniaInXL."
 ,2,2026-08-21,0.428252314814017,"Philip Swannell","Added findings worksheet."
 ,1,2026-08-20,0.57450231481198,"Philip Swannell","First version"

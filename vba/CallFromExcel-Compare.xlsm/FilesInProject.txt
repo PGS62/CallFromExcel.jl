@@ -1,12 +1,10 @@
 ﻿AuditSheetComments.txt
 Formulas\Main.tsv
-Formulas\Sheet2.tsv
 Values\Audit.csv
 Values\CallFromExcel.csv
 Values\Findings.csv
 Values\InputData.csv
 Values\JuliaInXL.csv
 Values\Main.csv
-Values\Sheet2.csv
 VBA\modMain.bas
 VBA\modUtils.bas

@@ -13,17 +13,17 @@ CallFromExcel is the successor to [JuliaExcel](https://github.com/PGS62/JuliaExc
 [Installation](#installation)  
 [Installation (Linux)](#installation-linux)  
 [Upgrading from JuliaExcel](#upgrading-from-juliaexcel)  
-[Functions](#functions)   
+[Functions](#functions)  
 [Example VBA](#example-vba)  
 [Function Documentation](#function-documentation)  
+[Performance](#performance)  
+[Alternatives](#alternatives)  
+[Compatibility](#compatibility)  
 [Attaching to a Julia session already running elsewhere](#attaching-to-a-julia-session-already-running-elsewhere)  
 [Debugging](#debugging)  
 [Marshalling](#marshalling)  
-[Alternatives](#alternatives)  
-[Compatibility](#compatibility)  
-[Viewing the code](#viewing-the-code)  
 [How CallFromExcel works](#how-callfromexcel-works)  
-[Performance](#performance)  
+[Viewing the code](#viewing-the-code)  
 
 ## Demo
 Here's a quick demonstration of CallFromExcel's functions in action.
@@ -245,6 +245,19 @@ Returns the process id of the current Excel session. You'll rarely need this dir
 Public Function JuliaExcelPID() As Long
 ```
 
+## Performance
+Calls are fast: a simple call takes under a millisecond, and `=JuliaCall("sort", A1:A1000000)` sorts a million numbers in about 0.4 seconds, including sending them to Julia and back. That's faster than Excel's own `=SORT(A1:A1000000)`, which takes about 0.6 seconds, and about a third of the time taken by CallFromExcel's predecessor, JuliaExcel. See the [changelog](CHANGELOG.md) for more timings.
+
+## Alternatives
+There is one alternative method of calling Julia from Excel of which I am aware:  
+
+https://github.com/JuliaComputing/JuliaInXL.jl  
+
+JuliaComputing made JuliaInXL open source in October 2021; it previously required a licence for commercial use. As of August 2026, JuliaInXL is not compatible with dynamic array formulas, and does not permit calling Julia from VBA. In tests on the same PC (see `workbooks/CallFromExcel-Compare.xlsm`), CallFromExcel was faster than JuliaInXL in every test: about 5 times faster in latency, between 1.6 and 8.6 times faster returning results to Excel, and 16 times faster passing data from Excel to Julia.
+
+## Compatibility
+CallFromExcel requires 64-bit Excel for Windows - the default for Microsoft 365 - and has been tested on Excel under Microsoft 365. It is not compatible with 32-bit Excel: the installer checks, and stops with an error if Excel is 32-bit. It requires Excel 2016 or later, and _should_ work on 64-bit Excel 2016, 2019 and 2021, but has not been tested on them.
+
 ## Attaching to a Julia session already running elsewhere
 Normally `JuliaLaunch` starts its own dedicated Julia process. If you'd rather use a Julia session you already have open - for example one running inside VS Code, where you can set breakpoints and step through code - you can attach that session to Excel instead:
 
@@ -333,16 +346,6 @@ From VBA, numbers keep their VBA type: `Integer` arrives as `Int16`, `Long` as `
 
 ### Complex numbers return as text
 Excel has no complex number type. Its functions such as `IMREAL`, `IMAGINARY` and `IMSUM` work on text such as `"3+4i"` instead. So complex numbers in Julia return to Excel as text in exactly the format of Excel's own `COMPLEX` function, e.g. `"3+4i"`, `"-i"` or `"1.5+i"`, with 15 significant digits. As with `COMPLEX`, a number with a zero imaginary part returns as text without one, e.g. `"3"`. Text in this form passed from Excel to Julia arrives as a `String`, not as a complex number.
-  
-## Alternatives
-There is one alternative method of calling Julia from Excel of which I am aware:  
-
-https://github.com/JuliaComputing/JuliaInXL.jl  
-
-JuliaComputing made JuliaInXL open source in October 2021; it previously required a licence for commercial use. As of August 2026, JuliaInXL is not compatible with dynamic array formulas, and does not permit calling Julia from VBA. In tests on the same PC (see `workbooks/CallFromExcel-Compare.xlsm`), CallFromExcel was faster than JuliaInXL in every test: about 5 times faster in latency, between 1.6 and 8.6 times faster returning results to Excel, and 16 times faster passing data from Excel to Julia.
-
-## Compatibility
-CallFromExcel requires 64-bit Excel for Windows - the default for Microsoft 365 - and has been tested on Excel under Microsoft 365. It is not compatible with 32-bit Excel: the installer checks, and stops with an error if Excel is 32-bit. It requires Excel 2016 or later, and _should_ work on 64-bit Excel 2016, 2019 and 2021, but has not been tested on them.
 
 ## How CallFromExcel works
 CallFromExcel's Excel add-in is written in C#, using [Excel-DNA](https://excel-dna.net/). Its worksheet functions are registered with Excel through the [Excel SDK](https://docs.microsoft.com/en-us/office/client-developer/excel/welcome-to-the-excel-software-development-kit), and VBA calls the same code through the object created by `CreateObject("CallFromExcel.ComServer")`. The add-in communicates with Julia over a local HTTP connection:
@@ -358,9 +361,6 @@ Other points to note:
 
 ## Viewing the code
 The Excel add-in is written in C#, using [Excel-DNA](https://excel-dna.net/); its source is in the `dotnet-addin` folder of this repository. Julia source code is always visible on your PC, and the [@functionloc](https://docs.julialang.org/en/v1/stdlib/InteractiveUtils/#InteractiveUtils.@functionloc) macro is an easy way to locate the code of any function you're interested in.
-
-## Performance
-Calls are fast: a simple call takes under a millisecond, and `=JuliaCall("sort", A1:A1000000)` sorts a million numbers in about 0.4 seconds, including sending them to Julia and back. That's faster than Excel's own `=SORT(A1:A1000000)`, which takes about 0.6 seconds, and about a third of the time taken by CallFromExcel's predecessor, JuliaExcel. See the [changelog](CHANGELOG.md) for more timings.
 
 &nbsp;
 

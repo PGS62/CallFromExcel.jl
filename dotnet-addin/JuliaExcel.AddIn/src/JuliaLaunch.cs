@@ -6,24 +6,26 @@ using System.Threading;
 
 namespace JuliaExcel.AddIn
 {
-    // C# port of JuliaLaunch (modMain.bas), Windows-native only -- the WSL/Linux launch
-    // path (bash statements, wsl.exe, Windows<->WSL path translation) is deferred; see
-    // JuliaExeLocation's own note. Everything else (the flag-file/window-title readiness
-    // protocol, the generated Julia startup script, the stale-port/stale-window checks)
-    // is ported as closely as .NET's own APIs allow -- see inline notes for the handful of
-    // places .NET's Process/ProcessStartInfo don't have an exact equivalent of
-    // WshShell.Run's behavior.
+    // C# port of JuliaLaunch (modMain.bas). The flag-file/window-title readiness protocol,
+    // the generated Julia startup script, and the stale-port/stale-window checks are ported
+    // as closely as .NET's own APIs allow -- see inline notes for the handful of places
+    // .NET's Process/ProcessStartInfo don't have an exact equivalent of WshShell.Run's
+    // behavior. WSL support (bash statements, wsl.exe, Windows<->WSL path translation) is
+    // ported too, below.
     public static class JuliaLaunch
     {
         private const string PackageName = "JuliaExcel";
+        private const string WSLExecutable = @"C:\Windows\System32\wsl.exe";
 
         public static string Launch(
+            bool useLinux = false,
             bool minimiseWindow = false,
             string commandLineOptions = "",
             string packages = "",
+            string bashStatements = "",
             int timeoutSeconds = 30)
         {
-            string juliaExe = JuliaExeLocation.Find();
+            string juliaExe = JuliaExeLocation.Find(useLinux);
 
             string userSuppliedCommandLineOptions = commandLineOptions ?? "";
             commandLineOptions = userSuppliedCommandLineOptions;
@@ -120,13 +122,59 @@ namespace JuliaExcel.AddIn
 
             string loadFile = Path.Combine(FileUtils.LocalTemp(), "StartUp_" + pid + ".jl");
 
-            string flagFileX = flagFile.Replace("\\", "/");
-            string commsFolderX = FileUtils.LocalTemp().Replace("\\", "/");
-            string errorFileX = errorFile.Replace("\\", "/");
-            string loadFileX = loadFile.Replace("\\", "/");
-
             string trimmedOptions = commandLineOptions.Trim();
-            string command = "\"" + juliaExe + "\" " + trimmedOptions + " --load \"" + loadFileX + "\"";
+            string flagFileX, commsFolderX, errorFileX, loadFileX, command;
+            string processFileName, processArguments;
+
+            if (useLinux)
+            {
+                if (!File.Exists(WSLExecutable))
+                {
+                    throw new InvalidOperationException(
+                        "Cannot find the WSL executable at '" + WSLExecutable + "'. Check if the file exists and " +
+                        "whether read and execute permissions are set for user '" + Environment.UserName + "'");
+                }
+                errorFileX = WSLAddress(errorFile);
+                flagFileX = WSLAddress(flagFile);
+                commsFolderX = WSLAddress(FileUtils.LocalTemp());
+                loadFileX = WSLAddress(loadFile);
+
+                // Only need a wrapper .sh script if there are BashStatements (e.g. to set
+                // environment variables) to run before launching Julia itself - otherwise
+                // the inner command below can invoke Julia directly.
+                bool wslLaunchFileNecessary = !string.IsNullOrEmpty(bashStatements);
+                string innerCommand;
+                if (wslLaunchFileNecessary)
+                {
+                    string wslLaunchFile = Path.Combine(FileUtils.LocalTemp(), "launchjulia.sh");
+                    string wslLaunchFileX = WSLAddress(wslLaunchFile);
+                    string wslLaunchFileContents = "#!/bin/bash\n" + bashStatements.TrimEnd('\n') + "\n" +
+                        juliaExe + " " + trimmedOptions + " --load \"" + loadFileX + "\"";
+                    FileUtils.SaveTextFile(wslLaunchFile, wslLaunchFileContents);
+                    // Run via bash rather than directly: files written from Windows onto /mnt/c lack execute permission.
+                    innerCommand = "bash '" + wslLaunchFileX + "' && exit";
+                }
+                else
+                {
+                    innerCommand = juliaExe + " " + trimmedOptions + " --load '" + loadFileX + "'";
+                }
+                // Login shell (bash -lc) so juliaup's PATH entry is picked up - a plain `wsl <command>`
+                // doesn't source it. Paths inside innerCommand use bash single quotes so they don't
+                // clash with the Windows-level double quotes grouping the whole argument.
+                processFileName = "wsl";
+                processArguments = "bash -lc \"" + innerCommand + "\"";
+                command = "wsl " + processArguments;
+            }
+            else
+            {
+                flagFileX = flagFile.Replace("\\", "/");
+                commsFolderX = FileUtils.LocalTemp().Replace("\\", "/");
+                errorFileX = errorFile.Replace("\\", "/");
+                loadFileX = loadFile.Replace("\\", "/");
+                processFileName = juliaExe;
+                processArguments = trimmedOptions + " --load \"" + loadFileX + "\"";
+                command = "\"" + juliaExe + "\" " + processArguments;
+            }
 
             // MakeJuliaLiteral wraps its result in quotes (so it can stand alone as a
             // Julia string literal); strip them here since the escaped content is about
@@ -159,8 +207,8 @@ namespace JuliaExcel.AddIn
             // works for both, so there's no reason to special-case it.
             var psi = new ProcessStartInfo
             {
-                FileName = juliaExe,
-                Arguments = trimmedOptions + " --load \"" + loadFileX + "\"",
+                FileName = processFileName,
+                Arguments = processArguments,
                 UseShellExecute = true,
                 WindowStyle = minimiseWindow ? ProcessWindowStyle.Minimized : ProcessWindowStyle.Normal
             };
@@ -207,6 +255,20 @@ namespace JuliaExcel.AddIn
                     "Julia launched but encountered an error when executing '" + loadFile + "' the error was: " +
                     FileUtils.ReadTextFile(errorFile));
             }
+
+            // Under WSL the port can take a while to become reachable from Windows after Julia
+            // starts listening (WSL2 port forwarding), so wait for it within the same timeout.
+            while (port > 0 && !JuliaHttpClient.IsListening(port))
+            {
+                if (stopwatch.Elapsed.TotalSeconds > timeoutSeconds)
+                {
+                    return "Julia has not signalled it's ready after " + timeoutSeconds + " seconds - it may " +
+                           "still be precompiling packages. Once you see \"JuliaExcel HTTP server listening\" " +
+                           "printed in its window, call JuliaLaunch (or JuliaEval) again.";
+                }
+                Thread.Sleep(100);
+            }
+
             if (JuliaPort.GetJuliaPort() == 0)
             {
                 throw new InvalidOperationException(
@@ -223,6 +285,19 @@ namespace JuliaExcel.AddIn
                 return "Julia launched in window \"" + WindowUtils.WindowTitleFromHandle(hwndFinal) + "\"";
             }
             return "Julia launched (listening on port " + JuliaPort.GetJuliaPort() + ")";
+        }
+
+        // "C:\foo\bar" -> "/mnt/c/foo/bar". Port of WSLAddress (modUtils.bas).
+        private static string WSLAddress(string windowsAddress)
+        {
+            if (windowsAddress.Length < 3 || windowsAddress[1] != ':' ||
+                (windowsAddress[2] != '\\' && windowsAddress[2] != '/'))
+            {
+                throw new ArgumentException("windowsAddress must start with characters \"x:\\\" for some drive-letter x");
+            }
+            string driveLetter = char.ToLowerInvariant(windowsAddress[0]).ToString();
+            string rest = windowsAddress.Substring(2).Replace("\\", "/");
+            return "/mnt/" + driveLetter + rest;
         }
 
         private static string BuildStartupScript(string packages, int pid, string commsFolderX, string errorFileX, string flagFileX, string literalCommand)

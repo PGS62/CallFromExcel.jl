@@ -148,13 +148,20 @@ For manual testing from real VBA: see `vba\TestRealAddin.bas`.
    binding gotchas (a `params object[]` method like `JuliaCall` can't be
    called early-bound at all - always use late-bound `Dim j As Object`),
    and the `OneBasedArray`/0-based-`Array()`-spreading gotcha.
-3. WSL/Linux Julia launch support, if still wanted.
-4. Planned breaking change (once released under the new package name,
+3. Planned breaking change (once released under the new package name,
    see below): give `JuliaLaunch` a dedicated `project` parameter
    instead of requiring `--project=...` to be embedded in
    `CommandLineOptions`.
 
 **Resolved since the status above was written:**
+- WSL/Linux Julia launch: `JuliaLaunch`'s `UseLinux`/`BashStatements`
+  now work (via `wsl bash -lc ...`, so juliaup's PATH entry is picked
+  up). Tested by hand with `modTest.RunWSLTest`, deliberately not part
+  of `RunTests` - it hangs when run headless via `Run-VbaTests.ps1`
+  (not investigated), and switching rapidly between native and WSL
+  sessions can briefly leave the WSL port unreachable (a WSL2 port-
+  forwarding quirk that doesn't arise at human pace). WSL's Julia needs
+  this repo's dependencies instantiated once before first use.
 - A real installer: `installer/Install.ps1` (in this folder) - installs
   to `%APPDATA%\Microsoft\AddIns\JuliaExcel` (no admin needed),
   uninstalls the old xlam if present, no interactive prompts. See its

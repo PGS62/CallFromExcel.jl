@@ -63,7 +63,7 @@ namespace JuliaExcel.AddIn
     {
         public string Launch(bool minimiseWindow, string commandLineOptions, string packages, int timeoutSeconds)
         {
-            return global::JuliaExcel.AddIn.JuliaLaunch.Launch(minimiseWindow, commandLineOptions, packages, timeoutSeconds);
+            return global::JuliaExcel.AddIn.JuliaLaunch.Launch(minimiseWindow: minimiseWindow, commandLineOptions: commandLineOptions, packages: packages, timeoutSeconds: timeoutSeconds);
         }
 
         public string Post(string payload, string path)
@@ -153,18 +153,12 @@ namespace JuliaExcel.AddIn
 
         // Unlike the other migration wrappers above, this can't just delegate to
         // JuliaFunctions.JuliaLaunch (its CommandLineOptions/Packages/TimeOut parameters are
-        // typed `object` to detect ExcelMissing, an XLL-only concept). UseLinux/BashStatements
-        // (WSL launch) are not yet supported by this port - old VBA code passing UseLinux:=True
-        // gets a clear error here rather than silently launching on Windows instead.
+        // typed `object` to detect ExcelMissing, an XLL-only concept).
         public object JuliaLaunch(bool useLinux = false, bool minimiseWindow = false, string commandLineOptions = "", string packages = "", string bashStatements = "", int timeOut = 30)
         {
-            if (useLinux || !string.IsNullOrEmpty(bashStatements))
-            {
-                throw new System.NotSupportedException("JuliaLaunch's UseLinux/BashStatements (launching Julia under WSL) is not yet supported by the C# port of JuliaExcel - launch Julia natively on Windows instead.");
-            }
             try
             {
-                return global::JuliaExcel.AddIn.JuliaLaunch.Launch(minimiseWindow: minimiseWindow, commandLineOptions: commandLineOptions, packages: packages, timeoutSeconds: timeOut);
+                return global::JuliaExcel.AddIn.JuliaLaunch.Launch(useLinux: useLinux, minimiseWindow: minimiseWindow, commandLineOptions: commandLineOptions, packages: packages, bashStatements: bashStatements, timeoutSeconds: timeOut);
             }
             catch (System.Exception ex)
             {

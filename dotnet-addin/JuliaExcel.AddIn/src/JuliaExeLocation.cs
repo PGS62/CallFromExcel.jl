@@ -3,13 +3,15 @@ using System.IO;
 
 namespace JuliaExcel.AddIn
 {
-    // C# port of JuliaExeLocation (modMain.bas), Windows-native only -- the WSL branch
-    // (UseLinux=True, just returning the literal string "julia") is deferred along with
-    // the rest of JuliaLaunch's WSL support.
+    // C# port of JuliaExeLocation (modMain.bas).
     public static class JuliaExeLocation
     {
-        public static string Find()
+        public static string Find(bool useLinux = false)
         {
+            // Under WSL, "julia" is resolved by the Linux-side shell against its own PATH,
+            // not anything Windows-side - no search needed here, matching the VBA original.
+            if (useLinux) return "julia";
+
             // First search PATH.
             string pathEnv = Environment.GetEnvironmentVariable("PATH") ?? "";
             foreach (string folder in pathEnv.Split(';'))

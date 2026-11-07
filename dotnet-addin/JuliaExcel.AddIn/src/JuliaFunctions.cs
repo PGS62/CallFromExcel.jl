@@ -36,33 +36,29 @@ namespace JuliaExcel.AddIn
 
         // Parameter order (UseLinux, MinimiseWindow, CommandLineOptions, Packages,
         // BashStatements, TimeOut) deliberately matches the old VBA worksheet function
-        // (modMain.bas) exactly, even though UseLinux/BashStatements aren't supported yet -
-        // dropping them from the signature (as an earlier version of this wrapper did) broke
-        // every old formula that set a later positional argument (e.g.
+        // (modMain.bas) exactly - dropping any of them from the signature (as an earlier
+        // version of this wrapper did, before WSL support existed here) broke every old
+        // formula that set a later positional argument (e.g.
         // "=JuliaLaunch(,,""--project=...."")" to set CommandLineOptions) by silently
         // shifting it onto the wrong parameter.
         [ExcelFunction(Description = "Launches a local Julia session which listens to the current Excel session and responds to calls to JuliaEval etc..", IsThreadSafe = false)]
         public static object JuliaLaunch(
-            [ExcelArgument(Name = "UseLinux", Description = "Launch Julia under WSL instead of natively on Windows. Not yet supported by this C# port - leave FALSE/blank.")] object useLinux,
+            [ExcelArgument(Name = "UseLinux", Description = "Launch Julia under WSL instead of natively on Windows.")] object useLinux,
             [ExcelArgument(Name = "MinimiseWindow", Description = "Launch Julia's console window minimised.")] object minimiseWindow,
             [ExcelArgument(Name = "CommandLineOptions", Description = "Command line options set when launching Julia.")] object commandLineOptions,
             [ExcelArgument(Name = "Packages", Description = "Packages to load, comma-delimited, which must be available in the default Julia environment.")] object packages,
-            [ExcelArgument(Name = "BashStatements", Description = "Bash statements to run before launching Julia under WSL. Not yet supported by this C# port - leave blank.")] object bashStatements,
+            [ExcelArgument(Name = "BashStatements", Description = "Relevant only when UseLinux is TRUE. Bash statements to run before launching Julia under WSL, e.g. to set environment variables. Delimit multiple statements with the line feed character.")] object bashStatements,
             [ExcelArgument(Name = "TimeOut", Description = "Seconds to wait for Julia to fully start before giving up waiting. Defaults to 30.")] object timeOut)
         {
             try
             {
                 bool linux = (useLinux is ExcelMissing) ? false : Convert.ToBoolean(useLinux);
                 string bash = (bashStatements is ExcelMissing) ? "" : Convert.ToString(bashStatements);
-                if (linux || !string.IsNullOrEmpty(bash))
-                {
-                    throw new NotSupportedException("JuliaLaunch's UseLinux/BashStatements (launching Julia under WSL) is not yet supported by the C# port of JuliaExcel - launch Julia natively on Windows instead.");
-                }
                 bool minimise = (minimiseWindow is ExcelMissing) ? false : Convert.ToBoolean(minimiseWindow);
                 string cmdOpts = (commandLineOptions is ExcelMissing) ? "" : Convert.ToString(commandLineOptions);
                 string pkgs = (packages is ExcelMissing) ? "" : Convert.ToString(packages);
                 int timeout = (timeOut is ExcelMissing) ? 30 : Convert.ToInt32(Convert.ToDouble(timeOut));
-                return JuliaExcel.AddIn.JuliaLaunch.Launch(minimiseWindow: minimise, commandLineOptions: cmdOpts, packages: pkgs, timeoutSeconds: timeout);
+                return JuliaExcel.AddIn.JuliaLaunch.Launch(useLinux: linux, minimiseWindow: minimise, commandLineOptions: cmdOpts, packages: pkgs, bashStatements: bash, timeoutSeconds: timeout);
             }
             catch (Exception ex)
             {

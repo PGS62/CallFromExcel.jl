@@ -70,18 +70,10 @@ Function RunTests(Optional SilentMode As Boolean = False, Optional CommandLineOp
           Dim NumFailed As Long
           Dim NumPassed As Long
           Dim Prompt As String
-          Dim XllPath As String
 
           On Error GoTo ErrHandler
 
-          Set JuliaExcel = CreateObject("JuliaExcel.AddIn.ComServer")
-
-          XllPath = ThisWorkbook.Path & "\..\..\JuliaExcel.AddIn\bin\Release\net48\publish\JuliaExcel.AddIn64-packed.xll"
-          If Dir(XllPath) = vbNullString Then
-              Throw "Cannot find the add-in at " & XllPath & _
-                  " - build it first (dotnet build -c Release in dotnet-addin\JuliaExcel.AddIn)."
-          End If
-          Application.RegisterXLL XllPath
+          LoadAddIn
 
           JuliaExcel.JuliaEval "exit()"
           Sleep 1000 'Give time to shut down properly, otherwise launch can fail thinking Julia still running but unresponsive
@@ -183,15 +175,24 @@ ErrHandler:
           RunTests = False
 End Function
 
+Private Sub LoadAddIn()
+          Dim XllPath As String
+          Set JuliaExcel = CreateObject("JuliaExcel.AddIn.ComServer")
+          XllPath = ThisWorkbook.Path & "\..\..\JuliaExcel.AddIn\bin\Release\net48\publish\JuliaExcel.AddIn64-packed.xll"
+          If Dir(XllPath) = vbNullString Then
+              Throw "Cannot find the add-in at " & XllPath & _
+                  " - build it first (dotnet build -c Release in dotnet-addin\JuliaExcel.AddIn)."
+          End If
+          Application.RegisterXLL XllPath
+End Sub
+
+' Echoing into the Julia REPL is best-effort: a logging helper must never abort the test run.
 Sub PrintTwice(Text As String)
-          On Error GoTo ErrHandler
-          ThrowIfError JuliaExcel.JuliaEval("println(" & SimpleJuliaStringLiteral(Text) & ")")
           Debug.Print Text
           TestLog = TestLog & Text & vbCrLf
-
-          Exit Sub
-ErrHandler:
-          ReThrow "PrintTwice", Err
+          On Error Resume Next
+          JuliaExcel.JuliaEval "println(" & SimpleJuliaStringLiteral(Text) & ")"
+          On Error GoTo 0
 End Sub
 
 ' Minimal ASCII-safe Julia string literal, enough for the plain diagnostic text PrintTwice is
@@ -1313,6 +1314,41 @@ Function WsTest_RelaunchAfterExit() As Boolean
 ErrHandler:
           PrintTwice ReThrow("WsTest_RelaunchAfterExit", Err, True)
           WsTest_RelaunchAfterExit = False
+End Function
+
+' Smoke test for Julia under WSL. Not part of RunTests (which needs a native session): run it by
+' hand from the VBA editor, in a visible Excel with no Julia session running. (It hangs when run
+' headless via Run-VbaTests.ps1 - not investigated.) One-time setup - instantiate this repo's
+' dependencies in WSL's Julia:
+' wsl bash -lc "julia --project=/mnt/c/Projects/JuliaExcel -e 'using Pkg; Pkg.instantiate()'"
+Function RunWSLTest(Optional SilentMode As Boolean = False) As Boolean
+          Const Title = "JuliaExcel RunWSLTest"
+          Dim ws As Worksheet
+          Dim Prompt As String
+
+          On Error GoTo ErrHandler
+
+          LoadAddIn
+          If JuliaExcel.JuliaIsRunning() Then
+              Throw "Julia is already running - close it, then run RunWSLTest again"
+          End If
+
+          Set ws = ScratchSheet()
+          ws.Range("A1").Formula2 = "=JuliaLaunch(TRUE,,""--project=" & WindowsPathToWSL(RepoRoot()) & """)"
+          ThrowIfError ws.Range("A1").Value2
+          ws.Range("A2").Formula2 = "=JuliaEval(""Sys.islinux()"")"
+          RunWSLTest = (ws.Range("A2").Value2 = True) And (JuliaExcel.JuliaCall("identity", 1) = 1)
+
+          Prompt = IIf(RunWSLTest, "RunWSLTest passed", "RunWSLTest FAILED: Julia did not report running under Linux")
+          PrintTwice Prompt
+          JuliaExcel.JuliaEval "exit()"
+          If Not SilentMode Then MsgBox Prompt, IIf(RunWSLTest, vbInformation, vbCritical), Title
+          Exit Function
+ErrHandler:
+          Prompt = ReThrow("RunWSLTest", Err, True)
+          TestLog = TestLog & Prompt & vbCrLf
+          If Not SilentMode Then MsgBox Prompt, vbCritical, Title
+          RunWSLTest = False
 End Function
 
 ' Cross-path consistency check: JuliaIsRunning/JuliaExcelPID as real worksheet formulas

@@ -324,3 +324,17 @@ Function HexToDouble(ByVal Hex As String) As Double
 ErrHandler:
           ReThrow "HexToDouble", Err
 End Function
+
+Function RepoRoot() As String
+          RepoRoot = CreateObject("Scripting.FileSystemObject").GetAbsolutePathName(ThisWorkbook.Path & "\..\..\..")
+End Function
+
+' "C:\foo\bar" -> "/mnt/c/foo/bar"
+Function WindowsPathToWSL(WindowsAddress As String) As String
+          On Error GoTo ErrHandler
+          If Mid(WindowsAddress, 2, 1) <> ":" Then Throw "WindowsAddress must start with characters ""x:\"" for some drive-letter x"
+          WindowsPathToWSL = "/mnt/" & LCase(Left(WindowsAddress, 1)) & Replace(Mid(WindowsAddress, 3), "\", "/")
+          Exit Function
+ErrHandler:
+          ReThrow "WindowsPathToWSL", Err
+End Function

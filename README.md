@@ -32,7 +32,7 @@ Here's a quick demonstration of CallFromExcel's functions in action.
  * Replay the GIF by refreshing your browser (F5).
 
 <a href="#no-click">
-  <img src="images/Demo4-take5.gif" alt="Calling Julia from Excel worksheet formulas with JuliaLaunch, JuliaEval and JuliaCall, with the Julia REPL echoing each call" />
+  <img src="images/Demo4-take6.gif" alt="Calling Julia from Excel worksheet formulas with JuliaLaunch, JuliaEval and JuliaCall, with the Julia REPL echoing each call" />
 </a>
 
 ## Installation
@@ -50,12 +50,13 @@ Installation does not require admin rights on the PC.
    `Pkg.build` is what installs the Excel add-in. `Pkg.add` usually does that too, but only the first time a given version of CallFromExcel is added to your PC - so if you've since removed the add-in from Excel, `Pkg.add` alone won't put it back.
  * Launch Excel. Check that the CallFromExcel functions are available by typing `=Julia` into a worksheet cell and checking that the auto-complete offers `JuliaCall`, `JuliaEval`, `JuliaInclude` etc.
  * Functions missing in Excel, or need to reinstall? Close Excel and run `Pkg.build("CallFromExcel")` again.
-
+<!--
 The process is illustrated in the GIF below. F5 to replay.
 
 <a href="#no-click">
   <img src="images/install-take4.gif" alt="Installing the CallFromExcel Excel add-in from the Julia REPL with Pkg.add, then checking the Julia functions appear in Excel" />
 </a>
+-->
 
 ## Installation (Linux)
 As an alternative to calling Julia running in a Windows process, CallFromExcel can call Julia running in a Linux process under Windows Subsystem for Linux (WSL). If that's your preference, then in addition to the steps described above, you need to:

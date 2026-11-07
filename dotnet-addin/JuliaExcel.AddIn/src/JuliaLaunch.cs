@@ -325,7 +325,14 @@ namespace JuliaExcel.AddIn
                    "    JuliaExcel.start_server()\n" +
                    "    rm(\"" + flagFileX + "\")\n" +
                    "catch e\n" +
-                   "    theerror = \"$e\"\n" +
+                   // Julia's own message suggests Pkg.add(\"JuliaExcel\"), which fails: the package isn't registered.
+                   "    theerror = if e isa ArgumentError && startswith(e.msg, \"Package " + PackageName + " not found\")\n" +
+                   "        \"The " + PackageName + " package is not installed in Julia's active environment ($(Base.active_project())). " +
+                   "Install it with: import Pkg; Pkg.add(url=\\\"https://github.com/PGS62/JuliaExcel.jl\\\", rev=\\\"dev_csharp_port\\\") " +
+                   "- or, if it is installed in a different environment, add --project=<that environment's folder> to JuliaLaunch's CommandLineOptions.\"\n" +
+                   "    else\n" +
+                   "        \"$e\"\n" +
+                   "    end\n" +
                    "    @error theerror \n" +
                    "    errorfile = \"" + errorFileX + "\"\n" +
                    "    io = open(errorfile, \"w\")\n" +

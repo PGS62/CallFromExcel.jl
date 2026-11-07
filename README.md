@@ -341,7 +341,7 @@ https://github.com/JuliaComputing/JuliaInXL.jl
 JuliaComputing made JuliaInXL open source in October 2021; it previously required a licence for commercial use. As of August 2026, JuliaInXL is not compatible with dynamic array formulas, and does not permit calling Julia from VBA. In tests on the same PC (see `workbooks/CallFromExcel-Compare.xlsm`), CallFromExcel was faster than JuliaInXL in every test: about 5 times faster in latency, between 1.6 and 8.6 times faster returning results to Excel, and 16 times faster passing data from Excel to Julia.
 
 ## Compatibility
-CallFromExcel requires 64-bit Excel for Windows - the default for Microsoft 365 - and has been tested on Excel under Microsoft 365. It is not compatible with 32-bit Excel: the installer checks, and stops with an error if Excel is 32-bit. It _should_ work on earlier 64-bit versions of Excel (perhaps back to Excel 2016) but it has not been tested on them.
+CallFromExcel requires 64-bit Excel for Windows - the default for Microsoft 365 - and has been tested on Excel under Microsoft 365. It is not compatible with 32-bit Excel: the installer checks, and stops with an error if Excel is 32-bit. It requires Excel 2016 or later, and _should_ work on 64-bit Excel 2016, 2019 and 2021, but has not been tested on them.
 
 ## How CallFromExcel works
 CallFromExcel's Excel add-in is written in C#, using [Excel-DNA](https://excel-dna.net/). Its worksheet functions are registered with Excel through the [Excel SDK](https://docs.microsoft.com/en-us/office/client-developer/excel/welcome-to-the-excel-software-development-kit), and VBA calls the same code through the object created by `CreateObject("CallFromExcel.ComServer")`. The add-in communicates with Julia over a local HTTP connection:

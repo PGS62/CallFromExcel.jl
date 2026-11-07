@@ -166,11 +166,7 @@ namespace CallFromExcel.AddIn
             }
         }
 
-        // Fixed at the modern (Excel 2016+) limit rather than querying Excel's own version
-        // (as JuliaFunctions.StringLengthLimit does via ExcelDnaUtil.ExcelVersion) -- that
-        // would need ExcelDna.Integration.dll loadable, which this COM-only code path must
-        // not depend on (see the note on JuliaCall/JuliaEval below). Pre-2016 Excel is not a
-        // realistic target in 2026.
+        // Excel 2016 and later, as in JuliaFunctions.cs.
         private const int StringLengthLimit = 32768;
 
         // Worksheet-style counterpart to CallVBACore below, used by the migration methods

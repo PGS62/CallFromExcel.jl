@@ -14,22 +14,9 @@ namespace CallFromExcel.AddIn
     // could see each other's arguments.
     public static class JuliaFunctions
     {
-        // Port of GetStringLengthLimit (modUnserialise.bas): Excel 2010 and earlier capped
-        // array-element strings at 255 chars; 2016+ (all report version 16) raised it to 32,767.
-        private static int _stringLengthLimit = 32768;
-
-        // Called from AutoOpen, on Excel's main thread: ExcelDnaUtil.ExcelVersion reads an Excel
-        // COM property, which deadlocks Excel if read from a calculation thread while the main
-        // thread waits for that calculation.
-        internal static void CacheStringLengthLimit()
-        {
-            _stringLengthLimit = ExcelDnaUtil.ExcelVersion <= 15 ? 256 : 32768;
-        }
-
-        private static int StringLengthLimit()
-        {
-            return _stringLengthLimit;
-        }
+        // Excel 2016 and later. (Excel 2013 and earlier, which CallFromExcel doesn't support,
+        // capped strings in an array at 255 characters.)
+        private const int StringLengthLimit = 32768;
 
         // Parameter order (UseLinux, MinimiseWindow, CommandLineOptions, Packages,
         // BashStatements, TimeOut) deliberately matches the old VBA worksheet function
@@ -136,7 +123,7 @@ namespace CallFromExcel.AddIn
         // nothing/missing an empty cell.
         private static object DecodeForWorksheet(string responseWire)
         {
-            object result = WireFormatDecode.Decode(responseWire, allowNesting: false, stringLengthLimit: StringLengthLimit(), vectorToColumn: true, forWorksheet: true);
+            object result = WireFormatDecode.Decode(responseWire, allowNesting: false, stringLengthLimit: StringLengthLimit, vectorToColumn: true, forWorksheet: true);
             return WireFormatDecode.MapLeaves(result, v => v is ExcelErrorValue ev ? MapToExcelDnaError(ev.Code) : v ?? ExcelEmpty.Value);
         }
 

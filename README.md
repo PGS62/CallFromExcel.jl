@@ -23,7 +23,7 @@ CallFromExcel is the successor to [JuliaExcel](https://github.com/PGS62/JuliaExc
 [Compatibility](#compatibility)  
 [Viewing the code](#viewing-the-code)  
 [How CallFromExcel works](#how-callfromexcel-works)  
-[Shortcomings](#shortcomings)  
+[Performance](#performance)  
 
 ## Demo
 Here's a quick demonstration of CallFromExcel's functions in action.
@@ -344,22 +344,22 @@ JuliaComputing made JuliaInXL open source in October 2021; it previously require
 CallFromExcel requires 64-bit Excel for Windows - the default for Microsoft 365 - and has been tested on Excel under Microsoft 365. It is not compatible with 32-bit Excel: the installer checks, and stops with an error if Excel is 32-bit. It _should_ work on earlier 64-bit versions of Excel (perhaps back to Excel 2016) but it has not been tested on them.
 
 ## How CallFromExcel works
-CallFromExcel communicates between Excel and Julia over a local HTTP connection:
-1) `JuliaLaunch` starts a Julia process (as a normal Windows process, or under WSL) running a small HTTP server (`CallFromExcel.start_server()`) on a free local port, and writes that port number to a file so VBA can discover it. If a session for the current Excel process already appears to be running, `JuliaLaunch` checks that it's actually responding before reusing it, rather than starting a duplicate.
+CallFromExcel's Excel add-in is written in C#, using [Excel-DNA](https://excel-dna.net/). Its worksheet functions are registered with Excel through the [Excel SDK](https://docs.microsoft.com/en-us/office/client-developer/excel/welcome-to-the-excel-software-development-kit), and VBA calls the same code through the object created by `CreateObject("CallFromExcel.ComServer")`. The add-in communicates with Julia over a local HTTP connection:
+1) `JuliaLaunch` starts a Julia process (as a normal Windows process, or under WSL) running a small HTTP server (`CallFromExcel.start_server()`) on a free local port, and writes that port number to a file so the add-in can find it. If a session for the current Excel process already appears to be running, `JuliaLaunch` checks that it's actually responding before reusing it, rather than starting a duplicate.
 2) `JuliaEval` POSTs the Julia expression as plain text to the server's `/eval` endpoint. The Julia function `srv_eval_inner` (in `comms.jl`) evaluates it with `Meta.parseall`/`eval` and returns the result - encoded in CallFromExcel's own wire format - in the HTTP response body.
 3) `JuliaCall` and `JuliaCallVBA` instead encode the function name and its arguments (marshalled per the rules described in [Marshalling](#marshalling)) into that same wire format and POST it to the `/call` endpoint. `srv_call_inner` decodes it and invokes the named function directly, returning the result the same way. This avoids `Meta.parse`ing a literal expression, which is slow for calls passing large arrays. `JuliaCallNamedArgs` and `JuliaCallNamedArgsVBA` encode their arguments the same way but POST them to the `/callkw` endpoint, where Julia splits them at the `";"` into positional and named arguments.
-4) VBA unserialises the response body back into worksheet values or VBA variables.
+4) The add-in decodes the response body into worksheet values or VBA variables.
 
 Other points to note:
- * The wire format was designed above all to be fast to parse in VBA: its length-prefixes let VBA just slice strings at known offsets. JSON was the obvious alternative but requires bracket-matching and escape handling. JSON also has no native support for 2-D arrays (a worksheet range), only nested 1-D arrays, and a much thinner type system than VBA's Variant (no distinction between e.g. Long and Double).
- * Each `JuliaEval`/`JuliaCall` is a simple synchronous HTTP request/response. If Julia isn't there to answer (e.g. after `=JuliaEval("exit()")`), the request fails with a connection error, which VBA reports as a normal error.
- * Best performance would still be achieved using C via the [Excel SDK](https://docs.microsoft.com/en-us/office/client-developer/excel/welcome-to-the-excel-software-development-kit) and [Julia Embedding](https://docs.julialang.org/en/v1/manual/embedding/).
+ * The wire format distinguishes the types VBA does (e.g. `Long` from `Double`), and supports 2-D arrays (a worksheet range) and Excel error values. JSON, the obvious alternative, has only nested 1-D arrays and a much thinner type system. Arrays of numbers are sent in bulk, without per-element type or length information, and Julia ranges such as `1:1000000` are sent as just their first value, step and length.
+ * Each `JuliaEval`/`JuliaCall` is a synchronous HTTP request/response, over connections kept open between calls. If Julia isn't there to answer (e.g. after `=JuliaEval("exit()")`), the call returns an error saying so.
+ * Running Julia inside Excel's own process, via [Julia embedding](https://docs.julialang.org/en/v1/manual/embedding/), would avoid the HTTP round trip altogether. But Julia could then only be restarted by restarting Excel and there would be no separate Julia REPL to watch or debug in.
 
 ## Viewing the code
 The Excel add-in is written in C#, using [Excel-DNA](https://excel-dna.net/); its source is in the `dotnet-addin` folder of this repository. Julia source code is always visible on your PC, and the [@functionloc](https://docs.julialang.org/en/v1/stdlib/InteractiveUtils/#InteractiveUtils.@functionloc) macro is an easy way to locate the code of any function you're interested in.
 
-## Shortcomings
-The most obvious shortcoming is the time taken to transfer large arrays between Excel and Julia. In practice this is rarely a problem: latency for a simple call is under a millisecond, and `=JuliaCall("sort", A1:A1000000)` on a million numbers takes about 0.4 seconds in total - about a third of the time taken by CallFromExcel's VBA-based predecessor, JuliaExcel (see the [changelog](CHANGELOG.md) for more timings). For most uses, transfer time is small compared with the execution time of the Julia code doing the actual work.
+## Performance
+Calls are fast: a simple call takes under a millisecond, and `=JuliaCall("sort", A1:A1000000)` sorts a million numbers in about 0.4 seconds, including sending them to Julia and back. That's faster than Excel's own `=SORT(A1:A1000000)`, which takes about 0.6 seconds, and about a third of the time taken by CallFromExcel's predecessor, JuliaExcel. See the [changelog](CHANGELOG.md) for more timings.
 
 &nbsp;
 

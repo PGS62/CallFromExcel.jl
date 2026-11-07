@@ -1,7 +1,7 @@
 using System;
 using System.IO;
 
-namespace JuliaExcel.AddIn
+namespace CallFromExcel.AddIn
 {
     // C# port of JuliaExeLocation (modMain.bas).
     public static class JuliaExeLocation

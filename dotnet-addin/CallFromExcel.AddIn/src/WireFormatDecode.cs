@@ -1,9 +1,9 @@
 using System;
 using System.Globalization;
 
-namespace JuliaExcel.AddIn
+namespace CallFromExcel.AddIn
 {
-    // C# port of Unserialise (modUnserialise.bas) -- decodes a JuliaExcel wire-format
+    // C# port of Unserialise (modUnserialise.bas) -- decodes a CallFromExcel wire-format
     // string back into a .NET value. See WireFormatEncode.cs for the .NET<->VBA Variant
     // type mapping used throughout.
     //

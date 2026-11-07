@@ -1,20 +1,20 @@
 Attribute VB_Name = "TestRealAddin"
 Option Explicit
 
-' Manual test module for the real C# add-in (dotnet-addin\JuliaExcel.AddIn), covering
+' Manual test module for the real C# add-in (dotnet-addin\CallFromExcel.AddIn), covering
 ' both call paths: JuliaLaunch/JuliaCall/JuliaEval as worksheet (XLL) functions, and
 ' JuliaCallVBA/JuliaEvalVBA via the COM-visible class (for Dictionary/nested-array
 ' results that Application.Run/XLL functions can't carry).
 '
 ' Setup (one-time):
-' 1. Build: cd dotnet-addin\JuliaExcel.AddIn && dotnet build -c Release
+' 1. Build: cd dotnet-addin\CallFromExcel.AddIn && dotnet build -c Release
 ' 2. Load the add-in: Excel > File > Options > Add-ins > Manage Excel Add-ins > Go... >
-'    Browse... > select bin\Release\net48\publish\JuliaExcel.AddIn64-packed.xll
+'    Browse... > select bin\Release\net48\publish\CallFromExcel.AddIn64-packed.xll
 ' 3. COM registration for JuliaCallVBA/JuliaEvalVBA (via ComServer): this session
-'    registered JuliaExcel.AddIn.ComServer under HKCU:\Software\Classes (no admin
-'    needed) pointing at bin\Release\net48\JuliaExcel.AddIn.dll. If you rebuild and the
+'    registered CallFromExcel.ComServer under HKCU:\Software\Classes (no admin
+'    needed) pointing at bin\Release\net48\CallFromExcel.AddIn.dll. If you rebuild and the
 '    DLL path changes, or on a different machine/user account, re-register with:
-'      $dllPath = "<repo>\dotnet-addin\JuliaExcel.AddIn\bin\Release\net48\JuliaExcel.AddIn.dll"
+'      $dllPath = "<repo>\dotnet-addin\CallFromExcel.AddIn\bin\Release\net48\CallFromExcel.AddIn.dll"
 '      (see this session's own commands for the exact HKCU registration script, or use
 '      an elevated RegAsm /codebase against that DLL for a normal HKLM registration)
 ' 4. Import this module into any workbook.
@@ -43,7 +43,7 @@ End Sub
 
 Sub TestComPath()
     Dim comServer As Object
-    Set comServer = CreateObject("JuliaExcel.AddIn.ComServer")
+    Set comServer = CreateObject("CallFromExcel.ComServer")
 
     Dim result As Variant
     result = comServer.JuliaCallVBA("+", 3, 4)

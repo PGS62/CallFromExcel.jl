@@ -1,7 +1,7 @@
 using System;
 using System.Globalization;
 
-namespace JuliaExcel.AddIn
+namespace CallFromExcel.AddIn
 {
     // C# port of the hex encode/decode helpers in modUnserialise.bas/modSerialise.bas
     // (DoubleToHex/HexToDouble, SingleToHex/HexToSingle, and the bulk "V"-format

@@ -7,8 +7,8 @@
          add-ins), and the COM-server + single-file-packing combination isn't clearly
          documented as proven under modern .NET. -->
     <Platforms>x64</Platforms>
-    <RootNamespace>JuliaExcel.AddIn</RootNamespace>
-    <AssemblyName>JuliaExcel.AddIn</AssemblyName>
+    <RootNamespace>CallFromExcel.AddIn</RootNamespace>
+    <AssemblyName>CallFromExcel.AddIn</AssemblyName>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <!-- We write ComVisible(false) at the assembly level ourselves (AssemblyInfo.cs) and
          opt specific classes in individually. SDK-style auto-generated AssemblyInfo

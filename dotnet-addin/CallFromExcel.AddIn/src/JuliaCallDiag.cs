@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using ExcelDna.Integration;
 
-namespace JuliaExcel.AddIn
+namespace CallFromExcel.AddIn
 {
     // Diagnostic XLL functions kept for future performance investigation -- not part of
     // the production API. Used to fully explain why the real, end-to-end

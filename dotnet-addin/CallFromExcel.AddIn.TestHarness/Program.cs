@@ -1,4 +1,4 @@
-namespace JuliaExcel.AddIn.TestHarness
+namespace CallFromExcel.AddIn.TestHarness
 {
     internal static class Program
     {

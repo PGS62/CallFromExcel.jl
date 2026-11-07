@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 
-namespace JuliaExcel.AddIn
+namespace CallFromExcel.AddIn
 {
     // Represents a VBA error Variant (what CVErr(n) produces / CStr(CVErr(n)) prints as
     // "Error n"). The wire format carries VBA's own XlCVError UI codes (e.g. 2007 for
@@ -25,7 +25,7 @@ namespace JuliaExcel.AddIn
     // rather than wrapping an actual Scripting.Dictionary COM object -- avoids a dependency
     // on that library being registered, and keeps this self-contained.
     [ComVisible(true)]
-    [Guid("2b6e8a1d-4c7f-4e2a-9b3d-5f8e6a1c2d4b")]
+    [Guid("f34593ef-a7db-43f6-a0ad-61d0cd86c218")]
     [InterfaceType(ComInterfaceType.InterfaceIsDual)]
     public interface IJuliaDictionary
     {
@@ -40,8 +40,8 @@ namespace JuliaExcel.AddIn
     }
 
     [ComVisible(true)]
-    [Guid("7e4c9f2a-1b8d-4a6e-8c3f-9d2b5a7e1f6c")]
-    [ProgId("JuliaExcel.AddIn.JuliaDictionary")]
+    [Guid("51faa46c-bed1-43fc-9571-91e7c7bd7385")]
+    [ProgId("CallFromExcel.JuliaDictionary")]
     [ClassInterface(ClassInterfaceType.None)]
     [ComDefaultInterface(typeof(IJuliaDictionary))]
     public class JuliaDictionary : IJuliaDictionary

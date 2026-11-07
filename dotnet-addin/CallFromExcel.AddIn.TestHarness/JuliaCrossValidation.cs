@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
-using JuliaExcel.AddIn;
+using CallFromExcel.AddIn;
 
-namespace JuliaExcel.AddIn.TestHarness
+namespace CallFromExcel.AddIn.TestHarness
 {
     // Cross-validates WireFormatEncode/WireFormatDecode against the REAL Julia process
     // (not just self-consistency): launches Julia, round-trips a battery of values

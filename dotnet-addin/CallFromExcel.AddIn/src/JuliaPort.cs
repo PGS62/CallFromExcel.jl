@@ -2,20 +2,20 @@ using System;
 using System.Diagnostics;
 using System.IO;
 
-namespace JuliaExcel.AddIn
+namespace CallFromExcel.AddIn
 {
     // C# port of the port-caching logic in modHttp.bas (SetJuliaPort/GetJuliaPort/
     // ReadJuliaPortFromFile). The port file is named by this process's own PID -- when
     // this code eventually runs loaded into Excel via Excel-DNA, Process.GetCurrentProcess().Id
     // is Excel's own PID, matching exactly what Julia's startup script is told to expect
-    // (see JuliaLaunch.BuildStartupScript's "JuliaExcel.setxlpid(...)" call) and what the
+    // (see JuliaLaunch.BuildStartupScript's "CallFromExcel.setxlpid(...)" call) and what the
     // VBA version keys its own port file on.
     public static class JuliaPort
     {
         private const string NoConnectionMessage =
             "There is no connection between Excel and Julia. If you haven't already, call JuliaLaunch. " +
             "If you have, Julia may still be starting (e.g. precompiling packages) - wait until you see " +
-            "\"JuliaExcel HTTP server listening\" printed in its window, then try again.";
+            "\"CallFromExcel HTTP server listening\" printed in its window, then try again.";
 
         private static int _cachedPort;
 

@@ -1,6 +1,6 @@
 using System.Text;
 
-namespace JuliaExcel.AddIn
+namespace CallFromExcel.AddIn
 {
     // C# port of MakeJuliaLiteral (modJuliaLiteral.bas): escape a string so it can be
     // embedded, double-quoted, as a Julia string literal. Sole use: embedding the launch

@@ -4,22 +4,22 @@
 # dist\source-hash.txt. test/runtests.jl recomputes that hash and fails if the source has
 # changed since dist\ was last refreshed.
 #
-# Runs automatically after every Release build (see JuliaExcel.AddIn.csproj).
+# Runs automatically after every Release build (see CallFromExcel.AddIn.csproj).
 #
 # Hash definition - must match source_hash in test/runtests.jl exactly: SHA-256 over every
-# file under JuliaExcel.AddIn\ except its bin\ and obj\ folders, in ordinal order of their
+# file under CallFromExcel.AddIn\ except its bin\ and obj\ folders, in ordinal order of their
 # relative paths (forward slashes), each contributing <path> LF <bytes> LF, with all CR bytes
 # removed so that git's line-ending conversion can't change the result.
 
 $ErrorActionPreference = "Stop"
 
-$projectDir = Join-Path $PSScriptRoot "JuliaExcel.AddIn"
+$projectDir = Join-Path $PSScriptRoot "CallFromExcel.AddIn"
 $buildDir = Join-Path $projectDir "bin\Release\net48"
 $distDir = Join-Path $PSScriptRoot "dist"
 
 if (-not (Test-Path $distDir)) { New-Item -ItemType Directory -Path $distDir | Out-Null }
-Copy-Item (Join-Path $buildDir "publish\JuliaExcel.AddIn64-packed.xll") $distDir -Force
-Copy-Item (Join-Path $buildDir "JuliaExcel.AddIn.dll") $distDir -Force
+Copy-Item (Join-Path $buildDir "publish\CallFromExcel.AddIn64-packed.xll") $distDir -Force
+Copy-Item (Join-Path $buildDir "CallFromExcel.AddIn.dll") $distDir -Force
 
 $projectRoot = (Resolve-Path $projectDir).Path.TrimEnd('\') + '\'
 $files = Get-ChildItem $projectDir -Recurse -File | Where-Object {

@@ -4,7 +4,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 
-namespace JuliaExcel.AddIn
+namespace CallFromExcel.AddIn
 {
     // C# port of JuliaHttpPost/TryHttpSend (modHttp.bas). Uses the classic synchronous
     // HttpWebRequest/HttpWebResponse API rather than HttpClient's async methods: the
@@ -34,7 +34,7 @@ namespace JuliaExcel.AddIn
             }
 
             // The cached port didn't respond - it may be stale, e.g. because
-            // JuliaExcel.serve_xl was called from Julia on a different port, without this
+            // CallFromExcel.serve_xl was called from Julia on a different port, without this
             // process's cached port being told. Re-read the port file directly (bypassing
             // the cache) and retry once before giving up, matching JuliaHttpPost.
             int refreshedPort = JuliaPort.ReadJuliaPortFromFile();

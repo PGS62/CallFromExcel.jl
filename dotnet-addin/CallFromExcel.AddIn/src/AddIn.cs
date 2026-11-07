@@ -1,7 +1,7 @@
 using ExcelDna.Integration;
 using ExcelDna.IntelliSense;
 
-namespace JuliaExcel.AddIn
+namespace CallFromExcel.AddIn
 {
     // Embeds the IntelliSense display server into this add-in's own .xll, so users get
     // formula-bar IntelliSense (from the [ExcelFunction]/[ExcelArgument] descriptions in

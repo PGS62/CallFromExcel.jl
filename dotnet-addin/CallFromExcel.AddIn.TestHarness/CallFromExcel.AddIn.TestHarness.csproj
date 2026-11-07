@@ -7,7 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\JuliaExcel.AddIn\JuliaExcel.AddIn.csproj" />
+    <ProjectReference Include="..\CallFromExcel.AddIn\CallFromExcel.AddIn.csproj" />
   </ItemGroup>
 
 </Project>

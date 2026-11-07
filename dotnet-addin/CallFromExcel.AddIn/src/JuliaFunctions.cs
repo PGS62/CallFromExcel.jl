@@ -2,7 +2,7 @@ using System;
 using System.Text;
 using ExcelDna.Integration;
 
-namespace JuliaExcel.AddIn
+namespace CallFromExcel.AddIn
 {
     // C# port of the worksheet-facing JuliaCall/JuliaEval (modMain.bas) as ordinary
     // Excel-DNA XLL functions -- per the August plan: "JuliaCall/JuliaEval (worksheet-
@@ -58,7 +58,7 @@ namespace JuliaExcel.AddIn
                 string cmdOpts = (commandLineOptions is ExcelMissing) ? "" : Convert.ToString(commandLineOptions);
                 string pkgs = (packages is ExcelMissing) ? "" : Convert.ToString(packages);
                 int timeout = (timeOut is ExcelMissing) ? 30 : Convert.ToInt32(Convert.ToDouble(timeOut));
-                return JuliaExcel.AddIn.JuliaLaunch.Launch(useLinux: linux, minimiseWindow: minimise, commandLineOptions: cmdOpts, packages: pkgs, bashStatements: bash, timeoutSeconds: timeout);
+                return CallFromExcel.AddIn.JuliaLaunch.Launch(useLinux: linux, minimiseWindow: minimise, commandLineOptions: cmdOpts, packages: pkgs, bashStatements: bash, timeoutSeconds: timeout);
             }
             catch (Exception ex)
             {
@@ -106,14 +106,14 @@ namespace JuliaExcel.AddIn
             [ExcelArgument(Name = "VariableName", Description = "The name of the variable to be set. Must follow Julia's rules for allowed variable names.")] string variableName,
             [ExcelArgument(Name = "RefersTo", Description = "An Excel range, or a number, string, Boolean, empty cell or array of such types.")] object refersTo)
         {
-            return CallCore("JuliaExcel.setvar", new[] { (object)variableName, refersTo }, "/call");
+            return CallCore("CallFromExcel.setvar", new[] { (object)variableName, refersTo }, "/call");
         }
 
         [ExcelFunction(Description = "Load a Julia source file into the Julia process, to make additional functions available via JuliaEval and JuliaCall.", IsThreadSafe = true)]
         public static object JuliaInclude(
             [ExcelArgument(Name = "FileName", Description = "The full name of the file to be included.")] string fileName)
         {
-            return CallCore("JuliaExcel.include", new object[] { fileName.Replace("\\", "/") }, "/call");
+            return CallCore("CallFromExcel.include", new object[] { fileName.Replace("\\", "/") }, "/call");
         }
 
         private static object CallCore(string juliaFunction, object[] args, string endpoint)

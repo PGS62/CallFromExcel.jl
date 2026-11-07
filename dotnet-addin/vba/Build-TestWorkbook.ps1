@@ -1,6 +1,6 @@
 # Build-TestWorkbook.ps1
-# (Re)builds dotnet-addin\vba\TestJuliaExcel.xlsm from its VBA source
-# (dotnet-addin\vba\TestJuliaExcel.xlsm\VBA\*.bas) by importing those modules into a fresh
+# (Re)builds dotnet-addin\vba\TestCallFromExcel.xlsm from its VBA source
+# (dotnet-addin\vba\TestCallFromExcel.xlsm\VBA\*.bas) by importing those modules into a fresh
 # workbook via COM automation - the source .bas files are what's under version control; the
 # .xlsm itself is a build artifact (not committed), rebuilt from source whenever needed.
 #
@@ -21,9 +21,9 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$vbaSourceDir = Join-Path $PSScriptRoot "TestJuliaExcel.xlsm\VBA"
+$vbaSourceDir = Join-Path $PSScriptRoot "TestCallFromExcel.xlsm\VBA"
 if ($OutputPath -eq "") {
-    $OutputPath = Join-Path $PSScriptRoot "TestJuliaExcel.xlsm\TestJuliaExcel.xlsm"
+    $OutputPath = Join-Path $PSScriptRoot "TestCallFromExcel.xlsm\TestCallFromExcel.xlsm"
 }
 $outputPath = $OutputPath
 

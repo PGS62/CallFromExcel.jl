@@ -2,7 +2,7 @@ using System;
 using System.Runtime.InteropServices;
 using System.Text;
 
-namespace JuliaExcel.AddIn
+namespace CallFromExcel.AddIn
 {
     // C# port of modWindowUtils.bas's window-enumeration helpers (NumWindowsWithCaption,
     // GetHandleFromPartialCaption, WindowTitleFromHandle) -- same Win32 API, same approach

@@ -4,7 +4,7 @@ using System.IO;
 using System.Text;
 using System.Threading;
 
-namespace JuliaExcel.AddIn
+namespace CallFromExcel.AddIn
 {
     // C# port of JuliaLaunch (modMain.bas). The flag-file/window-title readiness protocol,
     // the generated Julia startup script, and the stale-port/stale-window checks are ported
@@ -14,7 +14,7 @@ namespace JuliaExcel.AddIn
     // ported too, below.
     public static class JuliaLaunch
     {
-        private const string PackageName = "JuliaExcel";
+        private const string PackageName = "CallFromExcel";
         private const string WSLExecutable = @"C:\Windows\System32\wsl.exe";
 
         public static string Launch(
@@ -52,7 +52,7 @@ namespace JuliaExcel.AddIn
             }
 
             int pid = Process.GetCurrentProcess().Id;
-            string windowPartialTitle = "serving Excel PID " + pid; // must match Julia's JuliaExcel.settitle
+            string windowPartialTitle = "serving Excel PID " + pid; // must match Julia's CallFromExcel.settitle
 
             bool foundWindow = WindowUtils.TryGetHandleFromPartialCaption(windowPartialTitle, out IntPtr hwndJulia);
             int existingPort = JuliaPort.ReadJuliaPortFromFile();
@@ -92,13 +92,13 @@ namespace JuliaExcel.AddIn
             {
                 // Either no window was found, or the one found doesn't match the currently
                 // listening port - most likely a session started by calling
-                // JuliaExcel.serve_xl directly (e.g. from a Julia REPL in VS Code), which
+                // CallFromExcel.serve_xl directly (e.g. from a Julia REPL in VS Code), which
                 // has no dedicated console window to find. Read from disk rather than the
                 // (possibly stale) cache, and refresh that cache, so this reliably
                 // discovers a session attached this way instead of launching a redundant one.
                 JuliaPort.SetJuliaPort(existingPort);
                 return "Julia is already running, listening on port " + existingPort +
-                       " with no dedicated console window - most likely a session attached via JuliaExcel.serve_xl";
+                       " with no dedicated console window - most likely a session attached via CallFromExcel.serve_xl";
             }
             if (foundWindow)
             {
@@ -240,7 +240,7 @@ namespace JuliaExcel.AddIn
                 if (stopwatch.Elapsed.TotalSeconds > timeoutSeconds)
                 {
                     return "Julia has not signalled it's ready after " + timeoutSeconds + " seconds - it may " +
-                           "still be precompiling packages. Once you see \"JuliaExcel HTTP server listening\" " +
+                           "still be precompiling packages. Once you see \"CallFromExcel HTTP server listening\" " +
                            "printed in its window, call JuliaLaunch (or JuliaEval) again.";
                 }
             }
@@ -263,7 +263,7 @@ namespace JuliaExcel.AddIn
                 if (stopwatch.Elapsed.TotalSeconds > timeoutSeconds)
                 {
                     return "Julia has not signalled it's ready after " + timeoutSeconds + " seconds - it may " +
-                           "still be precompiling packages. Once you see \"JuliaExcel HTTP server listening\" " +
+                           "still be precompiling packages. Once you see \"CallFromExcel HTTP server listening\" " +
                            "printed in its window, call JuliaLaunch (or JuliaEval) again.";
                 }
                 Thread.Sleep(100);
@@ -272,8 +272,8 @@ namespace JuliaExcel.AddIn
             if (JuliaPort.GetJuliaPort() == 0)
             {
                 throw new InvalidOperationException(
-                    "Failed to establish connection between Julia and Excel. Is JuliaExcel installed correctly. " +
-                    "See https://github.com/PGS62/JuliaExcel.jl#installation");
+                    "Failed to establish connection between Julia and Excel. Is CallFromExcel installed correctly. " +
+                    "See https://github.com/PGS62/CallFromExcel.jl#installation");
             }
 
             // Best-effort only: on this exact machine (and plausibly for anyone using
@@ -302,7 +302,7 @@ namespace JuliaExcel.AddIn
 
         private static string BuildStartupScript(string packages, int pid, string commsFolderX, string errorFileX, string flagFileX, string literalCommand)
         {
-            // PGS 8 Dec 2021 (ported comment): it's important to make "using JuliaExcel"
+            // PGS 8 Dec 2021 (ported comment): it's important to make "using CallFromExcel"
             // the last "using" statement, believed to help avoid "world-age" problems.
             string allPackages = packages == ""
                 ? "Dates," + PackageName
@@ -318,17 +318,17 @@ namespace JuliaExcel.AddIn
 
             return "try\n" +
                    usingStatements +
-                   "    JuliaExcel.setxlpid(" + pid + ")\n" +
-                   "    JuliaExcel.comms_folder(\"" + commsFolderX + "\")\n" +
+                   "    CallFromExcel.setxlpid(" + pid + ")\n" +
+                   "    CallFromExcel.comms_folder(\"" + commsFolderX + "\")\n" +
                    "    println(\"Julia $VERSION, using " + PackageName + " to serve Excel running as process ID " + pid + ".\")\n" +
                    "    println(\"Julia launched with command: " + literalCommand + " \")\n" +
-                   "    JuliaExcel.start_server()\n" +
+                   "    CallFromExcel.start_server()\n" +
                    "    rm(\"" + flagFileX + "\")\n" +
                    "catch e\n" +
-                   // Julia's own message suggests Pkg.add(\"JuliaExcel\"), which fails: the package isn't registered.
+                   // Julia's own message suggests Pkg.add(\"CallFromExcel\"), which fails: the package isn't registered.
                    "    theerror = if e isa ArgumentError && startswith(e.msg, \"Package " + PackageName + " not found\")\n" +
                    "        \"The " + PackageName + " package is not installed in Julia's active environment ($(Base.active_project())). " +
-                   "Install it with: import Pkg; Pkg.add(url=\\\"https://github.com/PGS62/JuliaExcel.jl\\\", rev=\\\"dev_csharp_port\\\") " +
+                   "Install it with: import Pkg; Pkg.add(url=\\\"https://github.com/PGS62/CallFromExcel.jl\\\") " +
                    "- or, if it is installed in a different environment, add --project=<that environment's folder> to JuliaLaunch's CommandLineOptions.\"\n" +
                    "    else\n" +
                    "        \"$e\"\n" +

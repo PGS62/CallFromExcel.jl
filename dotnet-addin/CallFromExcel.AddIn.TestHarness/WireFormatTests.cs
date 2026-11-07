@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
-using JuliaExcel.AddIn;
+using CallFromExcel.AddIn;
 
-namespace JuliaExcel.AddIn.TestHarness
+namespace CallFromExcel.AddIn.TestHarness
 {
     // Self-contained correctness suite for WireFormatEncode/WireFormatDecode -- no Excel,
     // VBA or Julia needed. Includes the exact example strings from modUnserialise.bas's

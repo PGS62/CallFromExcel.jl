@@ -5,8 +5,8 @@
 # registers the XLL (Application.RegisterXLL) and creates the COM object it needs.
 #
 # Prerequisites:
-#   - dotnet build -c Release in dotnet-addin\JuliaExcel.AddIn (produces the packed .xll)
-#   - JuliaExcel.AddIn.ComServer registered for COM (see dotnet-addin\README.md)
+#   - dotnet build -c Release in dotnet-addin\CallFromExcel.AddIn (produces the packed .xll)
+#   - CallFromExcel.ComServer registered for COM (see dotnet-addin\README.md)
 #   - Excel Trust Center -> Trust Center Settings -> Macro Settings ->
 #     [x] Trust access to the VBA project object model
 #
@@ -20,7 +20,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 if ($XlPath -eq "") {
-    $XlPath = Join-Path $PSScriptRoot "TestJuliaExcel.xlsm\TestJuliaExcel.xlsm"
+    $XlPath = Join-Path $PSScriptRoot "TestCallFromExcel.xlsm\TestCallFromExcel.xlsm"
 }
 $xlPath = $XlPath
 if (-not (Test-Path $xlPath)) {

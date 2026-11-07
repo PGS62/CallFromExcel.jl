@@ -3,7 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Threading;
 
-namespace JuliaExcel.AddIn
+namespace CallFromExcel.AddIn
 {
     // C# port of the file-handling helpers in modUtils.bas. Most of modUtils.bas's own
     // helpers (FileExists, ReadTextFile, GetFullTempPath, IsProcessRunning) existed to work
@@ -13,7 +13,7 @@ namespace JuliaExcel.AddIn
     // behaviour) and the PID-based cleanup logic are ported.
     public static class FileUtils
     {
-        private const string SubFolderName = "@JuliaExcel";
+        private const string SubFolderName = "@CallFromExcel";
         private static string _localTemp;
 
         // Port of LocalTemp (modUtils.bas): a writable directory for files used to

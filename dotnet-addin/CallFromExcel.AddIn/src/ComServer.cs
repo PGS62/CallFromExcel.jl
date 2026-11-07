@@ -1,6 +1,6 @@
 using System.Runtime.InteropServices;
 
-namespace JuliaExcel.AddIn
+namespace CallFromExcel.AddIn
 {
     // The VBA-facing COM-visible class for JuliaCallVBA/JuliaEvalVBA (step 5 of the
     // plan) -- needed because Application.Run/XLL function return types can't carry a
@@ -16,9 +16,9 @@ namespace JuliaExcel.AddIn
     // in this codebase) go through IDispatch either way, so this only costs the early-bound
     // IntelliSense tooltip for the params-array methods, not any functionality.
     [ComVisible(true)]
-    [Guid("6a6e3e0a-6f3a-4b9a-8a2a-1d6f7c9a2b4e")]
+    [Guid("8ba635c2-d745-4d97-8fec-6cbfb398ae6d")]
     [InterfaceType(ComInterfaceType.InterfaceIsDual)]
-    public interface IJuliaExcelComServer
+    public interface ICallFromExcelComServer
     {
         string Launch(bool minimiseWindow, string commandLineOptions, string packages, int timeoutSeconds);
         string Post(string payload, string path);
@@ -34,10 +34,10 @@ namespace JuliaExcel.AddIn
         object JuliaCallNamedArgsVBA(string juliaFunction, params object[] args);
 
         // Migration surface for VBA code that used to call these as bare Public Functions
-        // in a referenced JuliaExcel.xlam (Tools > References -> JuliaExcel). Since the new
+        // in a referenced JuliaExcel.xlam (Tools > References -> CallFromExcel). Since the new
         // world has no xlam at all, old call sites become e.g.
-        //   Result = JuliaExcel.JuliaCall("sqrt", 16)
-        // with JuliaExcel declared once as CreateObject("JuliaExcel.AddIn.ComServer") (or the
+        //   Result = CallFromExcel.JuliaCall("sqrt", 16)
+        // with CallFromExcel declared once as CreateObject("CallFromExcel.ComServer") (or the
         // early-bound equivalent after a Tools > References to this assembly's type library).
         // These intentionally keep the worksheet-style restrictions (string-length limit,
         // no nested arrays/Dictionaries, 1-D arrays become a column) that the original
@@ -55,15 +55,15 @@ namespace JuliaExcel.AddIn
     }
 
     [ComVisible(true)]
-    [Guid("9d7b5c1a-2e4f-4a8b-9c3d-7e1a5b6f8c2d")]
-    [ProgId("JuliaExcel.AddIn.ComServer")]
+    [Guid("0581209a-2052-43b8-8875-83bfe419e8c5")]
+    [ProgId("CallFromExcel.ComServer")]
     [ClassInterface(ClassInterfaceType.None)]
-    [ComDefaultInterface(typeof(IJuliaExcelComServer))]
-    public class ComServer : IJuliaExcelComServer
+    [ComDefaultInterface(typeof(ICallFromExcelComServer))]
+    public class ComServer : ICallFromExcelComServer
     {
         public string Launch(bool minimiseWindow, string commandLineOptions, string packages, int timeoutSeconds)
         {
-            return global::JuliaExcel.AddIn.JuliaLaunch.Launch(minimiseWindow: minimiseWindow, commandLineOptions: commandLineOptions, packages: packages, timeoutSeconds: timeoutSeconds);
+            return global::CallFromExcel.AddIn.JuliaLaunch.Launch(minimiseWindow: minimiseWindow, commandLineOptions: commandLineOptions, packages: packages, timeoutSeconds: timeoutSeconds);
         }
 
         public string Post(string payload, string path)
@@ -143,12 +143,12 @@ namespace JuliaExcel.AddIn
 
         public object JuliaSetVar(string variableName, object refersTo)
         {
-            return CallCore("JuliaExcel.setvar", new[] { (object)variableName, refersTo }, "/call");
+            return CallCore("CallFromExcel.setvar", new[] { (object)variableName, refersTo }, "/call");
         }
 
         public object JuliaInclude(string fileName)
         {
-            return CallCore("JuliaExcel.include", new object[] { fileName.Replace("\\", "/") }, "/call");
+            return CallCore("CallFromExcel.include", new object[] { fileName.Replace("\\", "/") }, "/call");
         }
 
         // Unlike the other migration wrappers above, this can't just delegate to
@@ -158,7 +158,7 @@ namespace JuliaExcel.AddIn
         {
             try
             {
-                return global::JuliaExcel.AddIn.JuliaLaunch.Launch(useLinux: useLinux, minimiseWindow: minimiseWindow, commandLineOptions: commandLineOptions, packages: packages, bashStatements: bashStatements, timeoutSeconds: timeOut);
+                return global::CallFromExcel.AddIn.JuliaLaunch.Launch(useLinux: useLinux, minimiseWindow: minimiseWindow, commandLineOptions: commandLineOptions, packages: packages, bashStatements: bashStatements, timeoutSeconds: timeOut);
             }
             catch (System.Exception ex)
             {

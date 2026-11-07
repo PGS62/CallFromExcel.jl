@@ -1,12 +1,12 @@
 Attribute VB_Name = "modTestUtils"
 ' Copyright (c) 2021-2026 Philip Swannell
 ' License MIT (https://opensource.org/licenses/MIT)
-' Document: https://github.com/PGS62/JuliaExcel.jl#readme
+' Document: https://github.com/PGS62/CallFromExcel.jl#readme
 '
 ' Generic, JuliaExcel-independent helpers used by modTest.bas, ported from
 ' vba\JuliaExcel.xlam\VBA (modTestDependents.bas, modUtils.bas, modSetGet.bas,
 ' modPrivateMethods.bas, modUnserialise.bas). These are plain VBA array/error-handling/
-' bit-pattern utilities with no dependency on JuliaExcel itself, so they port to the new
+' bit-pattern utilities with no dependency on CallFromExcel itself, so they port to the new
 ' (no-xlam) world unchanged, except ThrowIfError (see note below).
 
 Option Explicit

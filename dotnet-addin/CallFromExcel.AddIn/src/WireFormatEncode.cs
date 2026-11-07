@@ -4,10 +4,10 @@ using System.Globalization;
 using System.Reflection;
 using System.Text;
 
-namespace JuliaExcel.AddIn
+namespace CallFromExcel.AddIn
 {
     // C# port of SerialiseElement/TrySerialiseArrayAsV (modSerialise.bas) -- encodes a
-    // single .NET value (scalar or array) into the JuliaExcel wire format. See
+    // single .NET value (scalar or array) into the CallFromExcel wire format. See
     // WireFormatDecode.cs for the full format specification (mirrored from
     // modUnserialise.bas's own wire-format spec comment) and the corresponding decoder.
     //

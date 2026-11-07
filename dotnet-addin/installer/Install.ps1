@@ -1,4 +1,4 @@
-# Installer for the C#/Excel-DNA JuliaExcel add-in (dotnet-addin), replacing the old
+# Installer for the C#/Excel-DNA CallFromExcel add-in (dotnet-addin), replacing the old
 # installer\Install.ps1 (pure-VBA JuliaExcel.xlam world) at the repo root. That script stays
 # as-is, serving users who haven't upgraded yet.
 #
@@ -21,7 +21,7 @@ param(
     # %APPDATA%\Microsoft\AddIns is Excel's own per-user add-ins folder - the "best practice"
     # no-admin-needed location (it's what Excel's own Add-ins > Browse dialog opens to by
     # default), rather than a self-invented folder like the old installer's
-    # C:\Users\Public\JuliaExcel\. A dedicated subfolder (rather than loose files directly in
+    # C:\Users\Public\CallFromExcel\. A dedicated subfolder (rather than loose files directly in
     # AddIns\) keeps our 2-3 files tidy without affecting how Excel loads the add-in - that's
     # driven entirely by the full path recorded in the registry (see Install-ExcelAddin
     # below), not by which folder the file happens to sit in.
@@ -30,12 +30,12 @@ param(
     # choice existed to avoid "Excel Link Hell" (a workbook's VBA project stores an absolute
     # path to a referenced .xlam, which breaks when shared between users whose copies live at
     # different paths) - but this add-in's primary, recommended VBA pattern is late-bound
-    # CreateObject("JuliaExcel.AddIn.ComServer") (ProgID-based, no path stored anywhere) and
+    # CreateObject("CallFromExcel.ComServer") (ProgID-based, no path stored anywhere) and
     # XLL worksheet functions (resolved by function name against loaded add-ins, not by path
     # either) - see dotnet-addin/README.md. Only an optional early-bound Tools > References to
     # the .tlb would store a path, and that's documented as an opt-in, not the recommended
     # pattern, so the per-user Link Hell risk doesn't apply here the way it did for the xlam.
-    [string]$DestFolder = (Join-Path $env:APPDATA "Microsoft\AddIns\JuliaExcel"),
+    [string]$DestFolder = (Join-Path $env:APPDATA "Microsoft\AddIns\CallFromExcel"),
     [string]$OldXlamName = "JuliaExcel.xlam"
 )
 
@@ -43,13 +43,13 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 # dist\ is the committed copy of the Release build (see ..\Update-Dist.ps1).
-if ($XllSourcePath -eq "") { $XllSourcePath = Join-Path $PSScriptRoot "..\dist\JuliaExcel.AddIn64-packed.xll" }
-if ($DllSourcePath -eq "") { $DllSourcePath = Join-Path $PSScriptRoot "..\dist\JuliaExcel.AddIn.dll" }
-if ($TlbSourcePath -eq "") { $TlbSourcePath = Join-Path $PSScriptRoot "..\dist\JuliaExcel.AddIn.tlb" }
+if ($XllSourcePath -eq "") { $XllSourcePath = Join-Path $PSScriptRoot "..\dist\CallFromExcel.AddIn64-packed.xll" }
+if ($DllSourcePath -eq "") { $DllSourcePath = Join-Path $PSScriptRoot "..\dist\CallFromExcel.AddIn.dll" }
+if ($TlbSourcePath -eq "") { $TlbSourcePath = Join-Path $PSScriptRoot "..\dist\CallFromExcel.AddIn.tlb" }
 
-$XllDestFileName = "JuliaExcel.AddIn64-packed.xll"
-$DllDestFileName = "JuliaExcel.AddIn.dll"
-$TlbDestFileName = "JuliaExcel.AddIn.tlb"
+$XllDestFileName = "CallFromExcel.AddIn64-packed.xll"
+$DllDestFileName = "CallFromExcel.AddIn.dll"
+$TlbDestFileName = "CallFromExcel.AddIn.tlb"
 
 function Get-ExcelOptionsRegPath {
     # Matches whichever Office version is actually installed by reading back the version
@@ -165,7 +165,7 @@ function Get-OfficeVersion {
 
 # -----------------------------------------------------------------------------------------------
 # Function  : Register-ComServer
-# Purpose   : Registers JuliaExcel.AddIn's two ComVisible classes (ComServer, JuliaDictionary)
+# Purpose   : Registers CallFromExcel.AddIn's two ComVisible classes (ComServer, JuliaDictionary)
 #             for COM activation, writing directly to HKCU:\Software\Classes\ rather than
 #             shelling out to RegAsm - RegAsm's /tlb and (effectively) /codebase options always
 #             write to HKEY_CLASSES_ROOT\/HKLM, needing admin rights; redirecting that to HKCU
@@ -188,8 +188,8 @@ function Register-ComServer {
     param([string]$DllPath)
 
     $classes = @(
-        @{ ProgId = "JuliaExcel.AddIn.ComServer"; Clsid = "{9D7B5C1A-2E4F-4A8B-9C3D-7E1A5B6F8C2D}" },
-        @{ ProgId = "JuliaExcel.AddIn.JuliaDictionary"; Clsid = "{7E4C9F2A-1B8D-4A6E-8C3F-9D2B5A7E1F6C}" }
+        @{ ProgId = "CallFromExcel.ComServer"; TypeName = "CallFromExcel.AddIn.ComServer"; Clsid = "{0581209a-2052-43b8-8875-83bfe419e8c5}" },
+        @{ ProgId = "CallFromExcel.JuliaDictionary"; TypeName = "CallFromExcel.AddIn.JuliaDictionary"; Clsid = "{51faa46c-bed1-43fc-9571-91e7c7bd7385}" }
     )
 
     foreach ($class in $classes) {
@@ -204,8 +204,8 @@ function Register-ComServer {
         $inprocPath = "$clsidPath\InprocServer32"
         Set-RegValue -Path $inprocPath -Name "(Default)" -Value "mscoree.dll"
         Set-RegValue -Path $inprocPath -Name "ThreadingModel" -Value "Both"
-        Set-RegValue -Path $inprocPath -Name "Class" -Value $class.ProgId
-        Set-RegValue -Path $inprocPath -Name "Assembly" -Value "JuliaExcel.AddIn, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null"
+        Set-RegValue -Path $inprocPath -Name "Class" -Value $class.TypeName
+        Set-RegValue -Path $inprocPath -Name "Assembly" -Value "CallFromExcel.AddIn, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null"
         Set-RegValue -Path $inprocPath -Name "RuntimeVersion" -Value "v4.0.30319"
         Set-RegValue -Path $inprocPath -Name "CodeBase" -Value ([uri]$DllPath).AbsoluteUri
     }
@@ -232,7 +232,7 @@ function Get-ExcelMachineType {
 function Copy-RequiredFile {
     param([string]$SourcePath, [string]$DestPath)
     if (-not (Test-Path -Path $SourcePath -PathType Leaf)) {
-        throw "Cannot find file: $SourcePath - it should be committed in dotnet-addin\dist\ (refresh it with dotnet build -c Release in dotnet-addin\JuliaExcel.AddIn)."
+        throw "Cannot find file: $SourcePath - it should be committed in dotnet-addin\dist\ (refresh it with dotnet build -c Release in dotnet-addin\CallFromExcel.AddIn)."
     }
     if (Test-Path -Path $DestPath -PathType Leaf) {
         try { Set-ItemProperty -Path $DestPath -Name IsReadOnly -Value $false -ErrorAction Stop } catch {}
@@ -250,10 +250,10 @@ if (Get-Process -Name "EXCEL" -ErrorAction SilentlyContinue) {
 
 $machineType = Get-ExcelMachineType
 if ($machineType -eq 0x014C) {
-    throw "This is 32-bit Excel. JuliaExcel requires 64-bit Excel (the default for Microsoft 365) - nothing has been installed."
+    throw "This is 32-bit Excel. CallFromExcel requires 64-bit Excel (the default for Microsoft 365) - nothing has been installed."
 }
 if ($null -eq $machineType) {
-    Write-Output "Could not locate EXCEL.EXE to check whether Excel is 64-bit - continuing (JuliaExcel requires 64-bit Excel)."
+    Write-Output "Could not locate EXCEL.EXE to check whether Excel is 64-bit - continuing (CallFromExcel requires 64-bit Excel)."
 }
 
 Write-Output "Detecting Office version..."
@@ -284,6 +284,29 @@ if ($null -ne $oldXlamValue) {
     Write-Output "Old $OldXlamName is not currently installed - nothing to uninstall."
 }
 
+# 1b) Uninstall the pre-release C# add-in that was named JuliaExcel (dev_csharp_port branch of
+# JuliaExcel.jl) before the rename to CallFromExcel: its add-in entry, files and COM classes.
+if ($null -ne (Remove-ExcelAddinFromRegistry -RegPath $regPath -AddinNameFragment "JuliaExcel.AddIn64-packed.xll")) {
+    Write-Output "Removed the pre-rename JuliaExcel.AddIn64-packed.xll add-in entry."
+}
+$preRenameFolder = Join-Path $env:APPDATA "Microsoft\AddIns\JuliaExcel"
+if (Test-Path -Path $preRenameFolder) {
+    try {
+        Remove-Item -Path $preRenameFolder -Recurse -Force -ErrorAction Stop
+        Write-Output "Deleted pre-rename add-in folder: $preRenameFolder"
+    } catch {
+        Write-Output "Could not delete pre-rename add-in folder (continuing): $preRenameFolder - $($_.Exception.Message)"
+    }
+}
+foreach ($key in @("JuliaExcel.AddIn.ComServer", "JuliaExcel.AddIn.JuliaDictionary",
+                   "CLSID\{9D7B5C1A-2E4F-4A8B-9C3D-7E1A5B6F8C2D}", "CLSID\{7E4C9F2A-1B8D-4A6E-8C3F-9D2B5A7E1F6C}")) {
+    $path = "HKCU:\Software\Classes\$key"
+    if (Test-Path -Path $path) {
+        Remove-Item -Path $path -Recurse -Force
+        Write-Output "Removed pre-rename COM registration: $key"
+    }
+}
+
 # 2) Copy the new add-in's files to a per-user location that needs no admin rights.
 Write-Output "Installing to $DestFolder"
 if (-not (Test-Path -Path $DestFolder)) { New-Item -ItemType Directory -Path $DestFolder -Force | Out-Null }
@@ -308,8 +331,8 @@ Install-ExcelAddin -RegPath $regPath -AddinFullName $xllDestPath
 Write-Output "Registered $xllDestPath to auto-load with Excel."
 
 Register-ComServer -DllPath $dllDestPath
-Write-Output "Registered JuliaExcel.AddIn.ComServer for COM (CreateObject(""JuliaExcel.AddIn.ComServer""))."
+Write-Output "Registered CallFromExcel.ComServer for COM (CreateObject(""CallFromExcel.ComServer""))."
 
 Write-Output ""
-Write-Output "JuliaExcel is installed. Its functions (JuliaLaunch, JuliaCall, JuliaEval, ...) will be available the next time Excel starts."
+Write-Output "CallFromExcel is installed. Its functions (JuliaLaunch, JuliaCall, JuliaEval, ...) will be available the next time Excel starts."
 exit 0

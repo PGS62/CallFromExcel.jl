@@ -80,7 +80,6 @@ CallFromExcel replaces [JuliaExcel](https://github.com/PGS62/JuliaExcel.jl). Its
    ```
    Declare it `As Object`: functions such as `JuliaCall` that take a variable number of arguments can't be called otherwise.
  * If the only argument after the function name is an array created with VBA's `Array` function (or any other array whose lower bound is 0), it arrives in Julia as separate arguments rather than as one array. Create the array with `ReDim x(1 To n)` instead.
- * Dictionaries returned by `JuliaCallVBA` and `JuliaEvalVBA` support `Count`, `Keys`, `Items`, `Item` and `Exists` as before, but are no longer `Scripting.Dictionary` objects, so assign them to a variable declared `As Object` or `As Variant`, not `As Scripting.Dictionary`.
 
 **Julia.** Functions and variables formerly accessed as `JuliaExcel.xxx`, such as `JuliaExcel.serve_xl()` and `JuliaExcel.last_answer`, are now `CallFromExcel.xxx`, after `using CallFromExcel`.
 

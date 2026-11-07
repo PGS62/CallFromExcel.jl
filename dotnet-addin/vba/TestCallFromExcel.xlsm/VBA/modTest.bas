@@ -22,13 +22,8 @@ Attribute VB_Name = "modTest"
 ' from a cell or a macro - now the XLL and the COM migration methods are separate
 ' implementations, so the XLL path needs its own coverage.
 '
-' A returned Dictionary is no longer a real Scripting.Dictionary (it was, in the old VBA
-' world) - it is a CallFromExcel.JuliaDictionary COM object, exposing the same
-' Count/Keys/Items/Item/Exists members (Item is also the default member, so y(k) still
-' works) but not assignable to a variable declared As Scripting.Dictionary. Tests that
-' receive a dictionary result now declare that variable As Object instead. A Dictionary
-' passed as an INPUT argument (never received as a result) is unaffected and stays a real
-' Scripting.Dictionary - this project requires a reference to "Microsoft Scripting Runtime".
+' Dictionaries, both passed in and returned, are Scripting.Dictionary objects, as in the old
+' VBA world - this project requires a reference to "Microsoft Scripting Runtime".
 '
 ' Not ported (no VBA-level equivalent exists any more - the functions they tested are now
 ' C#-only and already covered by dotnet-addin\CallFromExcel.AddIn.TestHarness\WireFormatTests.cs):
@@ -105,6 +100,7 @@ Function RunTests(Optional SilentMode As Boolean = False, Optional CommandLineOp
           AccResult "TestArrayOfDictionaries", TestArrayOfDictionaries, NumPassed, NumFailed
           AccResult "TestDictionaryOfArrays", TestDictionaryOfArrays, NumPassed, NumFailed
           AccResult "TestDictionaryOfTypes", TestDictionaryOfTypes, NumPassed, NumFailed
+          AccResult "TestDictionaryIsScriptingDictionary", TestDictionaryIsScriptingDictionary, NumPassed, NumFailed
           AccResult "TestOneDArraysDisplayAsOneColumnOnSheet", TestOneDArraysDisplayAsOneColumnOnSheet, NumPassed, NumFailed
           AccResult "TestElType", TestElType, NumPassed, NumFailed
           AccResult "TestBroadcasting", TestBroadcasting, NumPassed, NumFailed
@@ -450,7 +446,7 @@ End Function
 Function TestDictionary()
 
           Dim x As New Scripting.Dictionary
-          Dim y As Object
+          Dim y As Scripting.Dictionary
           Dim z As New Scripting.Dictionary
 
           On Error GoTo ErrHandler
@@ -523,7 +519,7 @@ End Function
 Function TestDictionaryOfArrays()
 
           Dim x As New Scripting.Dictionary
-          Dim y As Object
+          Dim y As Scripting.Dictionary
 
           On Error GoTo ErrHandler
 
@@ -546,7 +542,7 @@ End Function
 Function TestDictionaryOfTypes()
 
           Dim x As New Scripting.Dictionary
-          Dim y As Object
+          Dim y As Scripting.Dictionary
 
           On Error GoTo ErrHandler
 
@@ -570,6 +566,27 @@ Function TestDictionaryOfTypes()
 ErrHandler:
           PrintTwice ReThrow("TestDictionaryOfTypes", Err, True)
           TestDictionaryOfTypes = False
+End Function
+
+' Dictionaries returned to VBA must be real Scripting.Dictionary objects, as they were with
+' JuliaExcel, so that For Each, CompareMode etc. work, including for nested dictionaries.
+Function TestDictionaryIsScriptingDictionary() As Boolean
+          Dim d As Scripting.Dictionary
+          Dim k As Variant
+          Dim NumKeys As Long
+
+          On Error GoTo ErrHandler
+          Set d = CallFromExcel.JuliaEvalVBA("Dict(""a"" => 1.0, ""b"" => Dict(""c"" => 2.0))")
+          For Each k In d
+              NumKeys = NumKeys + 1
+          Next k
+          TestDictionaryIsScriptingDictionary = (TypeName(d) = "Dictionary") And (NumKeys = 2) And _
+              (d("a") = 1) And (TypeName(d("b")) = "Dictionary") And (d("b")("c") = 2) And _
+              (d.CompareMode = BinaryCompare)
+          Exit Function
+ErrHandler:
+          PrintTwice ReThrow("TestDictionaryIsScriptingDictionary", Err, True)
+          TestDictionaryIsScriptingDictionary = False
 End Function
 
 Function TestOneDArraysDisplayAsOneColumnOnSheet()

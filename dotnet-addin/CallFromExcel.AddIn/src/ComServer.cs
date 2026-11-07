@@ -97,7 +97,7 @@ namespace CallFromExcel.AddIn
             string responseWire = JuliaHttpClient.Post(expression, "/eval");
             object result = WireFormatDecode.Decode(responseWire, allowNesting: true, stringLengthLimit: 0, vectorToColumn: false);
             result = WireFormatDecode.MapErrorValues(result, MapToComError);
-            return Rebase1Based(result);
+            return ForVba(result);
         }
 
         public object JuliaCall(string juliaFunction, params object[] args)
@@ -117,7 +117,7 @@ namespace CallFromExcel.AddIn
                 string responseWire = JuliaHttpClient.Post(expression, "/eval");
                 object result = WireFormatDecode.Decode(responseWire, allowNesting: false, stringLengthLimit: StringLengthLimit, vectorToColumn: true);
                 result = WireFormatDecode.MapErrorValues(result, MapToComError);
-                return Rebase1Based(result);
+                return ForVba(result);
             }
             catch (System.Exception ex)
             {
@@ -207,7 +207,7 @@ namespace CallFromExcel.AddIn
                 string responseWire = JuliaHttpClient.Post(payload, endpoint);
                 object result = WireFormatDecode.Decode(responseWire, allowNesting: false, stringLengthLimit: StringLengthLimit, vectorToColumn: true);
                 result = WireFormatDecode.MapErrorValues(result, MapToComError);
-                return Rebase1Based(result);
+                return ForVba(result);
             }
             catch (System.Exception ex)
             {
@@ -231,7 +231,7 @@ namespace CallFromExcel.AddIn
             string responseWire = JuliaHttpClient.Post(payload, endpoint);
             object result = WireFormatDecode.Decode(responseWire, allowNesting: true, stringLengthLimit: 0, vectorToColumn: false);
             result = WireFormatDecode.MapErrorValues(result, MapToComError);
-            return Rebase1Based(result);
+            return ForVba(result);
         }
 
         // Maps a wire-format error code (VBA's own XlCVError UI numbering, e.g. 2042 for
@@ -285,21 +285,24 @@ namespace CallFromExcel.AddIn
             return System.Convert.ToString(juliaExpression);
         }
 
-        // Rebases every object[]/object[,]/double[]/double[,]/... in a decoded result tree
-        // from 0-based (WireFormatDecode's own convention, matching Excel-DNA's) to 1-based,
-        // matching the old, pure-VBA JuliaCallVBA/JuliaEvalVBA's behaviour exactly (its
-        // Unserialise always built results via ReDim(1 To n)) - without this, migrating VBA
-        // code indexing a result with a hard-coded 1 (not relative to LBound/UBound, which is
-        // how most of this codebase's own test suite was written) would silently read the
-        // wrong element rather than erroring, since COM doesn't care about VBA's own 1-based
-        // convention on its own.
-        private static object Rebase1Based(object value)
+        // Converts a decoded result tree to what JuliaExcel's VBA returned, so migrated code
+        // behaves identically: arrays rebased from 0-based (WireFormatDecode's convention) to
+        // 1-based, since the old Unserialise built them via ReDim(1 To n) and code indexing a
+        // result with a hard-coded 1 would otherwise silently read the wrong element; and
+        // dictionaries as real Scripting.Dictionary objects, so For Each, CompareMode etc. and
+        // variables declared As Scripting.Dictionary all keep working.
+        private static object ForVba(object value)
         {
             var dict = value as JuliaDictionary;
             if (dict != null)
             {
-                var mapped = new JuliaDictionary();
-                foreach (var kv in dict.Entries) mapped.Add(Rebase1Based(kv.Key), Rebase1Based(kv.Value));
+                System.Type scriptingDictionary = System.Type.GetTypeFromProgID("Scripting.Dictionary", throwOnError: true);
+                object mapped = System.Activator.CreateInstance(scriptingDictionary);
+                foreach (var kv in dict.Entries)
+                {
+                    scriptingDictionary.InvokeMember("Add", System.Reflection.BindingFlags.InvokeMethod, null, mapped,
+                        new[] { ForVba(kv.Key), ForVba(kv.Value) });
+                }
                 return mapped;
             }
 
@@ -328,7 +331,7 @@ namespace CallFromExcel.AddIn
             for (int count = 0; count < total; count++)
             {
                 object element = arr.GetValue(srcIdx);
-                object mappedElement = recurseIntoElements ? Rebase1Based(element) : element;
+                object mappedElement = recurseIntoElements ? ForVba(element) : element;
                 for (int d = 0; d < rank; d++) dstIdx[d] = srcIdx[d] + 1;
                 rebased.SetValue(mappedElement, dstIdx);
 

@@ -165,8 +165,7 @@ function Get-OfficeVersion {
 
 # -----------------------------------------------------------------------------------------------
 # Function  : Register-ComServer
-# Purpose   : Registers CallFromExcel.AddIn's two ComVisible classes (ComServer, JuliaDictionary)
-#             for COM activation, writing directly to HKCU:\Software\Classes\ rather than
+# Purpose   : Registers CallFromExcel.AddIn's ComVisible class (ComServer) for COM activation, writing directly to HKCU:\Software\Classes\ rather than
 #             shelling out to RegAsm - RegAsm's /tlb and (effectively) /codebase options always
 #             write to HKEY_CLASSES_ROOT\/HKLM, needing admin rights; redirecting that to HKCU
 #             is the documented workaround (generate a /regfile .reg script and remap
@@ -180,16 +179,14 @@ function Get-OfficeVersion {
 #             CLSID+ProgID+InprocServer32 - no Interface IID registration at all (confirmed by
 #             comparing against RegAsm's own /regfile output, which likewise omits one).
 #
-#             The CLSIDs below must match the [Guid(...)] attributes on ComServer.cs's
-#             ComServer and WireValues.cs's JuliaDictionary classes exactly - update both places
-#             together if either ever changes.
+#             The CLSID below must match the [Guid(...)] attribute on ComServer.cs's ComServer
+#             class exactly - update both places together if either ever changes.
 # -----------------------------------------------------------------------------------------------
 function Register-ComServer {
     param([string]$DllPath)
 
     $classes = @(
-        @{ ProgId = "CallFromExcel.ComServer"; TypeName = "CallFromExcel.AddIn.ComServer"; Clsid = "{0581209a-2052-43b8-8875-83bfe419e8c5}" },
-        @{ ProgId = "CallFromExcel.JuliaDictionary"; TypeName = "CallFromExcel.AddIn.JuliaDictionary"; Clsid = "{51faa46c-bed1-43fc-9571-91e7c7bd7385}" }
+        @{ ProgId = "CallFromExcel.ComServer"; TypeName = "CallFromExcel.AddIn.ComServer"; Clsid = "{0581209a-2052-43b8-8875-83bfe419e8c5}" }
     )
 
     foreach ($class in $classes) {
@@ -304,6 +301,15 @@ foreach ($key in @("JuliaExcel.AddIn.ComServer", "JuliaExcel.AddIn.JuliaDictiona
     if (Test-Path -Path $path) {
         Remove-Item -Path $path -Recurse -Force
         Write-Output "Removed pre-rename COM registration: $key"
+    }
+}
+# CallFromExcel.JuliaDictionary was briefly a COM class of its own; dictionaries are now
+# returned to VBA as Scripting.Dictionary objects.
+foreach ($key in @("CallFromExcel.JuliaDictionary", "CLSID\{51faa46c-bed1-43fc-9571-91e7c7bd7385}")) {
+    $path = "HKCU:\Software\Classes\$key"
+    if (Test-Path -Path $path) {
+        Remove-Item -Path $path -Recurse -Force
+        Write-Output "Removed obsolete COM registration: $key"
     }
 }
 

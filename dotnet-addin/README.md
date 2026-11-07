@@ -22,8 +22,8 @@ All of the August plan's steps 2-5 are done and working:
   Also includes `JuliaCallNamedArgs` (`/callkw`), `JuliaIsRunning`,
   `JuliaExcelPID`, `JuliaSetVar`, `JuliaInclude`, `JuliaLaunch` itself.
 - **Step 5** (`JuliaCallVBA`/`JuliaEvalVBA` via COM): `ComServer.cs`
-  (also `JuliaCallNamedArgsVBA`), `WireValues.cs`'s COM-visible
-  `JuliaDictionary`.
+  (also `JuliaCallNamedArgsVBA`). Dictionaries are returned to VBA as
+  real `Scripting.Dictionary` objects, as with the old xlam.
 
 So the full `modMain.bas` worksheet/VBA-facing surface is ported. Also
 done: a non-interactive, no-admin installer (`installer/Install.ps1`) and

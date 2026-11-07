@@ -20,7 +20,7 @@ namespace CallFromExcel.AddIn
     //   double, string, bool, short (Integer), int (Long), byte, float (Single),
     //   long (LongLong), DateTime, decimal (Currency/Decimal, decode only -- see below)
     //   ExcelErrorValue <-> a VBA error Variant (CVErr)
-    //   JuliaDictionary <-> Scripting.Dictionary
+    //   JuliaDictionary (decoded internally; ComServer converts it for VBA) <-> Scripting.Dictionary
     //   System.Array (any rank, any of the above element types) <-> a VBA array
     public static class WireFormatEncode
     {
@@ -74,12 +74,9 @@ namespace CallFromExcel.AddIn
                 throw new NotSupportedException("Cannot serialise Currency/Decimal values - reserved, not implemented (matches SerialiseElement's own omission)");
             }
 
-            // A genuine foreign COM object (e.g. a real VBA Scripting.Dictionary passed as an
-            // input argument over COM) is never a JuliaDictionary - that type only ever
-            // appears as a *result* of our own decode. Scripting.Dictionary isn't referenced
-            // by this project, so it arrives as a generic __ComObject RCW; late-bound
-            // reflection (the same mechanism VBA's own late binding uses) duck-types it by
-            // the same Count/Keys()/Item() members JuliaDictionary itself exposes.
+            // A Scripting.Dictionary passed in from VBA arrives as a generic __ComObject RCW
+            // (this project doesn't reference the Scripting library), so it's read via
+            // late-bound reflection of its Count/Keys()/Item() members.
             if (value.GetType().IsCOMObject) return EncodeComDictionary(value);
 
             throw new NotSupportedException("Cannot serialise value of type " + value.GetType().Name);

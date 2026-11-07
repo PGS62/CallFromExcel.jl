@@ -34,7 +34,7 @@ namespace CallFromExcel.AddIn
         object JuliaCallNamedArgsVBA(string juliaFunction, params object[] args);
 
         // Migration surface for VBA code that used to call these as bare Public Functions
-        // in a referenced JuliaExcel.xlam (Tools > References -> CallFromExcel). Since the new
+        // in a referenced JuliaExcel.xlam (Tools > References -> JuliaExcel). Since the new
         // world has no xlam at all, old call sites become e.g.
         //   Result = CallFromExcel.JuliaCall("sqrt", 16)
         // with CallFromExcel declared once as CreateObject("CallFromExcel.ComServer") (or the

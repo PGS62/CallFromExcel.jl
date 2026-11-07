@@ -1,8 +1,7 @@
 # Run-VbaTests.ps1
 # Builds (if needed) and runs the VBA test suite (modTest.RunTests) for the C#/Excel-DNA
-# add-in, in a fresh, invisible Excel instance - unlike scripts\Run-VbaTests.ps1 (the old
-# xlam's runner), this does not require a workbook to already be open, since RunTests itself
-# registers the XLL (Application.RegisterXLL) and creates the COM object it needs.
+# add-in, in a fresh, invisible Excel instance. No workbook needs to be open already, since
+# RunTests itself registers the XLL (Application.RegisterXLL) and creates the COM object it needs.
 #
 # Prerequisites:
 #   - dotnet build -c Release in dotnet-addin\CallFromExcel.AddIn (produces the packed .xll)

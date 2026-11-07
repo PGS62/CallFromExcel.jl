@@ -4,34 +4,31 @@ using ExcelDna.Integration;
 
 namespace CallFromExcel.AddIn
 {
-    // C# port of the worksheet-facing JuliaCall/JuliaEval (modMain.bas) as ordinary
-    // Excel-DNA XLL functions -- per the August plan: "JuliaCall/JuliaEval (worksheet-
-    // facing) -> ordinary Excel-DNA XLL functions, registered thread-safe. No behavior
-    // regression: they're already documented as restricted to worksheet-displayable
-    // results." JuliaCallVBA/JuliaEvalVBA (which can return Dictionaries/nested arrays,
-    // needing a live object reference Application.Run/XLL functions can't carry) are a
-    // separate COM-visible class -- step 5 of the plan, not yet done.
+    // C# port of the worksheet-facing functions (modMain.bas) as Excel-DNA XLL functions.
+    // JuliaCallVBA/JuliaEvalVBA, which can return dictionaries and nested arrays, are in
+    // ComServer.cs.
+    //
+    // None is registered thread-safe, so Excel runs them one at a time on its main thread, as
+    // it did JuliaExcel's VBA functions. Julia functions can have side effects, and the Julia
+    // server keeps each call's arguments in globals (args_from_xl etc.), so concurrent calls
+    // could see each other's arguments.
     public static class JuliaFunctions
     {
-        private static int _cachedStringLengthLimit;
+        // Port of GetStringLengthLimit (modUnserialise.bas): Excel 2010 and earlier capped
+        // array-element strings at 255 chars; 2016+ (all report version 16) raised it to 32,767.
+        private static int _stringLengthLimit = 32768;
+
+        // Called from AutoOpen, on Excel's main thread: ExcelDnaUtil.ExcelVersion reads an Excel
+        // COM property, which deadlocks Excel if read from a calculation thread while the main
+        // thread waits for that calculation.
+        internal static void CacheStringLengthLimit()
+        {
+            _stringLengthLimit = ExcelDnaUtil.ExcelVersion <= 15 ? 256 : 32768;
+        }
 
         private static int StringLengthLimit()
         {
-            // Port of GetStringLengthLimit (modUnserialise.bas): Excel 2010 and earlier
-            // capped array-element strings at 255 chars; 2016+ (all report version 16)
-            // raised it to 32,767. Cached after the first call, not just as a micro-
-            // optimization: ExcelDnaUtil.ExcelVersion reads an Excel COM property, and
-            // JuliaCall/JuliaEval run with IsThreadSafe=true, meaning Excel-DNA may invoke
-            // them on a worker thread rather than Excel's main thread -- querying a COM
-            // property cross-thread back onto Excel's STA thread on every single call was
-            // found (via this project's own JuliaCall("sort", ...) timing investigation) to
-            // roughly double the real end-to-end latency of every call, versus computing it
-            // once. Excel's version obviously can't change mid-session.
-            if (_cachedStringLengthLimit == 0)
-            {
-                _cachedStringLengthLimit = ExcelDnaUtil.ExcelVersion <= 15 ? 256 : 32768;
-            }
-            return _cachedStringLengthLimit;
+            return _stringLengthLimit;
         }
 
         // Parameter order (UseLinux, MinimiseWindow, CommandLineOptions, Packages,
@@ -66,7 +63,7 @@ namespace CallFromExcel.AddIn
             }
         }
 
-        [ExcelFunction(Description = "Call a named Julia function, passing in data from the worksheet. Returns an error string for results that cannot be displayed on a worksheet (nested arrays, dictionaries etc).", IsThreadSafe = true)]
+        [ExcelFunction(Description = "Call a named Julia function, passing in data from the worksheet. Returns an error string for results that cannot be displayed on a worksheet (nested arrays, dictionaries etc).", IsThreadSafe = false)]
         public static object JuliaCall(
             [ExcelArgument(Name = "JuliaFunction", Description = "The name of a Julia function visible from the Julia REPL.")] string juliaFunction,
             [ExcelArgument(Name = "Args", Description = "Zero or more arguments: a number, string, Boolean, empty cell, or array/range.")] params object[] args)
@@ -74,7 +71,7 @@ namespace CallFromExcel.AddIn
             return CallCore(juliaFunction, args, "/call");
         }
 
-        [ExcelFunction(Description = "Call a named Julia function, passing positional and named arguments from the worksheet. The argument \";\" marks where the named arguments start, given as name-value pairs. A named argument whose value is \";\" must be the last pair.", IsThreadSafe = true)]
+        [ExcelFunction(Description = "Call a named Julia function, passing positional and named arguments from the worksheet. The argument \";\" marks where the named arguments start, given as name-value pairs. A named argument whose value is \";\" must be the last pair.", IsThreadSafe = false)]
         public static object JuliaCallNamedArgs(
             [ExcelArgument(Name = "JuliaFunction", Description = "The name of a Julia function visible from the Julia REPL.")] string juliaFunction,
             [ExcelArgument(Name = "Args", Description = "Positional arguments, then \";\", then name/value pairs for keyword arguments.")] params object[] args)
@@ -101,7 +98,7 @@ namespace CallFromExcel.AddIn
             return System.Diagnostics.Process.GetCurrentProcess().Id;
         }
 
-        [ExcelFunction(Description = "Set a global variable in the Julia process.", IsThreadSafe = true)]
+        [ExcelFunction(Description = "Set a global variable in the Julia process.", IsThreadSafe = false)]
         public static object JuliaSetVar(
             [ExcelArgument(Name = "VariableName", Description = "The name of the variable to be set. Must follow Julia's rules for allowed variable names.")] string variableName,
             [ExcelArgument(Name = "RefersTo", Description = "An Excel range, or a number, string, Boolean, empty cell or array of such types.")] object refersTo)
@@ -109,7 +106,7 @@ namespace CallFromExcel.AddIn
             return CallCore("CallFromExcel.setvar", new[] { (object)variableName, refersTo }, "/call");
         }
 
-        [ExcelFunction(Description = "Load a Julia source file into the Julia process, to make additional functions available via JuliaEval and JuliaCall.", IsThreadSafe = true)]
+        [ExcelFunction(Description = "Load a Julia source file into the Julia process, to make additional functions available via JuliaEval and JuliaCall.", IsThreadSafe = false)]
         public static object JuliaInclude(
             [ExcelArgument(Name = "FileName", Description = "The full name of the file to be included.")] string fileName)
         {
@@ -143,7 +140,7 @@ namespace CallFromExcel.AddIn
             return WireFormatDecode.MapLeaves(result, v => v is ExcelErrorValue ev ? MapToExcelDnaError(ev.Code) : v ?? ExcelEmpty.Value);
         }
 
-        [ExcelFunction(Description = "Evaluate a Julia expression and return the result to an Excel worksheet.", IsThreadSafe = true)]
+        [ExcelFunction(Description = "Evaluate a Julia expression and return the result to an Excel worksheet.", IsThreadSafe = false)]
         public static object JuliaEval(
             [ExcelArgument(Name = "JuliaExpression", Description = "Any valid Julia code, as a string. Can also be a one-column range to evaluate multiple Julia statements.")] object juliaExpression)
         {

@@ -12,6 +12,7 @@ namespace CallFromExcel.AddIn
     {
         public void AutoOpen()
         {
+            JuliaFunctions.CacheStringLengthLimit();
             IntelliSenseServer.Install();
         }
 

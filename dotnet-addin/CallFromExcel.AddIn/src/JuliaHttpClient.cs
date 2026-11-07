@@ -20,8 +20,8 @@ namespace CallFromExcel.AddIn
     // real JuliaEval/JuliaCall can legitimately take a long time to compute.
     //
     // Synchronous on purpose: Excel calls these functions on its own calculation threads,
-    // and sync-over-async there risks deadlock. Thread-safe JuliaCall/JuliaEval calls can
-    // arrive concurrently, so idle connections are pooled and each call has one to itself.
+    // and sync-over-async there risks deadlock. Idle connections are pooled and each call has
+    // one to itself, which stays correct even if calls ever arrive concurrently.
     public static class JuliaHttpClient
     {
         private const int ConnectTimeoutMs = 150;

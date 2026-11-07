@@ -8,12 +8,13 @@ Compatible with Excel's [dynamic array formulas](https://support.microsoft.com/e
 
 Supports 64-bit Excel for Windows (not Mac, not 32-bit Excel). Julia can be run under Windows or Linux (via [WSL](https://docs.microsoft.com/en-us/windows/wsl/about)).
 
-CallFromExcel is the successor to [JuliaExcel](https://github.com/PGS62/JuliaExcel.jl), rewritten in C# for speed. Its worksheet functions have the same names as JuliaExcel's, but in workbooks saved with JuliaExcel, Excel records the path of JuliaExcel's add-in in each formula - e.g. `='C:\Users\Public\JuliaExcel\JuliaExcel.xlam'!JuliaLaunch()` - so that path must be removed. Use Find and Replace (Ctrl+H), with "Within" set to Workbook and "Look in" set to Formulas, to replace the exact text - here `'C:\Users\Public\JuliaExcel\JuliaExcel.xlam'!` (JuliaExcel's default install location) - with nothing.
+CallFromExcel is the successor to [JuliaExcel](https://github.com/PGS62/JuliaExcel.jl), rewritten in C# for speed. See [Upgrading from JuliaExcel](#upgrading-from-juliaexcel).
 
 ## Contents
 [Demo](#demo)  
 [Installation](#installation)  
 [Installation (Linux)](#installation-linux)  
+[Upgrading from JuliaExcel](#upgrading-from-juliaexcel)  
 [Functions](#functions)   
 [Example VBA](#example-vba)  
 [Function Documentation](#function-documentation)  
@@ -64,6 +65,26 @@ As an alternative to calling Julia running in a Windows process, CallFromExcel c
  * Install Julia under WSL by running `curl -fsSL https://install.julialang.org | sh` at the Ubuntu prompt, per the [official instructions](https://julialang.org/downloads/). This installs `juliaup`, which puts `julia` on the PATH automatically.
  * At the Julia prompt (under WSL) install CallFromExcel by copy-pasting   
   `using Pkg; Pkg.add(url="https://github.com/PGS62/CallFromExcel.jl")` into the REPL. 
+
+## Upgrading from JuliaExcel
+CallFromExcel replaces [JuliaExcel](https://github.com/PGS62/JuliaExcel.jl). Its worksheet functions have the same names, but some changes are needed to workbooks and code written for JuliaExcel.
+
+**Installation.** Installing CallFromExcel (see [Installation](#installation)) also uninstalls JuliaExcel's Excel add-in, `JuliaExcel.xlam`. The JuliaExcel Julia package is no longer used, and can be removed with `using Pkg; Pkg.rm("JuliaExcel")`.
+
+**Worksheet formulas.** In a workbook saved with JuliaExcel, Excel records the location of `JuliaExcel.xlam` in each formula that uses its functions, so after upgrading a formula such as `=JuliaLaunch()` appears as `='C:\Users\Public\JuliaExcel\JuliaExcel.xlam'!JuliaLaunch()`. Remove that path with Find and Replace (Ctrl+H): set "Within" to Workbook and "Look in" to Formulas, and replace the exact text - here `'C:\Users\Public\JuliaExcel\JuliaExcel.xlam'!`, JuliaExcel's default install location - with nothing.
+
+**VBA.**
+ * Remove the reference to JuliaExcel (VBA editor, Tools menu -> References).
+ * Create an object to call CallFromExcel's functions through, and put it in front of each call, so `JuliaCall("f", x)` becomes `CallFromExcel.JuliaCall("f", x)` - see [Example VBA](#example-vba):
+   ```vba
+   Dim CallFromExcel As Object
+   Set CallFromExcel = CreateObject("CallFromExcel.ComServer")
+   ```
+   Declare it `As Object`: functions such as `JuliaCall` that take a variable number of arguments can't be called otherwise.
+ * If the only argument after the function name is an array created with VBA's `Array` function (or any other array whose lower bound is 0), it arrives in Julia as separate arguments rather than as one array. Create the array with `ReDim x(1 To n)` instead.
+ * Dictionaries returned by `JuliaCallVBA` and `JuliaEvalVBA` support `Count`, `Keys`, `Items`, `Item` and `Exists` as before, but are no longer `Scripting.Dictionary` objects, so assign them to a variable declared `As Object` or `As Variant`, not `As Scripting.Dictionary`.
+
+**Julia.** Functions and variables formerly accessed as `JuliaExcel.xxx`, such as `JuliaExcel.serve_xl()` and `JuliaExcel.last_answer`, are now `CallFromExcel.xxx`, after `using CallFromExcel`.
 
 ## Functions
 CallFromExcel makes the following functions available from Excel worksheets and from VBA:

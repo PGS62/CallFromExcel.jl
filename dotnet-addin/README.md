@@ -4,14 +4,14 @@ Real, SDK-based (not the `csharp-prototype` folder's hand-rolled csc.exe
 build) implementation of the VBA-to-C# port described in the August plan.
 Lives entirely on `dev_csharp_port`; master is untouched.
 
-## Status as of 2026-11-06 (overnight autonomous session)
+## Status as of 2026-11-07
 
 All of the August plan's steps 2-5 are done and working:
 
 - **Step 2** (`JuliaHttpPost`/`JuliaLaunch`): `JuliaHttpClient.cs`,
   `JuliaLaunch.cs`, `JuliaExeLocation.cs`, `WindowUtils.cs`,
-  `JuliaLiteral.cs`, `JuliaPort.cs`, `FileUtils.cs`. Windows-native only
-  (WSL/Linux launch support deliberately deferred).
+  `JuliaLiteral.cs`, `JuliaPort.cs`, `FileUtils.cs`. Includes launching
+  Julia under WSL (`UseLinux`/`BashStatements`).
 - **Step 3** (wire-format encode/decode): `WireFormatEncode.cs`,
   `WireFormatDecode.cs`, `Hex.cs`, `WireValues.cs`. Every type the VBA
   wire format supports, arbitrary array rank (1-9), the "V" bulk-Double
@@ -23,19 +23,16 @@ All of the August plan's steps 2-5 are done and working:
   (also `JuliaCallNamedArgsVBA`), `WireValues.cs`'s COM-visible
   `JuliaDictionary`.
 
-So essentially the full `modMain.bas` worksheet/VBA-facing surface is now
-ported, except where explicitly deferred below.
-
-**Not done / explicitly deferred:** WSL/Linux Julia launch; a real
-installer (the COM registration below is a dev-session workaround, not a
-shippable install story); `modRegister.bas`'s Function-Wizard/IntelliSense
-registration (the plan's own view is this should simply disappear in
-favour of Excel-DNA's declarative IntelliSense, not be ported -- not yet
-wired up, but shouldn't need new logic, just `ExcelArgument`/
-`ExcelFunction` attributes, which are already present on every function).
+So the full `modMain.bas` worksheet/VBA-facing surface is ported. Also
+done: a non-interactive, no-admin installer (`installer/Install.ps1`) and
+formula-bar IntelliSense embedded in the add-in itself (replacing
+`modRegister.bas`). Remaining work is in "Suggested next steps" below.
 
 ## Validated
 
+- **55/55** VBA tests in `vba/TestJuliaExcel.xlsm` (`vba/Run-VbaTests.ps1`,
+  also run by `test/runtests.jl` locally), covering both the COM and the
+  worksheet/XLL surfaces. WSL: `modTest.RunWSLTest`, run by hand.
 - **58/58** self-contained wire-format tests (`JuliaExcel.AddIn.TestHarness`,
   `WireFormatTests.cs`), including the exact example strings hand-transcribed
   from `modUnserialise.bas`'s own wire-format spec comment.

@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
@@ -6,24 +8,27 @@ using System.Text;
 
 namespace CallFromExcel.AddIn
 {
-    // C# port of JuliaHttpPost/TryHttpSend (modHttp.bas). Uses the classic synchronous
-    // HttpWebRequest/HttpWebResponse API rather than HttpClient's async methods: the
-    // August plan explicitly flags Excel's threading model as a real risk ("stay
-    // synchronous/simple; don't reach for async/await just because it's available") --
-    // HttpWebRequest has no Task/await involved at all, so there's no sync-over-async
-    // deadlock risk to reason about once this runs on Excel's own thread.
+    // HTTP/1.1 client for the Julia server, over TCP connections kept open between calls.
     //
-    // ServerXMLHTTP's setTimeouts gives VBA's version a short (150ms) resolve/connect
-    // timeout but unlimited send/receive timeouts -- a real JuliaEval/JuliaCall can
-    // legitimately take a long time to compute and must never be aborted just for being
-    // slow to respond once connected. HttpWebRequest has no equivalent split (its Timeout
-    // covers the whole synchronous call, connect included), so a short raw TCP connect
-    // probe is done first via FastConnectProbe, and the real HttpWebRequest -- issued only
-    // once that probe succeeds -- is left with an effectively unlimited timeout.
+    // Not HttpWebRequest: it has no separate connect timeout, and a connection attempt to a
+    // localhost port nobody is listening on takes ~2s to fail on Windows (~4s once its own
+    // retry kicks in), so it needed a fresh TCP "probe" connection before every request -
+    // which, measured, cost more than the request itself (0.64ms per call vs 0.12ms here).
+    // Keeping connections open means a call normally needs no connection set-up at all, and
+    // a Julia that has exited shows up immediately as a broken connection. New connections
+    // are made with a short connect timeout (ConnectTimeoutMs); reads have none, since a
+    // real JuliaEval/JuliaCall can legitimately take a long time to compute.
+    //
+    // Synchronous on purpose: Excel calls these functions on its own calculation threads,
+    // and sync-over-async there risks deadlock. Thread-safe JuliaCall/JuliaEval calls can
+    // arrive concurrently, so idle connections are pooled and each call has one to itself.
     public static class JuliaHttpClient
     {
         private const int ConnectTimeoutMs = 150;
         private const string Host = "127.0.0.1";
+
+        private static readonly object PoolLock = new object();
+        private static readonly Stack<Connection> Pool = new Stack<Connection>();
 
         public static string Post(string payload, string path)
         {
@@ -36,7 +41,7 @@ namespace CallFromExcel.AddIn
             // The cached port didn't respond - it may be stale, e.g. because
             // CallFromExcel.serve_xl was called from Julia on a different port, without this
             // process's cached port being told. Re-read the port file directly (bypassing
-            // the cache) and retry once before giving up, matching JuliaHttpPost.
+            // the cache) and retry once before giving up.
             int refreshedPort = JuliaPort.ReadJuliaPortFromFile();
             if (refreshedPort == 0 || refreshedPort == port)
             {
@@ -50,46 +55,273 @@ namespace CallFromExcel.AddIn
             throw new InvalidOperationException(JuliaPort.NoConnectionErrorMessage);
         }
 
+        // False means Julia couldn't be reached on this port. A non-200 response is a real
+        // error for the caller to see, so it throws instead.
         private static bool TryPost(int port, string path, string payload, out string result)
         {
-            result = null;
-            if (!FastConnectProbe(port)) return false;
+            byte[] request = BuildRequest(path, payload);
 
-            var req = (HttpWebRequest)WebRequest.Create("http://" + Host + ":" + port + path);
-            req.Method = "POST";
-            req.ContentType = "text/plain; charset=utf-8";
-            req.KeepAlive = true;
-            req.ServicePoint.Expect100Continue = false;
-
-            byte[] bytes = Encoding.UTF8.GetBytes(payload);
-            req.ContentLength = bytes.Length;
-            try
+            // A pooled connection may have been closed by a Julia that has since exited (or
+            // been replaced by a new session on the same port). That shows up as a failure
+            // before any response arrives, in which case Julia never ran the request, so
+            // it's safe to send it again on a fresh connection.
+            Connection pooled = Rent(port);
+            if (pooled != null)
             {
-                using (Stream requestStream = req.GetRequestStream())
+                Response response;
+                if (pooled.TrySend(request, out response))
                 {
-                    requestStream.Write(bytes, 0, bytes.Length);
+                    return Finish(pooled, response, out result);
                 }
-                using (var resp = (HttpWebResponse)req.GetResponse())
-                using (var reader = new StreamReader(resp.GetResponseStream(), Encoding.UTF8))
+                pooled.Dispose();
+            }
+
+            Connection fresh = Connection.TryOpen(port);
+            if (fresh == null)
+            {
+                result = null;
+                return false;
+            }
+            Response freshResponse;
+            if (!fresh.TrySend(request, out freshResponse))
+            {
+                fresh.Dispose();
+                result = null;
+                return false;
+            }
+            return Finish(fresh, freshResponse, out result);
+        }
+
+        private static bool Finish(Connection connection, Response response, out string result)
+        {
+            if (response.KeepAlive) Return(connection); else connection.Dispose();
+            if (response.StatusCode != 200)
+            {
+                throw new InvalidOperationException("#HTTP " + response.StatusCode + ": " + response.ReasonPhrase + "! " + response.Body);
+            }
+            result = response.Body;
+            return true;
+        }
+
+        private static byte[] BuildRequest(string path, string payload)
+        {
+            byte[] body = Encoding.UTF8.GetBytes(payload);
+            byte[] header = Encoding.ASCII.GetBytes(
+                "POST " + path + " HTTP/1.1\r\nHost: " + Host + "\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: " +
+                body.Length.ToString(CultureInfo.InvariantCulture) + "\r\n\r\n");
+            var request = new byte[header.Length + body.Length];
+            Buffer.BlockCopy(header, 0, request, 0, header.Length);
+            Buffer.BlockCopy(body, 0, request, header.Length, body.Length);
+            return request;
+        }
+
+        private static Connection Rent(int port)
+        {
+            lock (PoolLock)
+            {
+                while (Pool.Count > 0)
                 {
-                    result = reader.ReadToEnd();
-                    return true;
+                    Connection c = Pool.Pop();
+                    if (c.Port == port) return c;
+                    c.Dispose();
                 }
             }
-            catch (WebException ex)
+            return null;
+        }
+
+        private static void Return(Connection connection)
+        {
+            lock (PoolLock) Pool.Push(connection);
+        }
+
+        private sealed class Response
+        {
+            public int StatusCode;
+            public string ReasonPhrase;
+            public string Body;
+            public bool KeepAlive;
+        }
+
+        private sealed class Connection : IDisposable
+        {
+            public readonly int Port;
+            private readonly TcpClient _client;
+            private readonly NetworkStream _stream;
+            private byte[] _buffer = new byte[16384];
+
+            private Connection(int port, TcpClient client)
             {
-                // A non-200 status (e.g. a 500 from a genuine server-side error) is a real
-                // error for the caller to see, not a sign of a stale/dead port -- only a
-                // connection-level failure should trigger the stale-port retry above.
-                if (ex.Response is HttpWebResponse errorResponse)
+                Port = port;
+                _client = client;
+                _stream = client.GetStream();
+            }
+
+            public static Connection TryOpen(int port)
+            {
+                var client = new TcpClient { NoDelay = true };
+                try
                 {
-                    using (errorResponse)
-                    using (var reader = new StreamReader(errorResponse.GetResponseStream(), Encoding.UTF8))
+                    IAsyncResult ar = client.BeginConnect(Host, port, null, null);
+                    if (!ar.AsyncWaitHandle.WaitOne(ConnectTimeoutMs))
                     {
-                        throw new InvalidOperationException("#HTTP " + (int)errorResponse.StatusCode + ": " + errorResponse.StatusDescription + "! " + reader.ReadToEnd());
+                        client.Close();
+                        return null;
                     }
+                    client.EndConnect(ar);
+                    return new Connection(port, client);
                 }
-                return false;
+                catch (SocketException)
+                {
+                    client.Close();
+                    return null;
+                }
+            }
+
+            // False if the connection failed before any of the response arrived. A failure
+            // after that closes the connection and throws.
+            public bool TrySend(byte[] request, out Response response)
+            {
+                response = null;
+                int filled = 0;
+                try
+                {
+                    _stream.Write(request, 0, request.Length);
+                    int headerEnd = -1;
+                    while (headerEnd < 0)
+                    {
+                        if (filled == _buffer.Length) Array.Resize(ref _buffer, _buffer.Length * 2);
+                        int n = _stream.Read(_buffer, filled, _buffer.Length - filled);
+                        if (n == 0)
+                        {
+                            if (filled == 0) return false;
+                            throw new IOException("Connection closed while reading the response headers");
+                        }
+                        filled += n;
+                        headerEnd = IndexOfHeaderEnd(_buffer, filled);
+                    }
+                    response = ParseResponse(filled, headerEnd);
+                    return true;
+                }
+                catch (Exception ex) when ((ex is IOException || ex is SocketException) && filled == 0)
+                {
+                    return false;
+                }
+                catch
+                {
+                    Dispose();
+                    throw;
+                }
+            }
+
+            private Response ParseResponse(int filled, int headerEnd)
+            {
+                string headers = Encoding.ASCII.GetString(_buffer, 0, headerEnd);
+                string[] lines = headers.Split(new[] { "\r\n" }, StringSplitOptions.None);
+                string[] statusParts = lines[0].Split(new[] { ' ' }, 3);
+                var response = new Response
+                {
+                    StatusCode = int.Parse(statusParts[1], CultureInfo.InvariantCulture),
+                    ReasonPhrase = statusParts.Length > 2 ? statusParts[2] : "",
+                    KeepAlive = true
+                };
+
+                int contentLength = -1;
+                bool chunked = false;
+                for (int i = 1; i < lines.Length; i++)
+                {
+                    int colon = lines[i].IndexOf(':');
+                    if (colon < 0) continue;
+                    string name = lines[i].Substring(0, colon).Trim();
+                    string value = lines[i].Substring(colon + 1).Trim();
+                    if (name.Equals("Content-Length", StringComparison.OrdinalIgnoreCase))
+                        contentLength = int.Parse(value, CultureInfo.InvariantCulture);
+                    else if (name.Equals("Transfer-Encoding", StringComparison.OrdinalIgnoreCase) && value.IndexOf("chunked", StringComparison.OrdinalIgnoreCase) >= 0)
+                        chunked = true;
+                    else if (name.Equals("Connection", StringComparison.OrdinalIgnoreCase) && value.Equals("close", StringComparison.OrdinalIgnoreCase))
+                        response.KeepAlive = false;
+                }
+
+                var leftover = new MemoryStream(_buffer, headerEnd + 4, filled - headerEnd - 4, false);
+                byte[] body;
+                if (chunked)
+                {
+                    body = ReadChunked(leftover);
+                }
+                else if (contentLength >= 0)
+                {
+                    body = new byte[contentLength];
+                    int have = leftover.Read(body, 0, contentLength);
+                    ReadExactly(body, have, contentLength - have);
+                }
+                else
+                {
+                    var all = new MemoryStream();
+                    leftover.CopyTo(all);
+                    _stream.CopyTo(all);
+                    body = all.ToArray();
+                    response.KeepAlive = false;
+                }
+                response.Body = Encoding.UTF8.GetString(body);
+                return response;
+            }
+
+            private byte[] ReadChunked(MemoryStream leftover)
+            {
+                var body = new MemoryStream();
+                while (true)
+                {
+                    string sizeLine = ReadLine(leftover);
+                    int semi = sizeLine.IndexOf(';');
+                    int size = int.Parse(semi >= 0 ? sizeLine.Substring(0, semi) : sizeLine, NumberStyles.HexNumber, CultureInfo.InvariantCulture);
+                    if (size == 0)
+                    {
+                        while (ReadLine(leftover).Length > 0) { }
+                        return body.ToArray();
+                    }
+                    var chunk = new byte[size];
+                    int have = leftover.Read(chunk, 0, size);
+                    if (have < size) ReadExactly(chunk, have, size - have);
+                    body.Write(chunk, 0, size);
+                    ReadLine(leftover);
+                }
+            }
+
+            private string ReadLine(MemoryStream leftover)
+            {
+                var line = new StringBuilder();
+                while (true)
+                {
+                    int b = leftover.ReadByte();
+                    if (b < 0) b = _stream.ReadByte();
+                    if (b < 0) throw new IOException("Connection closed while reading a chunked response");
+                    if (b == '\n') return line.ToString().TrimEnd('\r');
+                    line.Append((char)b);
+                }
+            }
+
+            private void ReadExactly(byte[] target, int offset, int count)
+            {
+                while (count > 0)
+                {
+                    int n = _stream.Read(target, offset, count);
+                    if (n == 0) throw new IOException("Connection closed while reading the response body");
+                    offset += n;
+                    count -= n;
+                }
+            }
+
+            private static int IndexOfHeaderEnd(byte[] buffer, int length)
+            {
+                for (int i = 3; i < length; i++)
+                {
+                    if (buffer[i] == '\n' && buffer[i - 1] == '\r' && buffer[i - 2] == '\n' && buffer[i - 3] == '\r') return i - 3;
+                }
+                return -1;
+            }
+
+            public void Dispose()
+            {
+                _client.Close();
             }
         }
 
@@ -114,7 +346,7 @@ namespace CallFromExcel.AddIn
 
         // Port of JuliaIsListening (modHttp.bas): used by JuliaLaunch to check whether a
         // previously-known port is still alive before deciding whether to launch a new
-        // Julia session.
+        // Julia session, and by JuliaIsRunning (ComServer.cs/JuliaFunctions.cs).
         public static bool IsListening(int port, int timeoutMs = 2000)
         {
             if (!FastConnectProbe(port)) return false;

@@ -338,7 +338,7 @@ There is one alternative method of calling Julia from Excel of which I am aware:
 
 https://github.com/JuliaComputing/JuliaInXL.jl  
 
-JuliaComputing made JuliaInXL open source in October 2021; it previously required a licence for commercial use. As of August 2026, JuliaInXL is not compatible with dynamic array formulas, and does not permit calling Julia from VBA. My tests of CallFromExcel's VBA-based predecessor, JuliaExcel, indicated that it and JuliaInXL had broadly similar performance in terms of latency and speed of data transfer.
+JuliaComputing made JuliaInXL open source in October 2021; it previously required a licence for commercial use. As of August 2026, JuliaInXL is not compatible with dynamic array formulas, and does not permit calling Julia from VBA. In tests on the same PC (see `workbooks/CallFromExcel-Compare.xlsm`), CallFromExcel was faster than JuliaInXL in every test: about 5 times faster in latency, between 1.6 and 8.6 times faster returning results to Excel, and 16 times faster passing data from Excel to Julia.
 
 ## Compatibility
 CallFromExcel requires 64-bit Excel for Windows - the default for Microsoft 365 - and has been tested on Excel under Microsoft 365. It is not compatible with 32-bit Excel: the installer checks, and stops with an error if Excel is 32-bit. It _should_ work on earlier 64-bit versions of Excel (perhaps back to Excel 2016) but it has not been tested on them.

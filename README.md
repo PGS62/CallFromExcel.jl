@@ -84,7 +84,7 @@ CallFromExcel replaces [JuliaExcel](https://github.com/PGS62/JuliaExcel.jl). Its
 **Julia.** Functions and variables formerly accessed as `JuliaExcel.xxx`, such as `JuliaExcel.serve_xl()` and `JuliaExcel.last_answer`, are now `CallFromExcel.xxx`, after `using CallFromExcel`.
 
 ## Functions
-CallFromExcel makes the following functions available from Excel worksheets and from VBA:
+CallFromExcel makes the following functions available from Excel worksheets and from VBA, except that the three ending in `VBA` can only be called from VBA:
 
 |Name|Description|
 |----|-----------|

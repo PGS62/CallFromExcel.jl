@@ -1,3 +1,4 @@
 ﻿Version	Date	Time	Author	Comment
+3	07-Nov-2026	15:12	Philip Swannell	Updated to compare CallFromExcel with JuniaInXL.
 2	21-Aug-2026	10:16	Philip Swannell	Added findings worksheet.
 1	20-Aug-2026	13:47	Philip Swannell	First version

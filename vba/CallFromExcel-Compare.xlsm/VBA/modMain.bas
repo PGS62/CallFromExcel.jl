@@ -1,7 +1,7 @@
 Attribute VB_Name = "modMain"
 ' Copyright (c) 2026 Philip Swannell
 ' License MIT (https://opensource.org/licenses/MIT)
-' Document: https://github.com/PGS62/JuliaExcel.jl#readme
+' Document: https://github.com/PGS62/CallFromExcel.jl#readme
 
 Option Explicit
 
@@ -9,16 +9,16 @@ Option Explicit
 ' Procedure  : RunOneTest
 ' Author     : Philip Swannell
 ' Date       : 20-Aug-2026
-' Purpose    : Compare execution time for two formulas, one using JuliaExcel, the other using JuliaInExcel. Since JuliaInXL
-'              does not seem to be callable from VBA, we test by pasting formulas into the worksheets JuliaExcel and JuliaInXL
+' Purpose    : Compare execution time for two formulas, one using CallFromExcel, the other using JuliaInXL. Since JuliaInXL
+'              does not seem to be callable from VBA, we test by pasting formulas into the worksheets CallFromExcel and JuliaInXL
 ' Parameters :
 '  Description    : Narrative giving the purpose of the test - e.g. Latency
 '  VectorLength   : The length of the vector passed to the JInXL/JE function
-'  JEFormula      : The text of the formula using JuliaExcel's JuliaCall or JuliaEval
+'  JEFormula      : The text of the formula using CallFromExcel's JuliaCall or JuliaEval
 '  JInXLFormula   : The text of the formula using JuliaInXL's jlcall or jleval. To indicate that the call must be a Ctrl+Shift+Enter array formula, the first and last characters should be { and }.
 '  NumCalls       : The number of times that the formula is evaluatd, with the average time recorded.
 '  OneCallPerCell : If TRUE then rather than a single array formula, the test is applied by pasting the same formula to VectorLength cells. Suitable for latency tests.
-'  ResultCellJE   : The cell to which the average execution time for the JuliaExcel function to be evaluated is written.
+'  ResultCellJE   : The cell to which the average execution time for the CallFromExcel function to be evaluated is written.
 '  ResultCellJInXL: The cell to which the average execution time for the JuliaInXL function to be evaluated is written.
 '  RatioCell      : The cell to which the ration of the two evaluation times is written
 ' -----------------------------------------------------------------------------------------------------------------------
@@ -61,11 +61,11 @@ Sub RunOneTest(Description As String, VectorLength As Long, ByVal JEFormula As S
 22            JInXLFormula = Replace(JInXLFormula, "InputData", InputDataAddress)
 23        End If
 
-24        Set TargetRangeJE = FindTargetRange(shJuliaExcel, VectorLength)
+24        Set TargetRangeJE = FindTargetRange(shCallFromExcel, VectorLength)
 25        Set TargetRangeJInXL = FindTargetRange(shJuliaInXL, VectorLength)
 
 26        If JEFormula <> "" Then
-27            LogMessage "Testing " & Description & " for JuliaExcel"
+27            LogMessage "Testing " & Description & " for CallFromExcel"
 28            ResultCellJE.Value = PasteAndTimeFormula(TargetRangeJE, JEFormula, OneCallPerCell, NumCalls)
 29        Else
 30            ResultCellJE.ClearContents
@@ -101,13 +101,13 @@ Sub RunManyTests(Optional FromRow As Long = 2, Optional ToRow As Long)
 
           Const cn_Description = 1
           Const cn_VectorLength = 2
-          Const cn_JuliaExcelFormula = 3
+          Const cn_CallFromExcelFormula = 3
           Const cn_JuliaInXLFormula = 4
           Const cn_NumCalls = 5
           Const cn_OneCallPerCell = 6
-          Const cn_JuliaExcel_s = 7
+          Const cn_CallFromExcel_s = 7
           Const cn_JuliaInXL_s = 8
-          Const cn_JuliaInXLOverJuliaExcel = 9
+          Const cn_JuliaInXLOverCallFromExcel = 9
           
           Dim i As Long
           Dim OrigCalculation As Long
@@ -138,18 +138,18 @@ Sub RunManyTests(Optional FromRow As Long = 2, Optional ToRow As Long)
 
 16                RunOneTest .Cells(i, cn_Description).Value, _
                       .Cells(i, cn_VectorLength).Value, _
-                      .Cells(i, cn_JuliaExcelFormula).Value, _
+                      .Cells(i, cn_CallFromExcelFormula).Value, _
                       .Cells(i, cn_JuliaInXLFormula).Value, _
                       .Cells(i, cn_NumCalls).Value, _
                       .Cells(i, cn_OneCallPerCell).Value, _
-                      .Cells(i, cn_JuliaExcel_s), _
+                      .Cells(i, cn_CallFromExcel_s), _
                       .Cells(i, cn_JuliaInXL_s), _
-                      .Cells(i, cn_JuliaInXLOverJuliaExcel)
+                      .Cells(i, cn_JuliaInXLOverCallFromExcel)
 17            Next i
 
 18        End With
 
-19        AddAllResultsRangeNameToSheet shJuliaExcel
+19        AddAllResultsRangeNameToSheet shCallFromExcel
 20        AddAllResultsRangeNameToSheet shJuliaInXL
 21        AlignColumnWidths
 22        shMain.Range("Results_Identical?").Calculate
@@ -261,7 +261,7 @@ End Function
 
 Sub TestInstallation()
 1         On Error GoTo ErrHandler
-2         With shMain.Range("JuliaExcelTestCell")
+2         With shMain.Range("CallFromExcelTestCell")
 3             .Dirty
 4             .Calculate
 5             If VarType(.Value) <> vbDouble Then Throw CStr(.Value)
@@ -313,7 +313,7 @@ Sub ClearOutSheets()
 1         On Error GoTo ErrHandler
 
 2         ClearOutSheet shInputData
-3         ClearOutSheet shJuliaExcel
+3         ClearOutSheet shCallFromExcel
 4         ClearOutSheet shJuliaInXL
 5         shMain.Activate
 
@@ -352,13 +352,13 @@ Sub AlignColumnWidths()
           Dim i As Long
 
 1         On Error GoTo ErrHandler
-2         For i = 1 To shJuliaExcel.UsedRange.Columns.Count
-3             JEColWidth = shJuliaExcel.Cells(1, i).ColumnWidth
+2         For i = 1 To shCallFromExcel.UsedRange.Columns.Count
+3             JEColWidth = shCallFromExcel.Cells(1, i).ColumnWidth
 4             JInXLColWidth = shJuliaInXL.Cells(1, i).ColumnWidth
 5             If JEColWidth > JInXLColWidth Then
 6                 shJuliaInXL.Cells(1, i).ColumnWidth = JEColWidth
 7             Else
-8                 shJuliaExcel.Cells(1, i).ColumnWidth = JInXLColWidth
+8                 shCallFromExcel.Cells(1, i).ColumnWidth = JInXLColWidth
 9             End If
 10        Next i
 

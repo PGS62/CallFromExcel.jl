@@ -1,7 +1,7 @@
 Attribute VB_Name = "modUtils"
 ' Copyright (c) 2026 Philip Swannell
 ' License MIT (https://opensource.org/licenses/MIT)
-' Document: https://github.com/PGS62/JuliaExcel.jl#readme
+' Document: https://github.com/PGS62/CallFromExcel.jl#readme
 Option Explicit
 
 #If VBA7 And Win64 Then
@@ -18,8 +18,8 @@ Private Declare Sub Sleep Lib "kernel32" (ByVal Milliseconds As Long)
 ' Procedure : ElapsedTime
 ' Purpose   : Retrieves the current value of the performance counter, which is a high resolution (<1us)
 '             time stamp that can be used for time-interval measurements.
-'             Local copy of JuliaExcel.xlam's modUtils.ElapsedTime - duplicated rather than referenced
-'             across VBA projects since this workbook has no VBA project reference to JuliaExcel.xlam.
+'             Local copy of SolumAddin.xlam's ElapsedTime - duplicated rather than referenced
+'             across VBA projects since this workbook has no VBA project reference to SolumAddin.xlam.
 ' -----------------------------------------------------------------------------------------------------------------------
 Function ElapsedTime() As Double
           Dim A As Currency
@@ -35,7 +35,7 @@ ErrHandler:
 6         ReThrow "ElapsedTime", Err
 End Function
 
-'Local copy of JuliaExcel.xlam's modUtils.Throw.
+'Local copy of SolumAddin.xlam's Throw.
 Sub Throw(ByVal ErrorString As String)
 1         If Len(ErrorString) > 32000 Then
 2             Err.Raise vbObjectError + 1, , Left$(ErrorString, 1) & Right$(ErrorString, 31999)
@@ -47,7 +47,7 @@ End Sub
 ' -----------------------------------------------------------------------------------------------------------------------
 ' Procedure  : ReThrow
 ' Purpose    : Common error handling to be used in the error handler of all methods. Local copy of
-'              JuliaExcel.xlam's modUtils.ReThrow.
+'              SolumAddin.xlam's modUtils.ReThrow.
 ' Parameters :
 '  FunctionName: The name of the function from which ReThrow is called, typically in the function's error handler.
 '  Error       : Err, the error object.
@@ -77,7 +77,7 @@ Function ReThrow(FunctionName As String, Error As ErrObject, Optional ReturnStri
 13        End If
 End Function
 
-'Local copy of JuliaExcel.xlam's modMain.ThrowIfError.
+'Local copy of SolumAddin.xlam's ThrowIfError.
 Function ThrowIfError(Data As Variant)
 1         ThrowIfError = Data
 2         If VarType(Data) = vbString Then

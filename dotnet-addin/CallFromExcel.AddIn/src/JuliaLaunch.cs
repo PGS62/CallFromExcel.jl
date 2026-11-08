@@ -307,9 +307,7 @@ namespace CallFromExcel.AddIn
                 }
                 if (stopwatch.Elapsed.TotalSeconds > timeoutSeconds)
                 {
-                    return "Julia has not signalled it's ready after " + timeoutSeconds + " seconds - it may " +
-                           "still be precompiling packages. Once you see \"CallFromExcel HTTP server listening\" " +
-                           "printed in its window, call JuliaLaunch (or JuliaEval) again.";
+                    return StillStartingMessage(timeoutSeconds);
                 }
             }
 
@@ -330,9 +328,7 @@ namespace CallFromExcel.AddIn
             {
                 if (stopwatch.Elapsed.TotalSeconds > timeoutSeconds)
                 {
-                    return "Julia has not signalled it's ready after " + timeoutSeconds + " seconds - it may " +
-                           "still be precompiling packages. Once you see \"CallFromExcel HTTP server listening\" " +
-                           "printed in its window, call JuliaLaunch (or JuliaEval) again.";
+                    return StillStartingMessage(timeoutSeconds);
                 }
                 Thread.Sleep(100);
             }
@@ -353,6 +349,17 @@ namespace CallFromExcel.AddIn
                 return "Julia launched in window \"" + WindowUtils.WindowTitleFromHandle(hwndFinal) + "\"";
             }
             return "Julia launched (listening on port " + JuliaPort.GetJuliaPort() + ")";
+        }
+
+        // Julia carries on starting after JuliaLaunch stops waiting for it. The message doesn't
+        // suggest calling JuliaLaunch again: that would start a second Julia if the first hasn't
+        // finished, and isn't needed - once Julia writes its port file, JuliaEval and JuliaCall
+        // find it there.
+        private static string StillStartingMessage(int timeoutSeconds)
+        {
+            return "Julia is still starting after " + timeoutSeconds + " seconds - it may be precompiling " +
+                   "packages. Wait until its window shows \"CallFromExcel HTTP server listening\"; JuliaEval " +
+                   "and JuliaCall will then connect to it.";
         }
 
         // "C:\foo\bar" -> "/mnt/c/foo/bar". Port of WSLAddress (modUtils.bas).

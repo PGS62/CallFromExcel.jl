@@ -326,7 +326,7 @@ ErrHandler:
 End Function
 
 Function RepoRoot() As String
-          RepoRoot = CreateObject("Scripting.FileSystemObject").GetAbsolutePathName(ThisWorkbook.Path & "\..\..\..")
+          RepoRoot = CreateObject("Scripting.FileSystemObject").GetAbsolutePathName(ThisWorkbook.Path & "\..")
 End Function
 
 ' "C:\foo\bar" -> "/mnt/c/foo/bar"

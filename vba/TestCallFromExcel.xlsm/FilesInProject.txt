@@ -1,6 +1,7 @@
 ﻿AuditSheetComments.txt
 Formulas\FileLocations.tsv
 Formulas\Scratch.tsv
+TestCallFromExcel.xlsm
 Values\Audit.csv
 Values\FileLocations.csv
 Values\Main.csv

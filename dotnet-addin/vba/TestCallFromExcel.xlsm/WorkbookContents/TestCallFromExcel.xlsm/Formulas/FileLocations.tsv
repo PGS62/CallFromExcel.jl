@@ -1,4 +1,0 @@
-﻿Address	Formula
-B5:D7	"=sDirList(B3,TRUE,,""FM#"",,""TestCallFromExcel.xlsm"")"
-B11:D12	"=sDirList(B3,TRUE,,""FM#"",,""*AddIn64-packed.xll"")"
-B15	=sBookName(,TRUE)

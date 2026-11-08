@@ -2,7 +2,7 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "VBA: Push to Excel (JuliaExcel)",
+            "label": "VBA: Push to Excel (CallFromExcel)",
             "detail": "Have a file open/focused inside the workbook's export folder (VBA/Formulas/Values) you want to push to.",
             "type": "shell",
             "command": "powershell",
@@ -25,7 +25,7 @@
             "problemMatcher": []
         },
         {
-            "label": "VBA: Push Changed Modules to Excel (JuliaExcel)",
+            "label": "VBA: Push Changed Modules to Excel (CallFromExcel)",
             "detail": "Push only modules changed since the last Pull. Have a file open/focused inside the workbook's export folder (VBA/Formulas/Values) you want to push to.",
             "type": "shell",
             "command": "powershell",
@@ -46,7 +46,7 @@
             "problemMatcher": []
         },
         {
-            "label": "VBA: Pull from Excel (JuliaExcel)",
+            "label": "VBA: Pull from Excel (CallFromExcel)",
             "detail": "Have a file open/focused inside the workbook's export folder (VBA/Formulas/Values) you want to pull from.",
             "type": "shell",
             "command": "powershell",

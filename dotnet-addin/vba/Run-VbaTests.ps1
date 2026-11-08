@@ -1,11 +1,15 @@
 # Run-VbaTests.ps1
-# Builds (if needed) and runs the VBA test suite (modTest.RunTests) for the C#/Excel-DNA
-# add-in, in a fresh, invisible Excel instance. No workbook needs to be open already, since
-# RunTests itself registers the XLL (Application.RegisterXLL) and creates the COM object it needs.
+# Runs the VBA test suite (modTest.RunTests in workbooks\TestCallFromExcel.xlsm) for the
+# C#/Excel-DNA add-in, in a fresh, invisible Excel instance. The workbook is opened and closed
+# without saving. No workbook needs to be open already, since RunTests itself registers the XLL
+# (Application.RegisterXLL) and creates the COM object it needs.
+#
+# The workbook's VBA source lives in vba\TestCallFromExcel.xlsm\VBA. Changes to it are pushed
+# into the workbook with SolumAddins\scripts\Sync-VbaModules.ps1 (the "VBA: Push" VS Code task).
 #
 # Prerequisites:
-#   - dotnet build -c Release in dotnet-addin\CallFromExcel.AddIn (produces the packed .xll)
-#   - CallFromExcel.ComServer registered for COM (see dotnet-addin\README.md)
+#   - dotnet build -c Release in dotnet-addin\CallFromExcel.AddIn (refreshes dotnet-addin\dist)
+#   - CallFromExcel.ComServer registered for COM (dotnet-addin\installer\Install.ps1)
 #   - Excel Trust Center -> Trust Center Settings -> Macro Settings ->
 #     [x] Trust access to the VBA project object model
 #
@@ -19,13 +23,12 @@ param(
 $ErrorActionPreference = "Stop"
 
 if ($XlPath -eq "") {
-    $XlPath = Join-Path $PSScriptRoot "TestCallFromExcel.xlsm\TestCallFromExcel.xlsm"
+    $XlPath = Join-Path $PSScriptRoot "..\..\workbooks\TestCallFromExcel.xlsm"
 }
-$xlPath = $XlPath
-if (-not (Test-Path $xlPath)) {
-    Write-Host "Workbook not found - building it first."
-    & (Join-Path $PSScriptRoot "Build-TestWorkbook.ps1")
+if (-not (Test-Path $XlPath)) {
+    throw "Test workbook not found: $XlPath"
 }
+$xlPath = (Resolve-Path $XlPath).Path
 
 $excel = New-Object -ComObject Excel.Application
 $excel.Visible = $false

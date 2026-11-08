@@ -32,7 +32,7 @@ formula-bar IntelliSense embedded in the add-in itself (replacing
 
 ## Validated
 
-- **55/55** VBA tests in `vba/TestCallFromExcel.xlsm` (`vba/Run-VbaTests.ps1`,
+- **58/58** VBA tests in `workbooks/TestCallFromExcel.xlsm` (`vba/Run-VbaTests.ps1`,
   also run by `test/runtests.jl` locally), covering both the COM and the
   worksheet/XLL surfaces. WSL: `modTest.RunWSLTest`, run by hand.
 - **58/58** self-contained wire-format tests (`CallFromExcel.AddIn.TestHarness`,

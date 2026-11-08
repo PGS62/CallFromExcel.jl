@@ -1,2 +1,0 @@
-﻿Version	Date	Time	Author	Comment
-1	06-Nov-2026	17:11	Philip Swannell	First version - taking two modules from JuliaExcel.xlam and putting into a stand-alone test workbook.

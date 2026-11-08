@@ -442,7 +442,7 @@ end
 
 end
 
-# The VBA-side test suite (modTest.RunTests, in dotnet-addin\vba\TestCallFromExcel.xlsm) exercises
+# The VBA-side test suite (modTest.RunTests, in workbooks\TestCallFromExcel.xlsm) exercises
 # both call paths against a real Excel/Julia session (via COM automation): CallFromExcel.JuliaCall/
 # JuliaEval called from VBA code (the ComServer COM class), and =JuliaCall(...)/=JuliaEval(...)
 # called from a genuine worksheet formula (the XLL) - these are separate implementations with

@@ -182,7 +182,7 @@ End Function
 Sub LoadAddIn()
           Dim XllPath As String
           Set CallFromExcel = CreateObject("CallFromExcel.ComServer")
-          XllPath = ThisWorkbook.Path & "\..\..\dist\CallFromExcel.AddIn64-packed.xll"
+          XllPath = RepoRoot() & "\dotnet-addin\dist\CallFromExcel.AddIn64-packed.xll"
           If Dir(XllPath) = vbNullString Then
               Throw "Cannot find the add-in at " & XllPath & _
                   " - build it first (dotnet build -c Release in dotnet-addin\CallFromExcel.AddIn)."

@@ -508,6 +508,36 @@ if Sys.iswindows()
         found = readchomp(`powershell -NoProfile -NonInteractive -Command $script`)
         @test lowercase(found) == lowercase(joinpath(Sys.BINDIR, "julia.exe"))
     end
+
+    # JuliaLaunch rejects -L/--load and adds -i and --threads=auto,1 unless given. It used to test
+    # for substrings of the whole CommandLineOptions string, so --project=C:/Users/Jean-Luc was
+    # rejected as if it were -L, and --project=C:/multi-index suppressed -i.
+    @testset "JuliaLaunch's CommandLineOptions checks look at options, not substrings" begin
+        dll = joinpath(@__DIR__, "..", "dotnet-addin", "dist", "CallFromExcel.AddIn.dll")
+        cases = [
+            "" => "-i --threads=auto,1",
+            "--project=C:/Users/Jean-Luc/multi-index" => "--project=C:/Users/Jean-Luc/multi-index -i --threads=auto,1",
+            "--project=\"C:/My -L -i Folder\"" => "--project=\"C:/My -L -i Folder\" -i --threads=auto,1",
+            "-q -i" => "-q -i --threads=auto,1",
+            "-qi" => "-qi --threads=auto,1",
+            "-t 4" => "-t 4 -i",
+            "-t4" => "-t4 -i",
+            "--threads=8 -i" => "--threads=8 -i",
+            "-e \"x = 1 -i\"" => "-e \"x = 1 -i\" -i --threads=auto,1",
+            "-L foo.jl" => "THROWS",
+            "-Lfoo.jl" => "THROWS",
+            "-qL foo.jl" => "THROWS",
+            "--load foo.jl" => "THROWS",
+            "--load=foo.jl" => "THROWS",
+        ]
+        ps1 = tempname() * ".ps1"
+        write(ps1, "[void][Reflection.Assembly]::LoadFrom('$dll')\n" * join(
+            ["try { [CallFromExcel.AddIn.JuliaLaunch]::NormaliseCommandLineOptions('$(c.first)') } catch { 'THROWS' }"
+             for c in cases], "\n"))
+        results = readlines(`powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $ps1`)
+        rm(ps1)
+        @test results == last.(cases)
+    end
 end
 
 # The VBA-side test suite (modTest.RunTests, in workbooks\TestCallFromExcel.xlsm) exercises

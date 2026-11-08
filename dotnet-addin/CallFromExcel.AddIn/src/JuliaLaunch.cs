@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Text;
@@ -17,6 +18,92 @@ namespace CallFromExcel.AddIn
         private const string PackageName = "CallFromExcel";
         private const string WSLExecutable = @"C:\Windows\System32\wsl.exe";
 
+        // Julia's short options that take a value, either attached (-Lfile) or as the next
+        // argument (-L file), per julia --help. Any other letter in a short-option group is a flag
+        // (or, for -O and -g, an optional attached value, which a flag scan handles harmlessly).
+        private const string ShortOptionsWithValue = "eEHLJCtpm";
+
+        // Checks the user's CommandLineOptions and adds -i and --threads=auto,1 unless the user
+        // gave their own. Looks at the actual options - each argument, quotes respected - not at
+        // substrings of the whole string, so that e.g. --project=C:/Users/Jean-Luc is not taken
+        // for -L, nor --project=C:/multi-index for -i. Public so the tests can call it directly.
+        public static string NormaliseCommandLineOptions(string commandLineOptions)
+        {
+            bool hasLoad = false, hasInteractive = false, hasThreads = false;
+            List<string> args = SplitArguments(commandLineOptions ?? "");
+            for (int k = 0; k < args.Count; k++)
+            {
+                string arg = args[k];
+                if (arg.StartsWith("--", StringComparison.Ordinal))
+                {
+                    string name = arg.Split('=')[0];
+                    if (name == "--load") hasLoad = true;
+                    else if (name == "--threads") hasThreads = true;
+                }
+                else if (arg.Length > 1 && arg[0] == '-')
+                {
+                    for (int c = 1; c < arg.Length; c++)
+                    {
+                        char option = arg[c];
+                        if (option == 'L') hasLoad = true;
+                        else if (option == 'i') hasInteractive = true;
+                        else if (option == 't') hasThreads = true;
+                        if (ShortOptionsWithValue.IndexOf(option) >= 0)
+                        {
+                            if (c == arg.Length - 1) k++;   // the value is the next argument
+                            break;                          // the rest of this one is the value
+                        }
+                    }
+                }
+            }
+
+            if (hasLoad)
+            {
+                throw new ArgumentException(
+                    "CommandLineOptions cannot include the -L or --load options. Instead use JuliaLaunch " +
+                    "without that option and then use JuliaCall(\"include\",\"path_to_file\")");
+            }
+            string result = commandLineOptions.Trim();
+            if (!hasInteractive)
+            {
+                // Lets OhMyREPL work correctly in the REPL, which requires -i (interactive).
+                // https://github.com/KristofferC/OhMyREPL.jl/issues/271
+                result = (result + " -i").Trim();
+            }
+            if (!hasThreads)
+            {
+                // Without a dedicated interactive thread, HTTP.jl's server tasks share
+                // Julia's single default thread with whatever expression is currently
+                // being evaluated - a long-running or blocking evaluation (even exit())
+                // can then leave the server unable to respond, or even to shut down
+                // cleanly. See the "Server" docstring in HTTP.jl's http_server.jl.
+                result = (result + " --threads=auto,1").Trim();
+            }
+            return result;
+        }
+
+        // Splits a command line into arguments at spaces outside double quotes; quotes are
+        // removed, as Windows' own argument parsing does.
+        private static List<string> SplitArguments(string commandLine)
+        {
+            var args = new List<string>();
+            var current = new StringBuilder();
+            bool inQuotes = false, any = false;
+            foreach (char ch in commandLine)
+            {
+                if (ch == '"') { inQuotes = !inQuotes; any = true; }
+                else if (char.IsWhiteSpace(ch) && !inQuotes)
+                {
+                    if (any) args.Add(current.ToString());
+                    current.Clear();
+                    any = false;
+                }
+                else { current.Append(ch); any = true; }
+            }
+            if (any) args.Add(current.ToString());
+            return args;
+        }
+
         public static string Launch(
             bool useLinux = false,
             bool minimiseWindow = false,
@@ -28,28 +115,7 @@ namespace CallFromExcel.AddIn
             string juliaExe = JuliaExeLocation.Find(useLinux);
 
             string userSuppliedCommandLineOptions = commandLineOptions ?? "";
-            commandLineOptions = userSuppliedCommandLineOptions;
-            if (commandLineOptions.Contains("-L") || commandLineOptions.Contains("--load "))
-            {
-                throw new ArgumentException(
-                    "CommandLineOptions cannot include the -L or --load options. Instead use JuliaLaunch " +
-                    "without that option and then use JuliaCall(\"include\",\"path_to_file\")");
-            }
-            if (!commandLineOptions.Contains("-i"))
-            {
-                // Lets OhMyREPL work correctly in the REPL, which requires -i (interactive).
-                // https://github.com/KristofferC/OhMyREPL.jl/issues/271
-                commandLineOptions = commandLineOptions.Trim() + " -i";
-            }
-            if (!commandLineOptions.Contains("--threads"))
-            {
-                // Without a dedicated interactive thread, HTTP.jl's server tasks share
-                // Julia's single default thread with whatever expression is currently
-                // being evaluated - a long-running or blocking evaluation (even exit())
-                // can then leave the server unable to respond, or even to shut down
-                // cleanly. See the "Server" docstring in HTTP.jl's http_server.jl.
-                commandLineOptions = commandLineOptions.Trim() + " --threads=auto,1";
-            }
+            commandLineOptions = NormaliseCommandLineOptions(userSuppliedCommandLineOptions);
 
             int pid = Process.GetCurrentProcess().Id;
             string windowPartialTitle = "serving Excel PID " + pid; // must match Julia's CallFromExcel.settitle

@@ -37,6 +37,9 @@ Option Explicit
 
 Public CallFromExcel As Object
 Private TestLog As String
+'The CommandLineOptions RunTests launched Julia with, so tests that relaunch Julia use the same
+'environment rather than the default one.
+Private TestCommandLineOptions As String
 Public Const gPackageName As String = "CallFromExcel"
 Public Const gTestCommandOptions = "--project=C:\Projects\CallFromExcel" 'Forces the Julia process
 'launched for RunTests/PerformanceTest/SimpleSpeedTest to activate this repo's own environment,
@@ -78,6 +81,7 @@ Function RunTests(Optional SilentMode As Boolean = False, Optional CommandLineOp
 3         CallFromExcel.JuliaEval "exit()"
 4         Sleep 1000 'Give time to shut down properly, otherwise launch can fail thinking Julia still running but unresponsive
 5         ThrowIfError CallFromExcel.JuliaLaunch(, , CommandLineOptions)
+          TestCommandLineOptions = CommandLineOptions
 
 6         PrintTwice vbLf & String(80, "=")
 7         PrintTwice "CallFromExcel RunTests (C#/Excel-DNA add-in)"
@@ -1369,7 +1373,7 @@ Function WsTest_RelaunchAfterExit() As Boolean
 1         On Error GoTo ErrHandler
 2         Set ws = ScratchSheet()
 3         CallFromExcel.JuliaEval "exit()"
-4         ws.Range("A1").Formula2 = "=JuliaLaunch()"
+4         ws.Range("A1").Formula2 = "=JuliaLaunch(,,""" & TestCommandLineOptions & """)"
 5         Result = ws.Range("A1").Text
 6         WsTest_RelaunchAfterExit = Left$(Result, 1) <> "#" And CallFromExcel.JuliaIsRunning()
 7         Exit Function

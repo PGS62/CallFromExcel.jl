@@ -1,0 +1,3 @@
+﻿Address	Formula
+C1:C5	=SORT(A1:A5)
+E1:E5	"=JuliaCall(""sort"",A1:A5)"

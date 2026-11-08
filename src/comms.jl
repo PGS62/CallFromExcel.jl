@@ -527,14 +527,15 @@ Set a variable in global scope. Called by VBA function JuliaSetVar.
 function setvar(name::String, arg)
 
     if Base.isidentifier(name)
-        Main.eval(Main.eval(Meta.parse(":(global $name = $arg)")))
+        # Assign the value itself, not its printed form re-parsed as source code, which
+        # fails for strings ("hello" would become the variable name hello) and for values
+        # with no parseable repr, such as ExcelError.
+        Core.eval(Main, Expr(:global, Expr(:(=), Symbol(name), QuoteNode(arg))))
 
         thesize = ()
-        thetype = Nothing
+        thetype = typeof(arg)
         try
-            tmp = Main.eval(Meta.parse(name))
-            thesize = size(tmp)
-            thetype = typeof(tmp)
+            thesize = size(arg)
         catch
         end
 

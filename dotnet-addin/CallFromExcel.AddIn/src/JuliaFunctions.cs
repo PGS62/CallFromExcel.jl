@@ -163,15 +163,44 @@ namespace CallFromExcel.AddIn
             encoded[0] = fnEncoded;
             for (int i = 0; i < args.Length; i++)
             {
-                object arg = args[i];
-                if (arg is ExcelMissing || arg is ExcelEmpty) arg = null;
-                encoded[i + 1] = WireFormatEncode.Encode(arg);
+                encoded[i + 1] = WireFormatEncode.Encode(FromExcelDna(args[i]));
             }
 
             var lens = new StringBuilder();
             foreach (string e in encoded) { lens.Append(e.Length); lens.Append(','); }
 
             return "*1," + encoded.Length + ";" + lens + ";" + string.Concat(encoded);
+        }
+
+        // Converts Excel-DNA's own argument types to the ones WireFormatEncode knows:
+        // blank cells and omitted arguments (ExcelEmpty/ExcelMissing) to null, and error
+        // values (the ExcelError enum, e.g. #DIV/0!) to ExcelErrorValue. WireFormatEncode
+        // can't do this itself, since it must not reference ExcelDna.Integration (see
+        // ComServer.CallCore). Excel-DNA passes a range as a zero-based object[,] (or
+        // object[]) of scalars, converted here in place.
+        private static object FromExcelDna(object value)
+        {
+            if (value is object[,] matrix)
+            {
+                int nr = matrix.GetLength(0), nc = matrix.GetLength(1);
+                for (int i = 0; i < nr; i++)
+                    for (int j = 0; j < nc; j++)
+                        matrix[i, j] = FromExcelDnaScalar(matrix[i, j]);
+                return matrix;
+            }
+            if (value is object[] vector)
+            {
+                for (int i = 0; i < vector.Length; i++) vector[i] = FromExcelDnaScalar(vector[i]);
+                return vector;
+            }
+            return FromExcelDnaScalar(value);
+        }
+
+        private static object FromExcelDnaScalar(object value)
+        {
+            if (value is ExcelEmpty || value is ExcelMissing) return null;
+            if (value is ExcelError error) return new ExcelErrorValue(2000 + (int)error);
+            return value;
         }
 
         // Maps a wire-format error code (VBA's own XlCVError UI numbering, e.g. 2042 for
@@ -213,7 +242,7 @@ namespace CallFromExcel.AddIn
                     int lb = arr.GetLowerBound(0);
                     int ub = arr.GetUpperBound(0);
                     var parts = new string[ub - lb + 1];
-                    for (int i = lb; i <= ub; i++) parts[i - lb] = Convert.ToString(arr.GetValue(i));
+                    for (int i = lb; i <= ub; i++) parts[i - lb] = ExpressionLine(arr.GetValue(i));
                     return string.Join("\n", parts);
                 }
                 if (arr.Rank == 2)
@@ -224,12 +253,19 @@ namespace CallFromExcel.AddIn
                     int nc = arr.GetUpperBound(1) - lb1 + 1;
                     if (nc > 1) throw new ArgumentException("When passed as an array or a Range, JuliaExpression should have only one column, but got " + nc + " columns");
                     var parts = new string[ub0 - lb0 + 1];
-                    for (int i = lb0; i <= ub0; i++) parts[i - lb0] = Convert.ToString(arr.GetValue(i, lb1));
+                    for (int i = lb0; i <= ub0; i++) parts[i - lb0] = ExpressionLine(arr.GetValue(i, lb1));
                     return string.Join("\n", parts);
                 }
                 throw new ArgumentException("Too many dimensions");
             }
             return Convert.ToString(juliaExpression);
+        }
+
+        // A blank cell in a range of expressions is a blank line, not the text of
+        // ExcelEmpty's type name.
+        private static string ExpressionLine(object cell)
+        {
+            return cell is ExcelEmpty ? "" : Convert.ToString(cell);
         }
     }
 }

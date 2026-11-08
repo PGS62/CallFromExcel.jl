@@ -1,3 +1,4 @@
 ﻿Version	Date	Time	Author	Comment
+3	08-Nov-2026	17:16	Philip Swannell	Deleted unused code.
 2	08-Nov-2026	15:11	Philip Swannell	Copied across the performance measuring code from JuliaExcel.xlam.
 1	08-Nov-2026	10:21	Philip Swannell	Added this Audit sheet

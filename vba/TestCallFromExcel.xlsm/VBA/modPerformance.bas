@@ -72,43 +72,43 @@ Private Sub SimpleSpeedTest()
 13        Debug.Print "'--------------------------------------------------"
 14    End Sub
 
-'--------------------------------------------------
-'29-Oct-2025 18:37:22       PHILIP-HPZ1
-'Expression = 1+1
-'Average time in JuliaEval   6.16188229999898E-03       Averaged over 1000 calls
-'--------------------------------------------------
-'22-Dec-2025 15:58:22       MSI
-'Expression = 1+1
-'Average time in JuliaEval   0.015039338300001          Averaged over 1000 calls
-'--------------------------------------------------
-'18-Aug-2026 20:09:02       MSI
-'Expression = 1+1
-'Average time in JuliaEval   1.32635509999818E-03       Averaged over 1000 calls
-'--------------------------------------------------
-'08-Nov-2026 11:03:46       MSI
-'Expression = 1+1
-'Average time in JuliaEval   1.60134200006723E-04       Averaged over 1000 calls' '1st run using C# code of CallFromExcel.
-'--------------------------------------------------
+      '--------------------------------------------------
+      '29-Oct-2025 18:37:22       PHILIP-HPZ1
+      'Expression = 1+1
+      'Average time in JuliaEval   6.16188229999898E-03       Averaged over 1000 calls
+      '--------------------------------------------------
+      '22-Dec-2025 15:58:22       MSI
+      'Expression = 1+1
+      'Average time in JuliaEval   0.015039338300001          Averaged over 1000 calls
+      '--------------------------------------------------
+      '18-Aug-2026 20:09:02       MSI
+      'Expression = 1+1
+      'Average time in JuliaEval   1.32635509999818E-03       Averaged over 1000 calls
+      '--------------------------------------------------
+      '08-Nov-2026 11:03:46       MSI
+      'Expression = 1+1
+      'Average time in JuliaEval   1.60134200006723E-04       Averaged over 1000 calls' '1st run using C# code of CallFromExcel.
+      '--------------------------------------------------
 
-'========================================================================================================================
-'Running method PerformanceTest
-'Time now = 2026-08-03 18:01:11
-'JuliaExcel Version = 107
-'Computer = MSI
-'Latency test
-'Average time for JuliaEval("1+1") = 7.96316399984062 miliseconds (averaged over 500 calls)
-'Two-way data transport test
-'Average time for JuliaCall("identity", vector of length 100,000) = 1.48447485999204 seconds (averaged over 10 calls)
-'One-way data transport test, Excel to Julia
-'Average time for JuliaCall("sum", vector of length 100,000) = 1.27661278001033 seconds (averaged over 10 calls)
-'One-way data transport test, Julia to Excel
-'Average time for JuliaEval("collect((1:100000).*pi)") = 0.294781249994412 seconds (averaged over 10 calls)
+      '========================================================================================================================
+      'Running method PerformanceTest
+      'Time now = 2026-08-03 18:01:11
+      'JuliaExcel Version = 107
+      'Computer = MSI
+      'Latency test
+      'Average time for JuliaEval("1+1") = 7.96316399984062 miliseconds (averaged over 500 calls)
+      'Two-way data transport test
+      'Average time for JuliaCall("identity", vector of length 100,000) = 1.48447485999204 seconds (averaged over 10 calls)
+      'One-way data transport test, Excel to Julia
+      'Average time for JuliaCall("sum", vector of length 100,000) = 1.27661278001033 seconds (averaged over 10 calls)
+      'One-way data transport test, Julia to Excel
+      'Average time for JuliaEval("collect((1:100000).*pi)") = 0.294781249994412 seconds (averaged over 10 calls)
 
-'========================================================================================================================
-'Running method PerformanceTest
-'Time now = 2026-08-04 15:53:30
-'JuliaExcel Version = 109 <- Version 109 had experimental code to use UTF-8 for Excel-> Julia and Julia->Excel _
- communication.Julia To Excel gets faster Excel To Julia gets slower.
+      '========================================================================================================================
+      'Running method PerformanceTest
+      'Time now = 2026-08-04 15:53:30
+      'JuliaExcel Version = 109 <- Version 109 had experimental code to use UTF-8 for Excel-> Julia and Julia->Excel _
+       communication.Julia To Excel gets faster Excel To Julia gets slower.
 'Computer = MSI
 'Latency test
 'Average time for JuliaEval("1+1") = 8.14005120001093 miliseconds (averaged over 500 calls)
@@ -512,8 +512,6 @@ End Function
 'Average time for UnserialiseFromString(vector of 100,000 Doubles) = 0.22391951800033 seconds (averaged over 50 calls)
 '========================================================================================================================
 
-
-
 '========================================================================================================================
 'Running method DataframePerformanceTest
 'Time now = 2026-09-16 11:26:39
@@ -585,10 +583,12 @@ Sub DataframePerformanceTest()
           Dim Report As String
 
           Const JuliaExpressionTemplate = "DataFrame(rand(Float64,(5000,Ncol)),:auto)"
+          Dim i As Long
           Dim JuliaExpression As String
-          Dim i As Long, j As Long, k As Long, Ncol As Long
-          Dim t1 As Double, t2 As Double
+          Dim Ncol As Long
           Dim Res As Variant
+          Dim t1 As Double
+          Dim t2 As Double
 
 1         On Error GoTo ErrHandler
 
@@ -627,12 +627,8 @@ Sub DataframePerformanceTest()
 25            Debug.Print "'Time to evaluate '" & JuliaExpression & "':  " & CStr(t2 - t1)
 26        Next i
 
-
 27        Exit Sub
 ErrHandler:
 28        MsgBox CStr(Erl) & " " & Err.Description
 End Sub
-
-
-
 

@@ -39,21 +39,20 @@ Public CallFromExcel As Object
 Private TestLog As String
 Public Const gPackageName As String = "CallFromExcel"
 Public Const gTestCommandOptions = "--project=C:\Projects\CallFromExcel" 'Forces the Julia process
-    'launched for RunTests/PerformanceTest/SimpleSpeedTest to activate this repo's own environment,
-    'so "using CallFromExcel" always loads the local working copy under test, regardless of what the
-    'default (non-project-specific) Julia environment happens to have installed/dev'd.
-
+'launched for RunTests/PerformanceTest/SimpleSpeedTest to activate this repo's own environment,
+'so "using CallFromExcel" always loads the local working copy under test, regardless of what the
+'default (non-project-specific) Julia environment happens to have installed/dev'd.
 
 #If VBA7 Then
-    Private Declare PtrSafe Sub Sleep Lib "kernel32" (ByVal dwMilliseconds As Long)
+Private Declare PtrSafe Sub Sleep Lib "kernel32" (ByVal dwMilliseconds As Long)
 #Else
-    Private Declare Sub Sleep Lib "kernel32" (ByVal dwMilliseconds As Long)
+Private Declare Sub Sleep Lib "kernel32" (ByVal dwMilliseconds As Long)
 #End If
 
 ' Lets a non-interactive caller (Run-VbaTests.ps1) retrieve what PrintTwice wrote, since
 ' Debug.Print's output (the Immediate window) isn't visible over COM automation.
 Function GetTestLog() As String
-          GetTestLog = TestLog
+1         GetTestLog = TestLog
 End Function
 
 ' -----------------------------------------------------------------------------------------------------------------------
@@ -72,131 +71,135 @@ Function RunTests(Optional SilentMode As Boolean = False, Optional CommandLineOp
           Dim NumPassed As Long
           Dim Prompt As String
 
-          On Error GoTo ErrHandler
+1         On Error GoTo ErrHandler
 
-          LoadAddIn
+2         LoadAddIn
 
-          CallFromExcel.JuliaEval "exit()"
-          Sleep 1000 'Give time to shut down properly, otherwise launch can fail thinking Julia still running but unresponsive
-          ThrowIfError CallFromExcel.JuliaLaunch(, , CommandLineOptions)
+3         CallFromExcel.JuliaEval "exit()"
+4         Sleep 1000 'Give time to shut down properly, otherwise launch can fail thinking Julia still running but unresponsive
+5         ThrowIfError CallFromExcel.JuliaLaunch(, , CommandLineOptions)
 
-          PrintTwice vbLf & String(80, "=")
-          PrintTwice "CallFromExcel RunTests (C#/Excel-DNA add-in)"
-          PrintTwice Format(Now, "yyyy-mm-dd hh:mm:ss")
-          PrintTwice "ComputerName = " & Environ("ComputerName")
+6         PrintTwice vbLf & String(80, "=")
+7         PrintTwice "CallFromExcel RunTests (C#/Excel-DNA add-in)"
+8         PrintTwice Format(Now, "yyyy-mm-dd hh:mm:ss")
+9         PrintTwice "ComputerName = " & Environ("ComputerName")
 
           'Tests ported from vba\JuliaExcel.xlam\VBA\modTest.bas - the CallFromExcel.<Name>/COM surface.
-          AccResult "TestEmpty", TestEmpty, NumPassed, NumFailed
-          AccResult "TestBoolean", TestBoolean, NumPassed, NumFailed
-          AccResult "TestDouble", TestDouble, NumPassed, NumFailed
-          AccResult "TestString", TestString, NumPassed, NumFailed
-          AccResult "TestWideString", TestWideString, NumPassed, NumFailed
-          AccResult "TestLong", TestLong, NumPassed, NumFailed
-          AccResult "TestLongLong", TestLongLong, NumPassed, NumFailed
-          AccResult "TestSingle", TestSingle, NumPassed, NumFailed
-          AccResult "TestDate", TestDate, NumPassed, NumFailed
-          AccResult "TestDateTime", TestDateTime, NumPassed, NumFailed
-          AccResult "TestByte", TestByte, NumPassed, NumFailed
-          AccResult "Test1DArrayOfDoubles", Test1DArrayOfDoubles, NumPassed, NumFailed
-          AccResult "Test2DArrayOfMixedType", Test2DArrayOfMixedType, NumPassed, NumFailed
-          AccResult "Test3DArray", Test3DArray, NumPassed, NumFailed
-          AccResult "Test4DArray", Test4DArray, NumPassed, NumFailed
-          AccResult "TestDictionary", TestDictionary, NumPassed, NumFailed
-          AccResult "TestExactRoundTripping", TestExactRoundTripping, NumPassed, NumFailed
-          AccResult "TestArrayOfDictionaries", TestArrayOfDictionaries, NumPassed, NumFailed
-          AccResult "TestDictionaryOfArrays", TestDictionaryOfArrays, NumPassed, NumFailed
-          AccResult "TestDictionaryOfTypes", TestDictionaryOfTypes, NumPassed, NumFailed
-          AccResult "TestDictionaryIsScriptingDictionary", TestDictionaryIsScriptingDictionary, NumPassed, NumFailed
-          AccResult "TestIntegerArrayIsLongLong", TestIntegerArrayIsLongLong, NumPassed, NumFailed
-          AccResult "TestOneDArraysDisplayAsOneColumnOnSheet", TestOneDArraysDisplayAsOneColumnOnSheet, NumPassed, NumFailed
-          AccResult "TestElType", TestElType, NumPassed, NumFailed
-          AccResult "TestBroadcasting", TestBroadcasting, NumPassed, NumFailed
-          AccResult "TestNaNFallback", TestNaNFallback, NumPassed, NumFailed
-          AccResult "TestInfFallback", TestInfFallback, NumPassed, NumFailed
-          AccResult "TestVFormatVectorColumn", TestVFormatVectorColumn, NumPassed, NumFailed
-          AccResult "TestVFormatMatrixNonSquare", TestVFormatMatrixNonSquare, NumPassed, NumFailed
-          AccResult "TestMatrixNaNFallback", TestMatrixNaNFallback, NumPassed, NumFailed
-          AccResult "TestVFormatEmptyArrayFallback", TestVFormatEmptyArrayFallback, NumPassed, NumFailed
-          AccResult "TestVEncodeFromVariantArray", TestVEncodeFromVariantArray, NumPassed, NumFailed
-          AccResult "TestVFormat3DArray", TestVFormat3DArray, NumPassed, NumFailed
-          AccResult "TestRangeIntegerVsCollect", TestRangeIntegerVsCollect, NumPassed, NumFailed
-          AccResult "TestRangeStepVsCollect", TestRangeStepVsCollect, NumPassed, NumFailed
-          AccResult "TestRangeFloatVsCollect", TestRangeFloatVsCollect, NumPassed, NumFailed
-          AccResult "TestRangeJuliaEvalVBAIsOneD", TestRangeJuliaEvalVBAIsOneD, NumPassed, NumFailed
-          AccResult "TestRangeJuliaEvalIsColumn", TestRangeJuliaEvalIsColumn, NumPassed, NumFailed
-          AccResult "TestRangeWireFormat", TestRangeWireFormat, NumPassed, NumFailed
-          AccResult "TestNaNInfRoundTripViaV", TestNaNInfRoundTripViaV, NumPassed, NumFailed
-          AccResult "TestExcelErrorRoundTrip", TestExcelErrorRoundTrip, NumPassed, NumFailed
-          AccResult "TestArrayOfSingleCharacters", TestArrayOfSingleCharacters, NumPassed, NumFailed
-          AccResult "TestNamedArgs", TestNamedArgs, NumPassed, NumFailed
-          AccResult "TestNamedArgsVBA", TestNamedArgsVBA, NumPassed, NumFailed
-          AccResult "TestVFormatBoundarySizes", TestVFormatBoundarySizes, NumPassed, NumFailed
-          AccResult "TestJuliaEvalMultiLineWithComment", TestJuliaEvalMultiLineWithComment, NumPassed, NumFailed
+10        AccResult "TestEmpty", TestEmpty, NumPassed, NumFailed
+11        AccResult "TestBoolean", TestBoolean, NumPassed, NumFailed
+12        AccResult "TestDouble", TestDouble, NumPassed, NumFailed
+13        AccResult "TestString", TestString, NumPassed, NumFailed
+14        AccResult "TestWideString", TestWideString, NumPassed, NumFailed
+15        AccResult "TestLong", TestLong, NumPassed, NumFailed
+16        AccResult "TestLongLong", TestLongLong, NumPassed, NumFailed
+17        AccResult "TestSingle", TestSingle, NumPassed, NumFailed
+18        AccResult "TestDate", TestDate, NumPassed, NumFailed
+19        AccResult "TestDateTime", TestDateTime, NumPassed, NumFailed
+20        AccResult "TestByte", TestByte, NumPassed, NumFailed
+21        AccResult "Test1DArrayOfDoubles", Test1DArrayOfDoubles, NumPassed, NumFailed
+22        AccResult "Test2DArrayOfMixedType", Test2DArrayOfMixedType, NumPassed, NumFailed
+23        AccResult "Test3DArray", Test3DArray, NumPassed, NumFailed
+24        AccResult "Test4DArray", Test4DArray, NumPassed, NumFailed
+25        AccResult "TestDictionary", TestDictionary, NumPassed, NumFailed
+26        AccResult "TestExactRoundTripping", TestExactRoundTripping, NumPassed, NumFailed
+27        AccResult "TestArrayOfDictionaries", TestArrayOfDictionaries, NumPassed, NumFailed
+28        AccResult "TestDictionaryOfArrays", TestDictionaryOfArrays, NumPassed, NumFailed
+29        AccResult "TestDictionaryOfTypes", TestDictionaryOfTypes, NumPassed, NumFailed
+30        AccResult "TestDictionaryIsScriptingDictionary", TestDictionaryIsScriptingDictionary, NumPassed, NumFailed
+31        AccResult "TestIntegerArrayIsLongLong", TestIntegerArrayIsLongLong, NumPassed, NumFailed
+32        AccResult "TestOneDArraysDisplayAsOneColumnOnSheet", TestOneDArraysDisplayAsOneColumnOnSheet, NumPassed, NumFailed
+33        AccResult "TestElType", TestElType, NumPassed, NumFailed
+34        AccResult "TestBroadcasting", TestBroadcasting, NumPassed, NumFailed
+35        AccResult "TestNaNFallback", TestNaNFallback, NumPassed, NumFailed
+36        AccResult "TestInfFallback", TestInfFallback, NumPassed, NumFailed
+37        AccResult "TestVFormatVectorColumn", TestVFormatVectorColumn, NumPassed, NumFailed
+38        AccResult "TestVFormatMatrixNonSquare", TestVFormatMatrixNonSquare, NumPassed, NumFailed
+39        AccResult "TestMatrixNaNFallback", TestMatrixNaNFallback, NumPassed, NumFailed
+40        AccResult "TestVFormatEmptyArrayFallback", TestVFormatEmptyArrayFallback, NumPassed, NumFailed
+41        AccResult "TestVEncodeFromVariantArray", TestVEncodeFromVariantArray, NumPassed, NumFailed
+42        AccResult "TestVFormat3DArray", TestVFormat3DArray, NumPassed, NumFailed
+43        AccResult "TestRangeIntegerVsCollect", TestRangeIntegerVsCollect, NumPassed, NumFailed
+44        AccResult "TestRangeStepVsCollect", TestRangeStepVsCollect, NumPassed, NumFailed
+45        AccResult "TestRangeFloatVsCollect", TestRangeFloatVsCollect, NumPassed, NumFailed
+46        AccResult "TestRangeJuliaEvalVBAIsOneD", TestRangeJuliaEvalVBAIsOneD, NumPassed, NumFailed
+47        AccResult "TestRangeJuliaEvalIsColumn", TestRangeJuliaEvalIsColumn, NumPassed, NumFailed
+48        AccResult "TestRangeWireFormat", TestRangeWireFormat, NumPassed, NumFailed
+49        AccResult "TestNaNInfRoundTripViaV", TestNaNInfRoundTripViaV, NumPassed, NumFailed
+50        AccResult "TestExcelErrorRoundTrip", TestExcelErrorRoundTrip, NumPassed, NumFailed
+51        AccResult "TestArrayOfSingleCharacters", TestArrayOfSingleCharacters, NumPassed, NumFailed
+52        AccResult "TestNamedArgs", TestNamedArgs, NumPassed, NumFailed
+53        AccResult "TestNamedArgsVBA", TestNamedArgsVBA, NumPassed, NumFailed
+54        AccResult "TestVFormatBoundarySizes", TestVFormatBoundarySizes, NumPassed, NumFailed
+55        AccResult "TestJuliaEvalMultiLineWithComment", TestJuliaEvalMultiLineWithComment, NumPassed, NumFailed
 
           'New: tests of the real worksheet-formula / XLL surface. No equivalent existed in the
           'old suite - a bare JuliaCall behaved identically whether called from a cell or a
           'macro, but the XLL and the COM migration methods above are now separate
           'implementations that can diverge, so this surface needs its own coverage.
-          AccResult "WsTest_Scalar", WsTest_Scalar, NumPassed, NumFailed
-          AccResult "WsTest_String", WsTest_String, NumPassed, NumFailed
-          AccResult "WsTest_OneDArrayBecomesColumn", WsTest_OneDArrayBecomesColumn, NumPassed, NumFailed
-          AccResult "WsTest_TwoDArray", WsTest_TwoDArray, NumPassed, NumFailed
-          AccResult "WsTest_IntegerArrays", WsTest_IntegerArrays, NumPassed, NumFailed
-          AccResult "WsTest_JuliaEvalScalar", WsTest_JuliaEvalScalar, NumPassed, NumFailed
-          AccResult "WsTest_EmptyResult", WsTest_EmptyResult, NumPassed, NumFailed
-          AccResult "WsTest_JuliaLaunchArgOrder", WsTest_JuliaLaunchArgOrder, NumPassed, NumFailed
-          AccResult "WsTest_RelaunchAfterExit", WsTest_RelaunchAfterExit, NumPassed, NumFailed
-          AccResult "WsTest_JuliaIsRunningAndPID", WsTest_JuliaIsRunningAndPID, NumPassed, NumFailed
-          AccResult "WsTest_ErrorString", WsTest_ErrorString, NumPassed, NumFailed
-          AccResult "WsTest_SortRoundTrip", WsTest_SortRoundTrip, NumPassed, NumFailed
+56        AccResult "WsTest_Scalar", WsTest_Scalar, NumPassed, NumFailed
+57        AccResult "WsTest_String", WsTest_String, NumPassed, NumFailed
+58        AccResult "WsTest_OneDArrayBecomesColumn", WsTest_OneDArrayBecomesColumn, NumPassed, NumFailed
+59        AccResult "WsTest_TwoDArray", WsTest_TwoDArray, NumPassed, NumFailed
+60        AccResult "WsTest_IntegerArrays", WsTest_IntegerArrays, NumPassed, NumFailed
+61        AccResult "WsTest_JuliaEvalScalar", WsTest_JuliaEvalScalar, NumPassed, NumFailed
+62        AccResult "WsTest_EmptyResult", WsTest_EmptyResult, NumPassed, NumFailed
+63        AccResult "WsTest_JuliaLaunchArgOrder", WsTest_JuliaLaunchArgOrder, NumPassed, NumFailed
+64        AccResult "WsTest_RelaunchAfterExit", WsTest_RelaunchAfterExit, NumPassed, NumFailed
+65        AccResult "WsTest_JuliaIsRunningAndPID", WsTest_JuliaIsRunningAndPID, NumPassed, NumFailed
+66        AccResult "WsTest_ErrorString", WsTest_ErrorString, NumPassed, NumFailed
+67        AccResult "WsTest_SortRoundTrip", WsTest_SortRoundTrip, NumPassed, NumFailed
+          AccResult "WsTest_ErrorArguments", WsTest_ErrorArguments, NumPassed, NumFailed
+          AccResult "WsTest_RangeWithBlanksAndErrors", WsTest_RangeWithBlanksAndErrors, NumPassed, NumFailed
+          AccResult "WsTest_JuliaSetVar", WsTest_JuliaSetVar, NumPassed, NumFailed
+          AccResult "WsTest_JuliaEvalRangeWithBlankLine", WsTest_JuliaEvalRangeWithBlankLine, NumPassed, NumFailed
 
-          Prompt = NumPassed & " test(s) passed" & vbLf & _
+68        Prompt = NumPassed & " test(s) passed" & vbLf & _
               NumFailed & " test(s) failed"
 
-          If NumFailed > 0 Then
-              Prompt = Prompt & vbLf & vbLf & "See VBA Immediate window for details"
-          End If
+69        If NumFailed > 0 Then
+70            Prompt = Prompt & vbLf & vbLf & "See VBA Immediate window for details"
+71        End If
 
-          PrintTwice NumPassed & " test(s) passed"
-          PrintTwice NumFailed & " test(s) failed"
-          PrintTwice String(80, "=")
+72        PrintTwice NumPassed & " test(s) passed"
+73        PrintTwice NumFailed & " test(s) failed"
+74        PrintTwice String(80, "=")
 
-          If Not SilentMode Then
-              AppActivate Application.Caption
-              MsgBox Prompt, IIf(NumFailed = 0, vbInformation, vbCritical), Title
-          End If
+75        If Not SilentMode Then
+76            AppActivate Application.Caption
+77            MsgBox Prompt, IIf(NumFailed = 0, vbInformation, vbCritical), Title
+78        End If
 
-          RunTests = NumFailed = 0
+79        RunTests = NumFailed = 0
 
-          Exit Function
+80        Exit Function
 ErrHandler:
           Dim ErrText As String
-          ErrText = ReThrow("RunTests", Err, True)
-          TestLog = TestLog & ErrText & vbCrLf
-          If Not SilentMode Then
-              MsgBox ErrText, vbCritical, Title
-          End If
-          RunTests = False
+81        ErrText = ReThrow("RunTests", Err, True)
+82        TestLog = TestLog & ErrText & vbCrLf
+83        If Not SilentMode Then
+84            MsgBox ErrText, vbCritical, Title
+85        End If
+86        RunTests = False
 End Function
 
 Sub LoadAddIn()
           Dim XllPath As String
-          Set CallFromExcel = CreateObject("CallFromExcel.ComServer")
-          XllPath = RepoRoot() & "\dotnet-addin\dist\CallFromExcel.AddIn64-packed.xll"
-          If Dir(XllPath) = vbNullString Then
-              Throw "Cannot find the add-in at " & XllPath & _
+1         Set CallFromExcel = CreateObject("CallFromExcel.ComServer")
+2         XllPath = RepoRoot() & "\dotnet-addin\dist\CallFromExcel.AddIn64-packed.xll"
+3         If Dir(XllPath) = vbNullString Then
+4             Throw "Cannot find the add-in at " & XllPath & _
                   " - build it first (dotnet build -c Release in dotnet-addin\CallFromExcel.AddIn)."
-          End If
-          Application.RegisterXLL XllPath
+5         End If
+6         Application.RegisterXLL XllPath
 End Sub
 
 ' Echoing into the Julia REPL is best-effort: a logging helper must never abort the test run.
 Sub PrintTwice(Text As String)
-          Debug.Print Text
-          TestLog = TestLog & Text & vbCrLf
-          On Error Resume Next
-          CallFromExcel.JuliaEval "println(" & SimpleJuliaStringLiteral(Text) & ")"
-          On Error GoTo 0
+1         Debug.Print Text
+2         TestLog = TestLog & Text & vbCrLf
+3         On Error Resume Next
+4         CallFromExcel.JuliaEval "println(" & SimpleJuliaStringLiteral(Text) & ")"
+5         On Error GoTo 0
 End Sub
 
 ' Minimal ASCII-safe Julia string literal, enough for the plain diagnostic text PrintTwice is
@@ -205,209 +208,209 @@ End Sub
 ' detail now (CallFromExcel.AddIn\src\JuliaLiteral.cs), not a public VBA-callable function.
 Private Function SimpleJuliaStringLiteral(Text As String) As String
           Dim Escaped As String
-          Escaped = Replace(Text, "\", "\\")
-          Escaped = Replace(Escaped, Chr(34), "\" & Chr(34))
-          Escaped = Replace(Escaped, vbCr, "\r")
-          Escaped = Replace(Escaped, vbLf, "\n")
-          Escaped = Replace(Escaped, "$", "\$")
-          SimpleJuliaStringLiteral = Chr(34) & Escaped & Chr(34)
+1         Escaped = Replace(Text, "\", "\\")
+2         Escaped = Replace(Escaped, Chr(34), "\" & Chr(34))
+3         Escaped = Replace(Escaped, vbCr, "\r")
+4         Escaped = Replace(Escaped, vbLf, "\n")
+5         Escaped = Replace(Escaped, "$", "\$")
+6         SimpleJuliaStringLiteral = Chr(34) & Escaped & Chr(34)
 End Function
 
 Sub AccResult(TestName As String, Result As Boolean, ByRef NumPassed, ByRef NumFailed)
-          On Error GoTo ErrHandler
-          PrintTwice "Test " & TestName & " completed"
-          If Result Then
-              NumPassed = NumPassed + 1
-          Else
-              PrintTwice "Test " & TestName & " Failed!"
-              NumFailed = NumFailed + 1
-          End If
-          Exit Sub
+1         On Error GoTo ErrHandler
+2         PrintTwice "Test " & TestName & " completed"
+3         If Result Then
+4             NumPassed = NumPassed + 1
+5         Else
+6             PrintTwice "Test " & TestName & " Failed!"
+7             NumFailed = NumFailed + 1
+8         End If
+9         Exit Sub
 ErrHandler:
-          ReThrow "AccResult", Err
+10        ReThrow "AccResult", Err
 End Sub
 
 Function TestEmpty()
-          On Error GoTo ErrHandler
-          TestEmpty = IsEmpty(CallFromExcel.JuliaCall("identity", Empty))
-          Exit Function
+1         On Error GoTo ErrHandler
+2         TestEmpty = IsEmpty(CallFromExcel.JuliaCall("identity", Empty))
+3         Exit Function
 ErrHandler:
-          PrintTwice ReThrow("TestEmpty", Err, True)
-          TestEmpty = False
+4         PrintTwice ReThrow("TestEmpty", Err, True)
+5         TestEmpty = False
 End Function
 
 Function TestBoolean()
-          On Error GoTo ErrHandler
-          TestBoolean = (CallFromExcel.JuliaCall("identity", True) = True) And (CallFromExcel.JuliaCall("identity", False) = False)
-          Exit Function
+1         On Error GoTo ErrHandler
+2         TestBoolean = (CallFromExcel.JuliaCall("identity", True) = True) And (CallFromExcel.JuliaCall("identity", False) = False)
+3         Exit Function
 ErrHandler:
-          PrintTwice ReThrow("TestBoolean", Err, True)
-          TestBoolean = False
+4         PrintTwice ReThrow("TestBoolean", Err, True)
+5         TestBoolean = False
 End Function
 
 Function TestDouble()
           Dim x As Double
           Dim y As Variant
-          On Error GoTo ErrHandler
-          x = Application.WorksheetFunction.Pi()
-          y = ThrowIfError(CallFromExcel.JuliaCall("identity", x))
-          TestDouble = (x = y) And (VarType(y) = vbDouble)
-          Exit Function
+1         On Error GoTo ErrHandler
+2         x = Application.WorksheetFunction.Pi()
+3         y = ThrowIfError(CallFromExcel.JuliaCall("identity", x))
+4         TestDouble = (x = y) And (VarType(y) = vbDouble)
+5         Exit Function
 ErrHandler:
-          PrintTwice ReThrow("TestDouble", Err, True)
-          TestDouble = False
+6         PrintTwice ReThrow("TestDouble", Err, True)
+7         TestDouble = False
 End Function
 
 Function TestString()
           Dim x As String
           Dim y As Variant
-          On Error GoTo ErrHandler
-          x = "FooBar"
-          y = ThrowIfError(CallFromExcel.JuliaCall("identity", x))
-          TestString = x = y
-          Exit Function
+1         On Error GoTo ErrHandler
+2         x = "FooBar"
+3         y = ThrowIfError(CallFromExcel.JuliaCall("identity", x))
+4         TestString = x = y
+5         Exit Function
 ErrHandler:
-          PrintTwice ReThrow("TestString", Err, True)
-          TestString = False
+6         PrintTwice ReThrow("TestString", Err, True)
+7         TestString = False
 End Function
 
 Function TestWideString()
           Dim i As Long
           Dim x As String
           Dim y As Variant
-          On Error GoTo ErrHandler
-          x = String(10000, " ")
-          For i = 1 To 10000
-              Mid$(x, i, 1) = ChrW(i)
-          Next i
-          y = ThrowIfError(CallFromExcel.JuliaCall("identity", x))
-          TestWideString = (x = y) And VarType(y) = vbString
+1         On Error GoTo ErrHandler
+2         x = String(10000, " ")
+3         For i = 1 To 10000
+4             Mid$(x, i, 1) = ChrW(i)
+5         Next i
+6         y = ThrowIfError(CallFromExcel.JuliaCall("identity", x))
+7         TestWideString = (x = y) And VarType(y) = vbString
 
-          Exit Function
+8         Exit Function
 ErrHandler:
-          PrintTwice ReThrow("TestWideString", Err, True)
-          TestWideString = False
+9         PrintTwice ReThrow("TestWideString", Err, True)
+10        TestWideString = False
 End Function
 
 Function TestLong()
           Dim x As Long
           Dim y As Variant
-          On Error GoTo ErrHandler
-          x = 123456789
-          y = ThrowIfError(CallFromExcel.JuliaCall("identity", x))
-          TestLong = (x = y) And VarType(y) = vbLong
+1         On Error GoTo ErrHandler
+2         x = 123456789
+3         y = ThrowIfError(CallFromExcel.JuliaCall("identity", x))
+4         TestLong = (x = y) And VarType(y) = vbLong
 
-          Exit Function
+5         Exit Function
 ErrHandler:
-          PrintTwice ReThrow("TestLong", Err, True)
-          TestLong = False
+6         PrintTwice ReThrow("TestLong", Err, True)
+7         TestLong = False
 End Function
 
 Function TestLongLong()
           Dim x As LongLong
           Dim y As Variant
-          On Error GoTo ErrHandler
-          x = 123456789^
-          y = ThrowIfError(CallFromExcel.JuliaCall("identity", x))
-          TestLongLong = (x = y) And VarType(y) = vbLongLong
+1         On Error GoTo ErrHandler
+2         x = 123456789^
+3         y = ThrowIfError(CallFromExcel.JuliaCall("identity", x))
+4         TestLongLong = (x = y) And VarType(y) = vbLongLong
 
-          Exit Function
+5         Exit Function
 ErrHandler:
-          PrintTwice ReThrow("TestLongLong", Err, True)
-          TestLongLong = False
+6         PrintTwice ReThrow("TestLongLong", Err, True)
+7         TestLongLong = False
 End Function
 
 Function TestSingle()
           Dim x As Single
           Dim y As Variant
-          On Error GoTo ErrHandler
-          x = CSng(1 / 3)
-          y = ThrowIfError(CallFromExcel.JuliaCall("identity", x))
-          TestSingle = (x = y) And (VarType(y) = vbSingle)
+1         On Error GoTo ErrHandler
+2         x = CSng(1 / 3)
+3         y = ThrowIfError(CallFromExcel.JuliaCall("identity", x))
+4         TestSingle = (x = y) And (VarType(y) = vbSingle)
 
-          Exit Function
+5         Exit Function
 ErrHandler:
-          PrintTwice ReThrow("TestSingle", Err, True)
-          TestSingle = False
+6         PrintTwice ReThrow("TestSingle", Err, True)
+7         TestSingle = False
 End Function
 
 Function TestDate()
           Dim x As Date
           Dim y As Variant
-          On Error GoTo ErrHandler
-          x = DateSerial(2025, 12, 22)
-          y = ThrowIfError(CallFromExcel.JuliaCall("identity", x))
-          TestDate = (x = y) And VarType(y) = vbDate
+1         On Error GoTo ErrHandler
+2         x = DateSerial(2025, 12, 22)
+3         y = ThrowIfError(CallFromExcel.JuliaCall("identity", x))
+4         TestDate = (x = y) And VarType(y) = vbDate
 
-          Exit Function
+5         Exit Function
 ErrHandler:
-          PrintTwice ReThrow("TestDate", Err, True)
-          TestDate = False
+6         PrintTwice ReThrow("TestDate", Err, True)
+7         TestDate = False
 End Function
 
 Function TestDateTime()
           Dim x As Date
           Dim y As Variant
-          On Error GoTo ErrHandler
-          x = DateSerial(2025, 12, 22) + TimeValue("03:40:33")
-          y = ThrowIfError(CallFromExcel.JuliaCall("identity", x))
-          TestDateTime = x = y
+1         On Error GoTo ErrHandler
+2         x = DateSerial(2025, 12, 22) + TimeValue("03:40:33")
+3         y = ThrowIfError(CallFromExcel.JuliaCall("identity", x))
+4         TestDateTime = x = y
 
-          Exit Function
+5         Exit Function
 ErrHandler:
-          PrintTwice ReThrow("TestDateTime", Err, True)
-          TestDateTime = False
+6         PrintTwice ReThrow("TestDateTime", Err, True)
+7         TestDateTime = False
 End Function
 
 Function TestByte()
           Dim x As Byte
           Dim y As Variant
-          On Error GoTo ErrHandler
-          x = 200
-          y = ThrowIfError(CallFromExcel.JuliaCall("identity", x))
-          TestByte = (x = y) And VarType(y) = vbByte
+1         On Error GoTo ErrHandler
+2         x = 200
+3         y = ThrowIfError(CallFromExcel.JuliaCall("identity", x))
+4         TestByte = (x = y) And VarType(y) = vbByte
 
-          Exit Function
+5         Exit Function
 ErrHandler:
-          PrintTwice ReThrow("TestByte", Err, True)
-          TestByte = False
+6         PrintTwice ReThrow("TestByte", Err, True)
+7         TestByte = False
 End Function
 
 Function Test1DArrayOfDoubles()
           Dim x() As Double
           Dim y As Variant
 
-          On Error GoTo ErrHandler
-          ReDim x(1 To 3)
-          x(1) = 1 / 3
-          x(2) = 1E+100
-          x(3) = 0
-          y = CallFromExcel.JuliaCallVBA("identity", x)
-          Test1DArrayOfDoubles = ArraysIdentical(x, y)
+1         On Error GoTo ErrHandler
+2         ReDim x(1 To 3)
+3         x(1) = 1 / 3
+4         x(2) = 1E+100
+5         x(3) = 0
+6         y = CallFromExcel.JuliaCallVBA("identity", x)
+7         Test1DArrayOfDoubles = ArraysIdentical(x, y)
 
-          Exit Function
+8         Exit Function
 ErrHandler:
-          PrintTwice ReThrow("Test1DArrayOfDoubles", Err, True)
-          Test1DArrayOfDoubles = False
+9         PrintTwice ReThrow("Test1DArrayOfDoubles", Err, True)
+10        Test1DArrayOfDoubles = False
 End Function
 
 Function Test2DArrayOfMixedType()
           Dim x() As Variant
           Dim y As Variant
 
-          On Error GoTo ErrHandler
-          ReDim x(1 To 3, 1 To 3)
-          x(1, 1) = 1 / 3:  x(1, 2) = 1E+100:    x(1, 3) = CLng(100)
-          x(2, 1) = "Foo":  x(2, 2) = CSng(3):   x(2, 3) = CLngLng(100)
-          x(3, 1) = "Foo":  x(3, 2) = CSng(3):   x(3, 3) = CInt(100)
+1         On Error GoTo ErrHandler
+2         ReDim x(1 To 3, 1 To 3)
+3         x(1, 1) = 1 / 3:  x(1, 2) = 1E+100:    x(1, 3) = CLng(100)
+4         x(2, 1) = "Foo":  x(2, 2) = CSng(3):   x(2, 3) = CLngLng(100)
+5         x(3, 1) = "Foo":  x(3, 2) = CSng(3):   x(3, 3) = CInt(100)
 
-          y = ThrowIfError(CallFromExcel.JuliaCall("identity", x))
-          Test2DArrayOfMixedType = ArraysIdentical(x, y)
+6         y = ThrowIfError(CallFromExcel.JuliaCall("identity", x))
+7         Test2DArrayOfMixedType = ArraysIdentical(x, y)
 
-          Exit Function
+8         Exit Function
 ErrHandler:
-          PrintTwice ReThrow("Test2DArrayOfMixedType", Err, True)
-          Test2DArrayOfMixedType = False
+9         PrintTwice ReThrow("Test2DArrayOfMixedType", Err, True)
+10        Test2DArrayOfMixedType = False
 End Function
 
 Function Test3DArray()
@@ -415,19 +418,19 @@ Function Test3DArray()
           Dim x() As Variant
           Dim y As Variant
 
-          On Error GoTo ErrHandler
-          ReDim x(1 To 2, 1 To 3, 1 To 4)
-          For i = 1 To 24
-              SetAtLinear x, i, ChrW(i)
-          Next
+1         On Error GoTo ErrHandler
+2         ReDim x(1 To 2, 1 To 3, 1 To 4)
+3         For i = 1 To 24
+4             SetAtLinear x, i, ChrW(i)
+5         Next
 
-          y = CallFromExcel.JuliaCallVBA("identity", x)
-          Test3DArray = ArraysIdentical(x, y)
+6         y = CallFromExcel.JuliaCallVBA("identity", x)
+7         Test3DArray = ArraysIdentical(x, y)
 
-          Exit Function
+8         Exit Function
 ErrHandler:
-          PrintTwice ReThrow("Test3DArray", Err, True)
-          Test3DArray = False
+9         PrintTwice ReThrow("Test3DArray", Err, True)
+10        Test3DArray = False
 End Function
 
 Function Test4DArray()
@@ -435,20 +438,20 @@ Function Test4DArray()
           Dim x() As Variant
           Dim y As Variant
 
-          On Error GoTo ErrHandler
-          ReDim x(1 To 2, 1 To 3, 1 To 4, 1 To 5)
+1         On Error GoTo ErrHandler
+2         ReDim x(1 To 2, 1 To 3, 1 To 4, 1 To 5)
 
-          For i = 1 To 120
-              SetAtLinear x, i, i
-          Next
+3         For i = 1 To 120
+4             SetAtLinear x, i, i
+5         Next
 
-          y = CallFromExcel.JuliaCallVBA("identity", x)
-          Test4DArray = ArraysIdentical(x, y)
+6         y = CallFromExcel.JuliaCallVBA("identity", x)
+7         Test4DArray = ArraysIdentical(x, y)
 
-          Exit Function
+8         Exit Function
 ErrHandler:
-          PrintTwice ReThrow("Test4DArray", Err, True)
-          Test4DArray = False
+9         PrintTwice ReThrow("Test4DArray", Err, True)
+10        Test4DArray = False
 End Function
 
 Function TestDictionary()
@@ -457,27 +460,27 @@ Function TestDictionary()
           Dim y As Scripting.Dictionary
           Dim z As New Scripting.Dictionary
 
-          On Error GoTo ErrHandler
-          z.Add "alpha", 100
-          z.Add "beta", 200
+1         On Error GoTo ErrHandler
+2         z.Add "alpha", 100
+3         z.Add "beta", 200
 
-          x.Add "a", 1
-          x.Add "b", 2
-          x.Add "c", "d"
-          x.Add "d", Array(1, 2, 3)
-          x.Add "e", z
+4         x.Add "a", 1
+5         x.Add "b", 2
+6         x.Add "c", "d"
+7         x.Add "d", Array(1, 2, 3)
+8         x.Add "e", z
 
-          Set y = CallFromExcel.JuliaCallVBA("identity", x)
+9         Set y = CallFromExcel.JuliaCallVBA("identity", x)
 
-          ThrowIfError CallFromExcel.JuliaSetVar("first_dictionary", x)
-          ThrowIfError CallFromExcel.JuliaSetVar("second_dictionary", y)
+10        ThrowIfError CallFromExcel.JuliaSetVar("first_dictionary", x)
+11        ThrowIfError CallFromExcel.JuliaSetVar("second_dictionary", y)
 
-          TestDictionary = CallFromExcel.JuliaEval("first_dictionary == second_dictionary")
+12        TestDictionary = CallFromExcel.JuliaEval("first_dictionary == second_dictionary")
 
-          Exit Function
+13        Exit Function
 ErrHandler:
-          PrintTwice ReThrow("TestDictionary", Err, True)
-          TestDictionary = False
+14        PrintTwice ReThrow("TestDictionary", Err, True)
+15        TestDictionary = False
 End Function
 
 Function TestExactRoundTripping()
@@ -485,18 +488,18 @@ Function TestExactRoundTripping()
           Dim x() As Double
           Dim y As Variant
 
-          On Error GoTo ErrHandler
-          ReDim x(1 To 1000)
-          For i = 1 To 1000
-              x(i) = Sqr(i)
-          Next i
-          y = CallFromExcel.JuliaCallVBA("identity", x)
-          TestExactRoundTripping = ArraysIdentical(x, y)
+1         On Error GoTo ErrHandler
+2         ReDim x(1 To 1000)
+3         For i = 1 To 1000
+4             x(i) = Sqr(i)
+5         Next i
+6         y = CallFromExcel.JuliaCallVBA("identity", x)
+7         TestExactRoundTripping = ArraysIdentical(x, y)
 
-          Exit Function
+8         Exit Function
 ErrHandler:
-          PrintTwice ReThrow("TestExactRoundTripping", Err, True)
-          TestExactRoundTripping = False
+9         PrintTwice ReThrow("TestExactRoundTripping", Err, True)
+10        TestExactRoundTripping = False
 End Function
 
 Function TestArrayOfDictionaries()
@@ -504,24 +507,24 @@ Function TestArrayOfDictionaries()
           Dim y As Variant
           Dim z As New Scripting.Dictionary
 
-          On Error GoTo ErrHandler
-          z("a") = 1
-          z("b") = 2
+1         On Error GoTo ErrHandler
+2         z("a") = 1
+3         z("b") = 2
 
-          ReDim x(1 To 2, 1 To 2)
+4         ReDim x(1 To 2, 1 To 2)
 
-          Set x(1, 1) = z: Set x(1, 2) = z
-          Set x(2, 1) = z: Set x(2, 2) = z
-          y = CallFromExcel.JuliaCallVBA("identity", x)
-          ThrowIfError CallFromExcel.JuliaSetVar("first_array_of_dictionaries", x)
-          ThrowIfError CallFromExcel.JuliaSetVar("second_array_of_dictionaries", y)
+5         Set x(1, 1) = z: Set x(1, 2) = z
+6         Set x(2, 1) = z: Set x(2, 2) = z
+7         y = CallFromExcel.JuliaCallVBA("identity", x)
+8         ThrowIfError CallFromExcel.JuliaSetVar("first_array_of_dictionaries", x)
+9         ThrowIfError CallFromExcel.JuliaSetVar("second_array_of_dictionaries", y)
 
-          TestArrayOfDictionaries = CallFromExcel.JuliaEval("first_array_of_dictionaries == second_array_of_dictionaries")
+10        TestArrayOfDictionaries = CallFromExcel.JuliaEval("first_array_of_dictionaries == second_array_of_dictionaries")
 
-          Exit Function
+11        Exit Function
 ErrHandler:
-          PrintTwice ReThrow("TestArrayOfDictionaries", Err, True)
-          TestArrayOfDictionaries = False
+12        PrintTwice ReThrow("TestArrayOfDictionaries", Err, True)
+13        TestArrayOfDictionaries = False
 End Function
 
 Function TestDictionaryOfArrays()
@@ -529,22 +532,22 @@ Function TestDictionaryOfArrays()
           Dim x As New Scripting.Dictionary
           Dim y As Scripting.Dictionary
 
-          On Error GoTo ErrHandler
+1         On Error GoTo ErrHandler
 
-          x("doubles") = Array(1#, 2#, 3#)
-          x("strings") = Array("foo", "bar")
+2         x("doubles") = Array(1#, 2#, 3#)
+3         x("strings") = Array("foo", "bar")
 
-          Set y = CallFromExcel.JuliaCallVBA("identity", x)
+4         Set y = CallFromExcel.JuliaCallVBA("identity", x)
 
-          ThrowIfError CallFromExcel.JuliaSetVar("first_dict_of_arrays", x)
-          ThrowIfError CallFromExcel.JuliaSetVar("second_dict_of_arrays", y)
+5         ThrowIfError CallFromExcel.JuliaSetVar("first_dict_of_arrays", x)
+6         ThrowIfError CallFromExcel.JuliaSetVar("second_dict_of_arrays", y)
 
-          TestDictionaryOfArrays = CallFromExcel.JuliaEval("first_dict_of_arrays == second_dict_of_arrays")
+7         TestDictionaryOfArrays = CallFromExcel.JuliaEval("first_dict_of_arrays == second_dict_of_arrays")
 
-          Exit Function
+8         Exit Function
 ErrHandler:
-          PrintTwice ReThrow("TestDictionaryOfArrays", Err, True)
-          TestDictionaryOfArrays = False
+9         PrintTwice ReThrow("TestDictionaryOfArrays", Err, True)
+10        TestDictionaryOfArrays = False
 End Function
 
 Function TestDictionaryOfTypes()
@@ -552,42 +555,42 @@ Function TestDictionaryOfTypes()
           Dim x As New Scripting.Dictionary
           Dim y As Scripting.Dictionary
 
-          On Error GoTo ErrHandler
+1         On Error GoTo ErrHandler
 
-          x.Add "Integer", 1
-          x.Add "Long", CLng(1)
-          x.Add "LongLong", CLngLng(1)
-          x.Add "Single", CSng(1)
-          x.Add "Double", CDbl(1)
+2         x.Add "Integer", 1
+3         x.Add "Long", CLng(1)
+4         x.Add "LongLong", CLngLng(1)
+5         x.Add "Single", CSng(1)
+6         x.Add "Double", CDbl(1)
 
-          Set y = CallFromExcel.JuliaCallVBA("identity", x)
+7         Set y = CallFromExcel.JuliaCallVBA("identity", x)
 
-          TestDictionaryOfTypes = True
+8         TestDictionaryOfTypes = True
           Dim k As Variant
-          For Each k In y.Keys
-              If TypeName(y(k)) <> k Then
-                  TestDictionaryOfTypes = False
-              End If
-          Next
+9         For Each k In y.Keys
+10            If TypeName(y(k)) <> k Then
+11                TestDictionaryOfTypes = False
+12            End If
+13        Next
 
-          Exit Function
+14        Exit Function
 ErrHandler:
-          PrintTwice ReThrow("TestDictionaryOfTypes", Err, True)
-          TestDictionaryOfTypes = False
+15        PrintTwice ReThrow("TestDictionaryOfTypes", Err, True)
+16        TestDictionaryOfTypes = False
 End Function
 
 ' Int64 arrays travel in the compact "L" format, but VBA must still receive LongLong elements, as
 ' it did with JuliaExcel.
 Function TestIntegerArrayIsLongLong() As Boolean
           Dim y As Variant
-          On Error GoTo ErrHandler
-          y = CallFromExcel.JuliaEvalVBA("[1, -2, typemax(Int64)]")
-          TestIntegerArrayIsLongLong = LBound(y) = 1 And UBound(y) = 3 And VarType(y(1)) = vbLongLong And _
+1         On Error GoTo ErrHandler
+2         y = CallFromExcel.JuliaEvalVBA("[1, -2, typemax(Int64)]")
+3         TestIntegerArrayIsLongLong = LBound(y) = 1 And UBound(y) = 3 And VarType(y(1)) = vbLongLong And _
               y(2) = -2 And y(3) = 9223372036854775807^
-          Exit Function
+4         Exit Function
 ErrHandler:
-          PrintTwice ReThrow("TestIntegerArrayIsLongLong", Err, True)
-          TestIntegerArrayIsLongLong = False
+5         PrintTwice ReThrow("TestIntegerArrayIsLongLong", Err, True)
+6         TestIntegerArrayIsLongLong = False
 End Function
 
 ' Dictionaries returned to VBA must be real Scripting.Dictionary objects, as they were with
@@ -597,38 +600,38 @@ Function TestDictionaryIsScriptingDictionary() As Boolean
           Dim k As Variant
           Dim NumKeys As Long
 
-          On Error GoTo ErrHandler
-          Set d = CallFromExcel.JuliaEvalVBA("Dict(""a"" => 1.0, ""b"" => Dict(""c"" => 2.0))")
-          For Each k In d
-              NumKeys = NumKeys + 1
-          Next k
-          TestDictionaryIsScriptingDictionary = (TypeName(d) = "Dictionary") And (NumKeys = 2) And _
+1         On Error GoTo ErrHandler
+2         Set d = CallFromExcel.JuliaEvalVBA("Dict(""a"" => 1.0, ""b"" => Dict(""c"" => 2.0))")
+3         For Each k In d
+4             NumKeys = NumKeys + 1
+5         Next k
+6         TestDictionaryIsScriptingDictionary = (TypeName(d) = "Dictionary") And (NumKeys = 2) And _
               (d("a") = 1) And (TypeName(d("b")) = "Dictionary") And (d("b")("c") = 2) And _
               (d.CompareMode = BinaryCompare)
-          Exit Function
+7         Exit Function
 ErrHandler:
-          PrintTwice ReThrow("TestDictionaryIsScriptingDictionary", Err, True)
-          TestDictionaryIsScriptingDictionary = False
+8         PrintTwice ReThrow("TestDictionaryIsScriptingDictionary", Err, True)
+9         TestDictionaryIsScriptingDictionary = False
 End Function
 
 Function TestOneDArraysDisplayAsOneColumnOnSheet()
 
           Dim OneDArray() As Variant
 
-          On Error GoTo ErrHandler
-          ReDim OneDArray(1 To 3)
-          OneDArray(1) = 1
-          OneDArray(2) = 2
-          OneDArray(3) = 3
+1         On Error GoTo ErrHandler
+2         ReDim OneDArray(1 To 3)
+3         OneDArray(1) = 1
+4         OneDArray(2) = 2
+5         OneDArray(3) = 3
 
-          TestOneDArraysDisplayAsOneColumnOnSheet = _
+6         TestOneDArraysDisplayAsOneColumnOnSheet = _
               NumDimensions(CallFromExcel.JuliaCall("identity", OneDArray)) = 2 And _
               NumDimensions(CallFromExcel.JuliaCallVBA("identity", OneDArray)) = 1
 
-          Exit Function
+7         Exit Function
 ErrHandler:
-          PrintTwice ReThrow("TestOneDArraysDisplayAsOneColumnOnSheet", Err, True)
-          TestOneDArraysDisplayAsOneColumnOnSheet = False
+8         PrintTwice ReThrow("TestOneDArraysDisplayAsOneColumnOnSheet", Err, True)
+9         TestOneDArraysDisplayAsOneColumnOnSheet = False
 End Function
 
 ' Builds a 1-based (ReDim(1 To n)) Variant array from a ParamArray of values. Deliberately
@@ -644,11 +647,11 @@ End Function
 Private Function OneBasedArray(ParamArray Values()) As Variant
           Dim i As Long
           Dim Result() As Variant
-          ReDim Result(1 To UBound(Values) - LBound(Values) + 1)
-          For i = LBound(Values) To UBound(Values)
-              Assign Result(i - LBound(Values) + 1), Values(i)
-          Next i
-          OneBasedArray = Result
+1         ReDim Result(1 To UBound(Values) - LBound(Values) + 1)
+2         For i = LBound(Values) To UBound(Values)
+3             Assign Result(i - LBound(Values) + 1), Values(i)
+4         Next i
+5         OneBasedArray = Result
 End Function
 
 ' Each array is built by its own statement into a local variable (Arr) before being passed to
@@ -661,52 +664,52 @@ End Function
 ' knowing about for any future code passing a function's return value directly into a
 ' ComServer method call.
 Function TestElType()
-          Dim OK As Boolean
           Dim Arr As Variant
+          Dim OK As Boolean
           Dim R As Variant
 
-          On Error GoTo ErrHandler
+1         On Error GoTo ErrHandler
 
-          OK = True
+2         OK = True
 
-          Arr = OneBasedArray(1, 2, 3)
-          R = CallFromExcel.JuliaCall("eltype", Arr)
-          If R <> "Int16" Then OK = False
+3         Arr = OneBasedArray(1, 2, 3)
+4         R = CallFromExcel.JuliaCall("eltype", Arr)
+5         If R <> "Int16" Then OK = False
 
-          Arr = OneBasedArray(1!, 2!, 3!)
-          R = CallFromExcel.JuliaCall("eltype", Arr)
-          If R <> "Float32" Then OK = False
+6         Arr = OneBasedArray(1!, 2!, 3!)
+7         R = CallFromExcel.JuliaCall("eltype", Arr)
+8         If R <> "Float32" Then OK = False
 
-          Arr = OneBasedArray(1#, 2#, 3#)
-          R = CallFromExcel.JuliaCall("eltype", Arr)
-          If R <> "Float64" Then OK = False
+9         Arr = OneBasedArray(1#, 2#, 3#)
+10        R = CallFromExcel.JuliaCall("eltype", Arr)
+11        If R <> "Float64" Then OK = False
 
-          Arr = OneBasedArray(1, 2#, 3#)
-          R = CallFromExcel.JuliaCall("eltype", Arr)
-          If R <> "Any" Then OK = False
+12        Arr = OneBasedArray(1, 2#, 3#)
+13        R = CallFromExcel.JuliaCall("eltype", Arr)
+14        If R <> "Any" Then OK = False
 
-          Arr = OneBasedArray("a", "b", "c")
-          R = CallFromExcel.JuliaCall("eltype", Arr)
-          If R <> "String" Then OK = False
+15        Arr = OneBasedArray("a", "b", "c")
+16        R = CallFromExcel.JuliaCall("eltype", Arr)
+17        If R <> "String" Then OK = False
 
-          Arr = OneBasedArray("a", 1, True)
-          R = CallFromExcel.JuliaCall("eltype", Arr)
-          If R <> "Any" Then OK = False
+18        Arr = OneBasedArray("a", 1, True)
+19        R = CallFromExcel.JuliaCall("eltype", Arr)
+20        If R <> "Any" Then OK = False
 
-          Arr = OneBasedArray(True, False, True)
-          R = CallFromExcel.JuliaCall("eltype", Arr)
-          If R <> "Bool" Then OK = False
+21        Arr = OneBasedArray(True, False, True)
+22        R = CallFromExcel.JuliaCall("eltype", Arr)
+23        If R <> "Bool" Then OK = False
 
-          Arr = OneBasedArray(Empty, Empty, Empty)
-          R = CallFromExcel.JuliaCall("eltype", Arr)
-          If R <> "Missing" Then OK = False
+24        Arr = OneBasedArray(Empty, Empty, Empty)
+25        R = CallFromExcel.JuliaCall("eltype", Arr)
+26        If R <> "Missing" Then OK = False
 
-          TestElType = OK
+27        TestElType = OK
 
-          Exit Function
+28        Exit Function
 ErrHandler:
-          PrintTwice ReThrow("TestElType", Err, True)
-          TestElType = False
+29        PrintTwice ReThrow("TestElType", Err, True)
+30        TestElType = False
 End Function
 
 Function TestBroadcasting()
@@ -716,24 +719,24 @@ Function TestBroadcasting()
           Dim Xs(1 To 1, 1 To 2) As Variant
           Dim Ys(1 To 2, 1 To 1) As Variant
 
-          On Error GoTo ErrHandler
+1         On Error GoTo ErrHandler
 
-          Xs(1, 1) = 7#: Xs(1, 2) = 5#
-          Ys(1, 1) = 2#: Ys(2, 1) = 3#
+2         Xs(1, 1) = 7#: Xs(1, 2) = 5#
+3         Ys(1, 1) = 2#: Ys(2, 1) = 3#
 
-          ExpRes(1, 1) = 20#: ExpRes(1, 2) = 16#
-          ExpRes(2, 1) = 23#: ExpRes(2, 2) = 19#
+4         ExpRes(1, 1) = 20#: ExpRes(1, 2) = 16#
+5         ExpRes(2, 1) = 23#: ExpRes(2, 2) = 19#
 
-          ThrowIfError CallFromExcel.JuliaEval("fn(x,y) = 2x + 3y")
+6         ThrowIfError CallFromExcel.JuliaEval("fn(x,y) = 2x + 3y")
           'Note the dot character below, makes this a broadcast use of fn
-          ObsRes = CallFromExcel.JuliaCall("fn.", Xs, Ys)
+7         ObsRes = CallFromExcel.JuliaCall("fn.", Xs, Ys)
 
-          TestBroadcasting = ArraysIdentical(ExpRes, ObsRes)
+8         TestBroadcasting = ArraysIdentical(ExpRes, ObsRes)
 
-          Exit Function
+9         Exit Function
 ErrHandler:
-          PrintTwice ReThrow("TestBroadcasting", Err, True)
-          TestBroadcasting = False
+10        PrintTwice ReThrow("TestBroadcasting", Err, True)
+11        TestBroadcasting = False
 End Function
 
 ' Checks that a Vector{Float64} containing a NaN falls back from the compact "V" wire format
@@ -743,17 +746,17 @@ Function TestNaNFallback()
           Dim Expected(1 To 3, 1 To 1) As Variant
           Dim y As Variant
 
-          On Error GoTo ErrHandler
-          Expected(1, 1) = 1#
-          Expected(2, 1) = 2#
-          Expected(3, 1) = CVErr(2042) '#N/A
-          y = ThrowIfError(CallFromExcel.JuliaEval("[1.0,2.0,NaN]"))
-          TestNaNFallback = ArraysIdentical(Expected, y)
+1         On Error GoTo ErrHandler
+2         Expected(1, 1) = 1#
+3         Expected(2, 1) = 2#
+4         Expected(3, 1) = CVErr(2042) '#N/A
+5         y = ThrowIfError(CallFromExcel.JuliaEval("[1.0,2.0,NaN]"))
+6         TestNaNFallback = ArraysIdentical(Expected, y)
 
-          Exit Function
+7         Exit Function
 ErrHandler:
-          PrintTwice ReThrow("TestNaNFallback", Err, True)
-          TestNaNFallback = False
+8         PrintTwice ReThrow("TestNaNFallback", Err, True)
+9         TestNaNFallback = False
 End Function
 
 ' As TestNaNFallback, but for Inf.
@@ -761,17 +764,17 @@ Function TestInfFallback()
           Dim Expected(1 To 3, 1 To 1) As Variant
           Dim y As Variant
 
-          On Error GoTo ErrHandler
-          Expected(1, 1) = 1#
-          Expected(2, 1) = 2#
-          Expected(3, 1) = CVErr(2036) '#NUM!
-          y = ThrowIfError(CallFromExcel.JuliaEval("[1.0,2.0,Inf]"))
-          TestInfFallback = ArraysIdentical(Expected, y)
+1         On Error GoTo ErrHandler
+2         Expected(1, 1) = 1#
+3         Expected(2, 1) = 2#
+4         Expected(3, 1) = CVErr(2036) '#NUM!
+5         y = ThrowIfError(CallFromExcel.JuliaEval("[1.0,2.0,Inf]"))
+6         TestInfFallback = ArraysIdentical(Expected, y)
 
-          Exit Function
+7         Exit Function
 ErrHandler:
-          PrintTwice ReThrow("TestInfFallback", Err, True)
-          TestInfFallback = False
+8         PrintTwice ReThrow("TestInfFallback", Err, True)
+9         TestInfFallback = False
 End Function
 
 ' Exercises the "V" branch's vector-to-column path, used by JuliaCall/JuliaEval but not by
@@ -781,18 +784,18 @@ Function TestVFormatVectorColumn()
           Dim x() As Double
           Dim y As Variant
 
-          On Error GoTo ErrHandler
-          ReDim x(1 To 4)
-          x(1) = 1.5: x(2) = -2.25: x(3) = 0#: x(4) = 100000.125
-          Expected(1, 1) = x(1): Expected(2, 1) = x(2)
-          Expected(3, 1) = x(3): Expected(4, 1) = x(4)
-          y = ThrowIfError(CallFromExcel.JuliaCall("identity", x))
-          TestVFormatVectorColumn = ArraysIdentical(Expected, y)
+1         On Error GoTo ErrHandler
+2         ReDim x(1 To 4)
+3         x(1) = 1.5: x(2) = -2.25: x(3) = 0#: x(4) = 100000.125
+4         Expected(1, 1) = x(1): Expected(2, 1) = x(2)
+5         Expected(3, 1) = x(3): Expected(4, 1) = x(4)
+6         y = ThrowIfError(CallFromExcel.JuliaCall("identity", x))
+7         TestVFormatVectorColumn = ArraysIdentical(Expected, y)
 
-          Exit Function
+8         Exit Function
 ErrHandler:
-          PrintTwice ReThrow("TestVFormatVectorColumn", Err, True)
-          TestVFormatVectorColumn = False
+9         PrintTwice ReThrow("TestVFormatVectorColumn", Err, True)
+10        TestVFormatVectorColumn = False
 End Function
 
 ' Exercises the "V" branch's rank-2 (matrix) path with a non-square shape and distinct values
@@ -802,18 +805,18 @@ Function TestVFormatMatrixNonSquare()
           Dim x(1 To 2, 1 To 3) As Double
           Dim y As Variant
 
-          On Error GoTo ErrHandler
-          x(1, 1) = 1.1: x(1, 2) = 2.2: x(1, 3) = 3.3
-          x(2, 1) = 4.4: x(2, 2) = 5.5: x(2, 3) = 6.6
-          Expected(1, 1) = x(1, 1): Expected(1, 2) = x(1, 2): Expected(1, 3) = x(1, 3)
-          Expected(2, 1) = x(2, 1): Expected(2, 2) = x(2, 2): Expected(2, 3) = x(2, 3)
-          y = CallFromExcel.JuliaCallVBA("identity", x)
-          TestVFormatMatrixNonSquare = ArraysIdentical(Expected, y)
+1         On Error GoTo ErrHandler
+2         x(1, 1) = 1.1: x(1, 2) = 2.2: x(1, 3) = 3.3
+3         x(2, 1) = 4.4: x(2, 2) = 5.5: x(2, 3) = 6.6
+4         Expected(1, 1) = x(1, 1): Expected(1, 2) = x(1, 2): Expected(1, 3) = x(1, 3)
+5         Expected(2, 1) = x(2, 1): Expected(2, 2) = x(2, 2): Expected(2, 3) = x(2, 3)
+6         y = CallFromExcel.JuliaCallVBA("identity", x)
+7         TestVFormatMatrixNonSquare = ArraysIdentical(Expected, y)
 
-          Exit Function
+8         Exit Function
 ErrHandler:
-          PrintTwice ReThrow("TestVFormatMatrixNonSquare", Err, True)
-          TestVFormatMatrixNonSquare = False
+9         PrintTwice ReThrow("TestVFormatMatrixNonSquare", Err, True)
+10        TestVFormatMatrixNonSquare = False
 End Function
 
 ' As TestNaNFallback, but for the matrix encoder, which has its own NaN/Inf fallback guard.
@@ -821,18 +824,18 @@ Function TestMatrixNaNFallback()
           Dim Expected(1 To 2, 1 To 3) As Variant
           Dim y As Variant
 
-          On Error GoTo ErrHandler
-          Expected(1, 1) = 1#: Expected(1, 2) = 2#: Expected(1, 3) = 3#
-          Expected(2, 1) = 4#
-          Expected(2, 2) = CVErr(2042) '#N/A
-          Expected(2, 3) = 6#
-          y = ThrowIfError(CallFromExcel.JuliaEval("[1.0 2.0 3.0; 4.0 NaN 6.0]"))
-          TestMatrixNaNFallback = ArraysIdentical(Expected, y)
+1         On Error GoTo ErrHandler
+2         Expected(1, 1) = 1#: Expected(1, 2) = 2#: Expected(1, 3) = 3#
+3         Expected(2, 1) = 4#
+4         Expected(2, 2) = CVErr(2042) '#N/A
+5         Expected(2, 3) = 6#
+6         y = ThrowIfError(CallFromExcel.JuliaEval("[1.0 2.0 3.0; 4.0 NaN 6.0]"))
+7         TestMatrixNaNFallback = ArraysIdentical(Expected, y)
 
-          Exit Function
+8         Exit Function
 ErrHandler:
-          PrintTwice ReThrow("TestMatrixNaNFallback", Err, True)
-          TestMatrixNaNFallback = False
+9         PrintTwice ReThrow("TestMatrixNaNFallback", Err, True)
+10        TestMatrixNaNFallback = False
 End Function
 
 ' Checks an empty Float64 vector correctly routes to the general array format rather than
@@ -840,14 +843,14 @@ End Function
 Function TestVFormatEmptyArrayFallback()
           Dim y As Variant
 
-          On Error GoTo ErrHandler
-          y = ThrowIfError(CallFromExcel.JuliaEvalVBA("Float64[]"))
-          TestVFormatEmptyArrayFallback = IsArray(y) And (UBound(y) < LBound(y))
+1         On Error GoTo ErrHandler
+2         y = ThrowIfError(CallFromExcel.JuliaEvalVBA("Float64[]"))
+3         TestVFormatEmptyArrayFallback = IsArray(y) And (UBound(y) < LBound(y))
 
-          Exit Function
+4         Exit Function
 ErrHandler:
-          PrintTwice ReThrow("TestVFormatEmptyArrayFallback", Err, True)
-          TestVFormatEmptyArrayFallback = False
+5         PrintTwice ReThrow("TestVFormatEmptyArrayFallback", Err, True)
+6         TestVFormatEmptyArrayFallback = False
 End Function
 
 ' Live round trip through a Variant() array (not a genuinely-typed Double() array) - the
@@ -860,16 +863,16 @@ Function TestVEncodeFromVariantArray()
           Dim x() As Variant
           Dim y As Variant
 
-          On Error GoTo ErrHandler
-          ReDim x(1 To 5)
-          x(1) = 1#: x(2) = -2.5: x(3) = 3.14159265358979: x(4) = 0#: x(5) = 1000000#
-          y = CallFromExcel.JuliaCallVBA("identity", x)
-          TestVEncodeFromVariantArray = ArraysIdentical(x, y)
+1         On Error GoTo ErrHandler
+2         ReDim x(1 To 5)
+3         x(1) = 1#: x(2) = -2.5: x(3) = 3.14159265358979: x(4) = 0#: x(5) = 1000000#
+4         y = CallFromExcel.JuliaCallVBA("identity", x)
+5         TestVEncodeFromVariantArray = ArraysIdentical(x, y)
 
-          Exit Function
+6         Exit Function
 ErrHandler:
-          PrintTwice ReThrow("TestVEncodeFromVariantArray", Err, True)
-          TestVEncodeFromVariantArray = False
+7         PrintTwice ReThrow("TestVEncodeFromVariantArray", Err, True)
+8         TestVEncodeFromVariantArray = False
 End Function
 
 ' Exercises the "V" branch's rank 3-9 handling. A genuinely-typed Double() array, so both
@@ -883,22 +886,22 @@ Function TestVFormat3DArray()
           Dim x(1 To 2, 1 To 3, 1 To 4) As Double
           Dim y As Variant
 
-          On Error GoTo ErrHandler
-          For k = 1 To 4
-              For j = 1 To 3
-                  For i = 1 To 2
-                      x(i, j, k) = i + 10 * j + 100 * k
-                  Next i
-              Next j
-          Next k
+1         On Error GoTo ErrHandler
+2         For k = 1 To 4
+3             For j = 1 To 3
+4                 For i = 1 To 2
+5                     x(i, j, k) = i + 10 * j + 100 * k
+6                 Next i
+7             Next j
+8         Next k
 
-          y = CallFromExcel.JuliaCallVBA("identity", x)
-          TestVFormat3DArray = ArraysIdentical(x, y)
+9         y = CallFromExcel.JuliaCallVBA("identity", x)
+10        TestVFormat3DArray = ArraysIdentical(x, y)
 
-          Exit Function
+11        Exit Function
 ErrHandler:
-          PrintTwice ReThrow("TestVFormat3DArray", Err, True)
-          TestVFormat3DArray = False
+12        PrintTwice ReThrow("TestVFormat3DArray", Err, True)
+13        TestVFormat3DArray = False
 End Function
 
 ' Exercises the "R" (range) branch's integer sub-format - a UnitRange is encoded as just
@@ -907,15 +910,15 @@ Function TestRangeIntegerVsCollect()
           Dim y1 As Variant
           Dim y2 As Variant
 
-          On Error GoTo ErrHandler
-          y1 = ThrowIfError(CallFromExcel.JuliaEval("1:1000"))
-          y2 = ThrowIfError(CallFromExcel.JuliaEval("collect(1:1000)"))
-          TestRangeIntegerVsCollect = ArraysIdentical(y1, y2)
+1         On Error GoTo ErrHandler
+2         y1 = ThrowIfError(CallFromExcel.JuliaEval("1:1000"))
+3         y2 = ThrowIfError(CallFromExcel.JuliaEval("collect(1:1000)"))
+4         TestRangeIntegerVsCollect = ArraysIdentical(y1, y2)
 
-          Exit Function
+5         Exit Function
 ErrHandler:
-          PrintTwice ReThrow("TestRangeIntegerVsCollect", Err, True)
-          TestRangeIntegerVsCollect = False
+6         PrintTwice ReThrow("TestRangeIntegerVsCollect", Err, True)
+7         TestRangeIntegerVsCollect = False
 End Function
 
 ' As TestRangeIntegerVsCollect, but for a StepRange with a non-1 step.
@@ -923,15 +926,15 @@ Function TestRangeStepVsCollect()
           Dim y1 As Variant
           Dim y2 As Variant
 
-          On Error GoTo ErrHandler
-          y1 = ThrowIfError(CallFromExcel.JuliaEval("5:3:47"))
-          y2 = ThrowIfError(CallFromExcel.JuliaEval("collect(5:3:47)"))
-          TestRangeStepVsCollect = ArraysIdentical(y1, y2)
+1         On Error GoTo ErrHandler
+2         y1 = ThrowIfError(CallFromExcel.JuliaEval("5:3:47"))
+3         y2 = ThrowIfError(CallFromExcel.JuliaEval("collect(5:3:47)"))
+4         TestRangeStepVsCollect = ArraysIdentical(y1, y2)
 
-          Exit Function
+5         Exit Function
 ErrHandler:
-          PrintTwice ReThrow("TestRangeStepVsCollect", Err, True)
-          TestRangeStepVsCollect = False
+6         PrintTwice ReThrow("TestRangeStepVsCollect", Err, True)
+7         TestRangeStepVsCollect = False
 End Function
 
 ' As TestRangeIntegerVsCollect, but for the float sub-format.
@@ -939,62 +942,62 @@ Function TestRangeFloatVsCollect()
           Dim y1 As Variant
           Dim y2 As Variant
 
-          On Error GoTo ErrHandler
-          y1 = ThrowIfError(CallFromExcel.JuliaEval("(1:1000).*pi"))
-          y2 = ThrowIfError(CallFromExcel.JuliaEval("collect((1:1000).*pi)"))
-          TestRangeFloatVsCollect = ArraysIdentical(y1, y2)
+1         On Error GoTo ErrHandler
+2         y1 = ThrowIfError(CallFromExcel.JuliaEval("(1:1000).*pi"))
+3         y2 = ThrowIfError(CallFromExcel.JuliaEval("collect((1:1000).*pi)"))
+4         TestRangeFloatVsCollect = ArraysIdentical(y1, y2)
 
-          Exit Function
+5         Exit Function
 ErrHandler:
-          PrintTwice ReThrow("TestRangeFloatVsCollect", Err, True)
-          TestRangeFloatVsCollect = False
+6         PrintTwice ReThrow("TestRangeFloatVsCollect", Err, True)
+7         TestRangeFloatVsCollect = False
 End Function
 
 ' Confirms JuliaEvalVBA gives a genuine 1-D array for a range result.
 Function TestRangeJuliaEvalVBAIsOneD()
           Dim y As Variant
 
-          On Error GoTo ErrHandler
-          y = ThrowIfError(CallFromExcel.JuliaEvalVBA("1:1000"))
-          TestRangeJuliaEvalVBAIsOneD = (NumDimensions(y) = 1) And (UBound(y) - LBound(y) + 1 = 1000) And _
+1         On Error GoTo ErrHandler
+2         y = ThrowIfError(CallFromExcel.JuliaEvalVBA("1:1000"))
+3         TestRangeJuliaEvalVBAIsOneD = (NumDimensions(y) = 1) And (UBound(y) - LBound(y) + 1 = 1000) And _
               (y(LBound(y)) = 1) And (y(UBound(y)) = 1000)
 
-          Exit Function
+4         Exit Function
 ErrHandler:
-          PrintTwice ReThrow("TestRangeJuliaEvalVBAIsOneD", Err, True)
-          TestRangeJuliaEvalVBAIsOneD = False
+5         PrintTwice ReThrow("TestRangeJuliaEvalVBAIsOneD", Err, True)
+6         TestRangeJuliaEvalVBAIsOneD = False
 End Function
 
 ' As TestRangeJuliaEvalVBAIsOneD, but via JuliaEval - must give a 2-D, single-column array.
 Function TestRangeJuliaEvalIsColumn()
           Dim y As Variant
 
-          On Error GoTo ErrHandler
-          y = ThrowIfError(CallFromExcel.JuliaEval("1:1000"))
-          TestRangeJuliaEvalIsColumn = (NumDimensions(y) = 2) And (UBound(y, 1) = 1000) And (UBound(y, 2) = 1) And _
+1         On Error GoTo ErrHandler
+2         y = ThrowIfError(CallFromExcel.JuliaEval("1:1000"))
+3         TestRangeJuliaEvalIsColumn = (NumDimensions(y) = 2) And (UBound(y, 1) = 1000) And (UBound(y, 2) = 1) And _
               (y(1, 1) = 1) And (y(1000, 1) = 1000)
 
-          Exit Function
+4         Exit Function
 ErrHandler:
-          PrintTwice ReThrow("TestRangeJuliaEvalIsColumn", Err, True)
-          TestRangeJuliaEvalIsColumn = False
+5         PrintTwice ReThrow("TestRangeJuliaEvalIsColumn", Err, True)
+6         TestRangeJuliaEvalIsColumn = False
 End Function
 
 ' Directly confirms the compact "R" wire format is actually used, for both sub-formats.
 Function TestRangeWireFormat()
           Dim s As Variant
 
-          On Error GoTo ErrHandler
-          s = ThrowIfError(CallFromExcel.JuliaEvalVBA("CallFromExcel.encode_for_xl(1:1000)"))
-          If Left$(s, 3) <> "RI," Then Throw "Expected integer range to use 'RI' wire format, got: " & Left$(s, 10)
-          s = ThrowIfError(CallFromExcel.JuliaEvalVBA("CallFromExcel.encode_for_xl((1:1000).*pi)"))
-          If Left$(s, 3) <> "RF," Then Throw "Expected float range to use 'RF' wire format, got: " & Left$(s, 10)
-          TestRangeWireFormat = True
+1         On Error GoTo ErrHandler
+2         s = ThrowIfError(CallFromExcel.JuliaEvalVBA("CallFromExcel.encode_for_xl(1:1000)"))
+3         If Left$(s, 3) <> "RI," Then Throw "Expected integer range to use 'RI' wire format, got: " & Left$(s, 10)
+4         s = ThrowIfError(CallFromExcel.JuliaEvalVBA("CallFromExcel.encode_for_xl((1:1000).*pi)"))
+5         If Left$(s, 3) <> "RF," Then Throw "Expected float range to use 'RF' wire format, got: " & Left$(s, 10)
+6         TestRangeWireFormat = True
 
-          Exit Function
+7         Exit Function
 ErrHandler:
-          PrintTwice ReThrow("TestRangeWireFormat", Err, True)
-          TestRangeWireFormat = False
+8         PrintTwice ReThrow("TestRangeWireFormat", Err, True)
+9         TestRangeWireFormat = False
 End Function
 
 ' Confirms an array containing NaN/Infinity travels Excel -> Julia via the fast "V" path, and
@@ -1005,24 +1008,24 @@ Function TestNaNInfRoundTripViaV()
           Dim x(1 To 4) As Double
           Dim y As Variant
 
-          On Error GoTo ErrHandler
-          x(1) = 1#
-          x(2) = HexToDouble("7FF8000000000000") 'quiet NaN
-          x(3) = 2#
-          x(4) = HexToDouble("7FF0000000000000") 'positive infinity
+1         On Error GoTo ErrHandler
+2         x(1) = 1#
+3         x(2) = HexToDouble("7FF8000000000000") 'quiet NaN
+4         x(3) = 2#
+5         x(4) = HexToDouble("7FF0000000000000") 'positive infinity
 
-          Expected(1, 1) = 1#
-          Expected(2, 1) = CVErr(2042) '#N/A
-          Expected(3, 1) = 2#
-          Expected(4, 1) = CVErr(2036) '#NUM!
+6         Expected(1, 1) = 1#
+7         Expected(2, 1) = CVErr(2042) '#N/A
+8         Expected(3, 1) = 2#
+9         Expected(4, 1) = CVErr(2036) '#NUM!
 
-          y = ThrowIfError(CallFromExcel.JuliaCall("identity", x))
-          TestNaNInfRoundTripViaV = ArraysIdentical(Expected, y)
+10        y = ThrowIfError(CallFromExcel.JuliaCall("identity", x))
+11        TestNaNInfRoundTripViaV = ArraysIdentical(Expected, y)
 
-          Exit Function
+12        Exit Function
 ErrHandler:
-          PrintTwice ReThrow("TestNaNInfRoundTripViaV", Err, True)
-          TestNaNInfRoundTripViaV = False
+13        PrintTwice ReThrow("TestNaNInfRoundTripViaV", Err, True)
+14        TestNaNInfRoundTripViaV = False
 End Function
 
 ' Confirms Excel errors round-trip correctly through Julia via JuliaCall("identity", ...),
@@ -1034,38 +1037,38 @@ Function TestExcelErrorRoundTrip()
           Dim i As Long
           Dim y As Variant
 
-          On Error GoTo ErrHandler
-          Codes(1) = 2000: Codes(2) = 2007: Codes(3) = 2015: Codes(4) = 2023: Codes(5) = 2029
-          Codes(6) = 2036: Codes(7) = 2042: Codes(8) = 2043: Codes(9) = 2045: Codes(10) = 2046
-          Codes(11) = 2047: Codes(12) = 2048: Codes(13) = 2049: Codes(14) = 2050
+1         On Error GoTo ErrHandler
+2         Codes(1) = 2000: Codes(2) = 2007: Codes(3) = 2015: Codes(4) = 2023: Codes(5) = 2029
+3         Codes(6) = 2036: Codes(7) = 2042: Codes(8) = 2043: Codes(9) = 2045: Codes(10) = 2046
+4         Codes(11) = 2047: Codes(12) = 2048: Codes(13) = 2049: Codes(14) = 2050
 
-          For i = 1 To 14
-              Expected(i, 1) = CVErr(Codes(i))
-          Next i
+5         For i = 1 To 14
+6             Expected(i, 1) = CVErr(Codes(i))
+7         Next i
 
-          y = ThrowIfError(CallFromExcel.JuliaCall("identity", Expected))
-          TestExcelErrorRoundTrip = ArraysIdentical(Expected, y)
+8         y = ThrowIfError(CallFromExcel.JuliaCall("identity", Expected))
+9         TestExcelErrorRoundTrip = ArraysIdentical(Expected, y)
 
-          Exit Function
+10        Exit Function
 ErrHandler:
-          PrintTwice ReThrow("TestExcelErrorRoundTrip", Err, True)
-          TestExcelErrorRoundTrip = False
+11        PrintTwice ReThrow("TestExcelErrorRoundTrip", Err, True)
+12        TestExcelErrorRoundTrip = False
 End Function
 
 Function TestArrayOfSingleCharacters()
           Dim x As Variant
           Dim y As Variant
 
-          On Error GoTo ErrHandler
+1         On Error GoTo ErrHandler
           'All characters with code point <= 100000
-          x = Application.Evaluate("=UNICHAR(VSTACK(SEQUENCE(55295,,1),SEQUENCE(7632,,57344),SEQUENCE(526,,65008),SEQUENCE(34465,,65536)))")
-          y = ThrowIfError(CallFromExcel.JuliaCall("identity", x))
-          TestArrayOfSingleCharacters = ArraysIdentical(x, y)
+2         x = Application.Evaluate("=UNICHAR(VSTACK(SEQUENCE(55295,,1),SEQUENCE(7632,,57344),SEQUENCE(526,,65008),SEQUENCE(34465,,65536)))")
+3         y = ThrowIfError(CallFromExcel.JuliaCall("identity", x))
+4         TestArrayOfSingleCharacters = ArraysIdentical(x, y)
 
-          Exit Function
+5         Exit Function
 ErrHandler:
-          PrintTwice ReThrow("TestArrayOfSingleCharacters", Err, True)
-          TestArrayOfSingleCharacters = False
+6         PrintTwice ReThrow("TestArrayOfSingleCharacters", Err, True)
+7         TestArrayOfSingleCharacters = False
 End Function
 
 ' Checks JuliaCallNamedArgs passes the arguments after ";" as keyword arguments, including
@@ -1077,26 +1080,26 @@ Function TestNamedArgs()
           Dim Expected3(1 To 2, 1 To 1) As Variant
           Dim OK As Boolean
 
-          On Error GoTo ErrHandler
-          ThrowIfError CallFromExcel.JuliaEval("named_args_test(x, y=0; a=1, b=2) = [x, y, a, b]; named_args_join(xs...; delim="","") = join(xs, delim)")
+1         On Error GoTo ErrHandler
+2         ThrowIfError CallFromExcel.JuliaEval("named_args_test(x, y=0; a=1, b=2) = [x, y, a, b]; named_args_join(xs...; delim="","") = join(xs, delim)")
 
-          Expected1(1, 1) = 10#: Expected1(2, 1) = 0#: Expected1(3, 1) = 1#: Expected1(4, 1) = 5#
-          OK = ArraysIdentical(Expected1, ThrowIfError(CallFromExcel.JuliaCallNamedArgs("named_args_test", 10#, ";", "b", 5#)))
+3         Expected1(1, 1) = 10#: Expected1(2, 1) = 0#: Expected1(3, 1) = 1#: Expected1(4, 1) = 5#
+4         OK = ArraysIdentical(Expected1, ThrowIfError(CallFromExcel.JuliaCallNamedArgs("named_args_test", 10#, ";", "b", 5#)))
 
-          OK = OK And Left$(CallFromExcel.JuliaCallNamedArgs("named_args_test", 10#), 15) = "#ArgumentError:"
-          OK = OK And Left$(CallFromExcel.JuliaCallNamedArgs("named_args_test", 10#, ";", "b", 5#, "a"), 15) = "#ArgumentError:"
+5         OK = OK And Left$(CallFromExcel.JuliaCallNamedArgs("named_args_test", 10#), 15) = "#ArgumentError:"
+6         OK = OK And Left$(CallFromExcel.JuliaCallNamedArgs("named_args_test", 10#, ";", "b", 5#, "a"), 15) = "#ArgumentError:"
 
-          Expected3(1, 1) = "a": Expected3(2, 1) = "b"
-          OK = OK And ArraysIdentical(Expected3, ThrowIfError(CallFromExcel.JuliaCallNamedArgs("split", "a;;b", ";", ";", "keepempty", False)))
-          OK = OK And CallFromExcel.JuliaCallNamedArgs("named_args_join", "a", ";", "b", ";", "delim", ";") = "a;;;b"
+7         Expected3(1, 1) = "a": Expected3(2, 1) = "b"
+8         OK = OK And ArraysIdentical(Expected3, ThrowIfError(CallFromExcel.JuliaCallNamedArgs("split", "a;;b", ";", ";", "keepempty", False)))
+9         OK = OK And CallFromExcel.JuliaCallNamedArgs("named_args_join", "a", ";", "b", ";", "delim", ";") = "a;;;b"
 
-          OK = OK And Left$(CallFromExcel.JuliaCallNamedArgs("named_args_test", 10#, ";", "a", 1, "a", 2), 15) = "#ArgumentError:"
+10        OK = OK And Left$(CallFromExcel.JuliaCallNamedArgs("named_args_test", 10#, ";", "a", 1, "a", 2), 15) = "#ArgumentError:"
 
-          TestNamedArgs = OK
-          Exit Function
+11        TestNamedArgs = OK
+12        Exit Function
 ErrHandler:
-          PrintTwice ReThrow("TestNamedArgs", Err, True)
-          TestNamedArgs = False
+13        PrintTwice ReThrow("TestNamedArgs", Err, True)
+14        TestNamedArgs = False
 End Function
 
 ' Checks JuliaCallNamedArgsVBA returns a vector as a 1-dimensional array, and that both
@@ -1108,23 +1111,23 @@ Function TestNamedArgsVBA()
           Dim x As New Scripting.Dictionary
           Dim y As Object
 
-          On Error GoTo ErrHandler
-          ThrowIfError CallFromExcel.JuliaEval("named_args_test(x, y=0; a=1, b=2) = [x, y, a, b]")
-          Expected(1) = 10#: Expected(2) = 0#: Expected(3) = 1#: Expected(4) = 5#
-          OK = ArraysIdentical(Expected, CallFromExcel.JuliaCallNamedArgsVBA("named_args_test", 10#, ";", "b", 5#))
+1         On Error GoTo ErrHandler
+2         ThrowIfError CallFromExcel.JuliaEval("named_args_test(x, y=0; a=1, b=2) = [x, y, a, b]")
+3         Expected(1) = 10#: Expected(2) = 0#: Expected(3) = 1#: Expected(4) = 5#
+4         OK = ArraysIdentical(Expected, CallFromExcel.JuliaCallNamedArgsVBA("named_args_test", 10#, ";", "b", 5#))
 
-          ThrowIfError CallFromExcel.JuliaEval("named_args_dict(; kw...) = Dict(string(k) => v for (k, v) in kw)")
-          x.Add "alpha", 100
-          Set y = CallFromExcel.JuliaCallNamedArgsVBA("named_args_dict", ";", "d", x, "n", 1#)
-          OK = OK And y.Count = 2
-          OK = OK And y("n") = 1#
-          OK = OK And y("d")("alpha") = 100
+5         ThrowIfError CallFromExcel.JuliaEval("named_args_dict(; kw...) = Dict(string(k) => v for (k, v) in kw)")
+6         x.Add "alpha", 100
+7         Set y = CallFromExcel.JuliaCallNamedArgsVBA("named_args_dict", ";", "d", x, "n", 1#)
+8         OK = OK And y.Count = 2
+9         OK = OK And y("n") = 1#
+10        OK = OK And y("d")("alpha") = 100
 
-          TestNamedArgsVBA = OK
-          Exit Function
+11        TestNamedArgsVBA = OK
+12        Exit Function
 ErrHandler:
-          PrintTwice ReThrow("TestNamedArgsVBA", Err, True)
-          TestNamedArgsVBA = False
+13        PrintTwice ReThrow("TestNamedArgsVBA", Err, True)
+14        TestNamedArgsVBA = False
 End Function
 
 ' Adapted from vba\JuliaExcel.xlam\VBA\modTest.bas's TestVFormatBoundarySizes: that version
@@ -1141,27 +1144,27 @@ Function TestVFormatBoundarySizes() As Boolean
           Dim x() As Double
           Dim y As Variant
 
-          On Error GoTo ErrHandler
-          Sizes = Array(1, 2, 3, 7, 8, 9, 17, 100, 1000, 1000000)
+1         On Error GoTo ErrHandler
+2         Sizes = Array(1, 2, 3, 7, 8, 9, 17, 100, 1000, 1000000)
 
-          OK = True
-          For Idx = LBound(Sizes) To UBound(Sizes)
-              Sz = Sizes(Idx)
-              ReDim x(1 To Sz)
-              For i = 1 To Sz
-                  x(i) = (i - Sz / 2) * 1.5 + 0.25 'varied: negative, positive, fractional values
-              Next i
-              y = CallFromExcel.JuliaCallVBA("identity", x)
-              If Not ArraysIdentical(x, y) Then
-                  Throw "Round trip mismatch for size " & Sz
-              End If
-          Next Idx
+3         OK = True
+4         For Idx = LBound(Sizes) To UBound(Sizes)
+5             Sz = Sizes(Idx)
+6             ReDim x(1 To Sz)
+7             For i = 1 To Sz
+8                 x(i) = (i - Sz / 2) * 1.5 + 0.25 'varied: negative, positive, fractional values
+9             Next i
+10            y = CallFromExcel.JuliaCallVBA("identity", x)
+11            If Not ArraysIdentical(x, y) Then
+12                Throw "Round trip mismatch for size " & Sz
+13            End If
+14        Next Idx
 
-          TestVFormatBoundarySizes = OK
-          Exit Function
+15        TestVFormatBoundarySizes = OK
+16        Exit Function
 ErrHandler:
-          PrintTwice ReThrow("TestVFormatBoundarySizes", Err, True)
-          TestVFormatBoundarySizes = False
+17        PrintTwice ReThrow("TestVFormatBoundarySizes", Err, True)
+18        TestVFormatBoundarySizes = False
 End Function
 
 ' Regression test: ConcatenateExpressions used to join a multi-line JuliaExpression with ";"
@@ -1171,17 +1174,17 @@ End Function
 Function TestJuliaEvalMultiLineWithComment() As Boolean
           Dim Lines(1 To 3) As Variant
           Dim OK As Boolean
-          On Error GoTo ErrHandler
-          Lines(1) = "function RegressionTestForComment(a, b)"
-          Lines(2) = "a + b #this comment messes things up!"
-          Lines(3) = "end"
-          ThrowIfError CallFromExcel.JuliaEvalVBA(Lines)
-          OK = CallFromExcel.JuliaCall("RegressionTestForComment", 2, 3) = 5
-          TestJuliaEvalMultiLineWithComment = OK
-          Exit Function
+1         On Error GoTo ErrHandler
+2         Lines(1) = "function RegressionTestForComment(a, b)"
+3         Lines(2) = "a + b #this comment messes things up!"
+4         Lines(3) = "end"
+5         ThrowIfError CallFromExcel.JuliaEvalVBA(Lines)
+6         OK = CallFromExcel.JuliaCall("RegressionTestForComment", 2, 3) = 5
+7         TestJuliaEvalMultiLineWithComment = OK
+8         Exit Function
 ErrHandler:
-          PrintTwice ReThrow("TestJuliaEvalMultiLineWithComment", Err, True)
-          TestJuliaEvalMultiLineWithComment = False
+9         PrintTwice ReThrow("TestJuliaEvalMultiLineWithComment", Err, True)
+10        TestJuliaEvalMultiLineWithComment = False
 End Function
 
 ' =========================================================================================
@@ -1194,41 +1197,41 @@ End Function
 ' =========================================================================================
 
 Private Function ScratchSheet() As Worksheet
-          On Error Resume Next
-          Set ScratchSheet = ThisWorkbook.Worksheets("Scratch")
-          On Error GoTo 0
-          If ScratchSheet Is Nothing Then
-              Set ScratchSheet = ThisWorkbook.Worksheets.Add
-              ScratchSheet.Name = "Scratch"
-          End If
-          ScratchSheet.Unprotect
-          ScratchSheet.Cells.Clear
+1         On Error Resume Next
+2         Set ScratchSheet = ThisWorkbook.Worksheets("Scratch")
+3         On Error GoTo 0
+4         If ScratchSheet Is Nothing Then
+5             Set ScratchSheet = ThisWorkbook.Worksheets.Add
+6             ScratchSheet.Name = "Scratch"
+7         End If
+8         ScratchSheet.Unprotect
+9         ScratchSheet.Cells.Clear
 End Function
 
 Function WsTest_Scalar() As Boolean
           Dim ws As Worksheet
-          On Error GoTo ErrHandler
-          Set ws = ScratchSheet()
-          ws.Range("A1").Value2 = Application.WorksheetFunction.Pi()
-          ws.Range("B1").Formula2 = "=JuliaCall(""identity"",A1)"
-          WsTest_Scalar = ws.Range("B1").Value2 = Application.WorksheetFunction.Pi()
-          Exit Function
+1         On Error GoTo ErrHandler
+2         Set ws = ScratchSheet()
+3         ws.Range("A1").Value2 = Application.WorksheetFunction.Pi()
+4         ws.Range("B1").Formula2 = "=JuliaCall(""identity"",A1)"
+5         WsTest_Scalar = ws.Range("B1").Value2 = Application.WorksheetFunction.Pi()
+6         Exit Function
 ErrHandler:
-          PrintTwice ReThrow("WsTest_Scalar", Err, True)
-          WsTest_Scalar = False
+7         PrintTwice ReThrow("WsTest_Scalar", Err, True)
+8         WsTest_Scalar = False
 End Function
 
 Function WsTest_String() As Boolean
           Dim ws As Worksheet
-          On Error GoTo ErrHandler
-          Set ws = ScratchSheet()
-          ws.Range("A1").Value2 = "FooBar"
-          ws.Range("B1").Formula2 = "=JuliaCall(""identity"",A1)"
-          WsTest_String = ws.Range("B1").Value2 = "FooBar"
-          Exit Function
+1         On Error GoTo ErrHandler
+2         Set ws = ScratchSheet()
+3         ws.Range("A1").Value2 = "FooBar"
+4         ws.Range("B1").Formula2 = "=JuliaCall(""identity"",A1)"
+5         WsTest_String = ws.Range("B1").Value2 = "FooBar"
+6         Exit Function
 ErrHandler:
-          PrintTwice ReThrow("WsTest_String", Err, True)
-          WsTest_String = False
+7         PrintTwice ReThrow("WsTest_String", Err, True)
+8         WsTest_String = False
 End Function
 
 ' Confirms a 1-D range argument to a real worksheet formula comes back as a single column,
@@ -1243,63 +1246,63 @@ End Function
 Function WsTest_OneDArrayBecomesColumn() As Boolean
           Dim Expected As Variant
           Dim ws As Worksheet
-          On Error GoTo ErrHandler
-          Set ws = ScratchSheet()
-          ws.Range("A1:A3").Value2 = Application.WorksheetFunction.Transpose(Array(1, 2, 3))
-          ws.Range("E1").Formula2 = "=JuliaCall(""identity"",A1:A3)"
-          Expected = ws.Range("E1:E3").Value2
-          WsTest_OneDArrayBecomesColumn = NumDimensions(Expected) = 2 And _
+1         On Error GoTo ErrHandler
+2         Set ws = ScratchSheet()
+3         ws.Range("A1:A3").Value2 = Application.WorksheetFunction.Transpose(Array(1, 2, 3))
+4         ws.Range("E1").Formula2 = "=JuliaCall(""identity"",A1:A3)"
+5         Expected = ws.Range("E1:E3").Value2
+6         WsTest_OneDArrayBecomesColumn = NumDimensions(Expected) = 2 And _
               Expected(1, 1) = 1 And Expected(2, 1) = 2 And Expected(3, 1) = 3
-          Exit Function
+7         Exit Function
 ErrHandler:
-          PrintTwice ReThrow("WsTest_OneDArrayBecomesColumn", Err, True)
-          WsTest_OneDArrayBecomesColumn = False
+8         PrintTwice ReThrow("WsTest_OneDArrayBecomesColumn", Err, True)
+9         WsTest_OneDArrayBecomesColumn = False
 End Function
 
 Function WsTest_TwoDArray() As Boolean
           Dim Observed As Variant
           Dim ws As Worksheet
-          On Error GoTo ErrHandler
-          Set ws = ScratchSheet()
-          ws.Range("A1:B2").Value2 = Array(1, 2) 'row 1 only - fill row 2 explicitly below
-          ws.Range("A1").Value2 = 1: ws.Range("B1").Value2 = 2
-          ws.Range("A2").Value2 = 3: ws.Range("B2").Value2 = 4
-          ws.Range("D1").Formula2 = "=JuliaCall(""identity"",A1:B2)"
-          Observed = ws.Range("D1:E2").Value2
-          WsTest_TwoDArray = Observed(1, 1) = 1 And Observed(1, 2) = 2 And _
+1         On Error GoTo ErrHandler
+2         Set ws = ScratchSheet()
+3         ws.Range("A1:B2").Value2 = Array(1, 2) 'row 1 only - fill row 2 explicitly below
+4         ws.Range("A1").Value2 = 1: ws.Range("B1").Value2 = 2
+5         ws.Range("A2").Value2 = 3: ws.Range("B2").Value2 = 4
+6         ws.Range("D1").Formula2 = "=JuliaCall(""identity"",A1:B2)"
+7         Observed = ws.Range("D1:E2").Value2
+8         WsTest_TwoDArray = Observed(1, 1) = 1 And Observed(1, 2) = 2 And _
               Observed(2, 1) = 3 And Observed(2, 2) = 4
-          Exit Function
+9         Exit Function
 ErrHandler:
-          PrintTwice ReThrow("WsTest_TwoDArray", Err, True)
-          WsTest_TwoDArray = False
+10        PrintTwice ReThrow("WsTest_TwoDArray", Err, True)
+11        WsTest_TwoDArray = False
 End Function
 
 ' Int64 arrays travel in the compact "L" format, decoded to Doubles for a worksheet.
 Function WsTest_IntegerArrays() As Boolean
           Dim ws As Worksheet
-          On Error GoTo ErrHandler
-          Set ws = ScratchSheet()
-          ws.Range("A1").Formula2 = "=JuliaEval(""[10, -20, 30]"")"
-          ws.Range("C1").Formula2 = "=JuliaEval(""[1 2; 3 4]"")"
-          WsTest_IntegerArrays = ws.Range("A1").Value2 = 10 And ws.Range("A2").Value2 = -20 And _
+1         On Error GoTo ErrHandler
+2         Set ws = ScratchSheet()
+3         ws.Range("A1").Formula2 = "=JuliaEval(""[10, -20, 30]"")"
+4         ws.Range("C1").Formula2 = "=JuliaEval(""[1 2; 3 4]"")"
+5         WsTest_IntegerArrays = ws.Range("A1").Value2 = 10 And ws.Range("A2").Value2 = -20 And _
               ws.Range("A3").Value2 = 30 And IsEmpty(ws.Range("A4").Value2) And IsEmpty(ws.Range("B1").Value2) And _
               ws.Range("C1").Value2 = 1 And ws.Range("D1").Value2 = 2 And ws.Range("C2").Value2 = 3 And ws.Range("D2").Value2 = 4
-          Exit Function
+6         Exit Function
 ErrHandler:
-          PrintTwice ReThrow("WsTest_IntegerArrays", Err, True)
-          WsTest_IntegerArrays = False
+7         PrintTwice ReThrow("WsTest_IntegerArrays", Err, True)
+8         WsTest_IntegerArrays = False
 End Function
 
 Function WsTest_JuliaEvalScalar() As Boolean
           Dim ws As Worksheet
-          On Error GoTo ErrHandler
-          Set ws = ScratchSheet()
-          ws.Range("A1").Formula2 = "=JuliaEval(""1+1"")"
-          WsTest_JuliaEvalScalar = ws.Range("A1").Value2 = 2
-          Exit Function
+1         On Error GoTo ErrHandler
+2         Set ws = ScratchSheet()
+3         ws.Range("A1").Formula2 = "=JuliaEval(""1+1"")"
+4         WsTest_JuliaEvalScalar = ws.Range("A1").Value2 = 2
+5         Exit Function
 ErrHandler:
-          PrintTwice ReThrow("WsTest_JuliaEvalScalar", Err, True)
-          WsTest_JuliaEvalScalar = False
+6         PrintTwice ReThrow("WsTest_JuliaEvalScalar", Err, True)
+7         WsTest_JuliaEvalScalar = False
 End Function
 
 ' Regression test: a bare .NET null (decoded from Julia's "nothing"/"missing") returned
@@ -1311,16 +1314,16 @@ End Function
 ' cell holds a computed formula, not nothing at all).
 Function WsTest_EmptyResult() As Boolean
           Dim ws As Worksheet
-          On Error GoTo ErrHandler
-          Set ws = ScratchSheet()
-          ws.Range("A1").Formula2 = "=JuliaEval(""nothing"")"
-          ws.Range("A2").Formula2 = "=JuliaEval(""missing"")"
-          ws.Range("A3").Formula2 = "=ISBLANK(A1)"
-          WsTest_EmptyResult = ws.Range("A1").Value2 = 0 And ws.Range("A2").Value2 = 0 And ws.Range("A3").Value2 = False
-          Exit Function
+1         On Error GoTo ErrHandler
+2         Set ws = ScratchSheet()
+3         ws.Range("A1").Formula2 = "=JuliaEval(""nothing"")"
+4         ws.Range("A2").Formula2 = "=JuliaEval(""missing"")"
+5         ws.Range("A3").Formula2 = "=ISBLANK(A1)"
+6         WsTest_EmptyResult = ws.Range("A1").Value2 = 0 And ws.Range("A2").Value2 = 0 And ws.Range("A3").Value2 = False
+7         Exit Function
 ErrHandler:
-          PrintTwice ReThrow("WsTest_EmptyResult", Err, True)
-          WsTest_EmptyResult = False
+8         PrintTwice ReThrow("WsTest_EmptyResult", Err, True)
+9         WsTest_EmptyResult = False
 End Function
 
 ' Regression test: the worksheet JuliaLaunch function's parameter order must exactly match
@@ -1337,17 +1340,17 @@ End Function
 ' closes, which can make a genuine relaunch attempt immediately afterwards flaky - a real
 ' but separate concern from the argument-order bug this test targets).
 Function WsTest_JuliaLaunchArgOrder() As Boolean
-          Dim ws As Worksheet
           Dim Result As String
-          On Error GoTo ErrHandler
-          Set ws = ScratchSheet()
-          ws.Range("A1").Formula2 = "=JuliaLaunch(,,""-q"")"
-          Result = ws.Range("A1").Text
-          WsTest_JuliaLaunchArgOrder = Left$(Result, 1) <> "#"
-          Exit Function
+          Dim ws As Worksheet
+1         On Error GoTo ErrHandler
+2         Set ws = ScratchSheet()
+3         ws.Range("A1").Formula2 = "=JuliaLaunch(,,""-q"")"
+4         Result = ws.Range("A1").Text
+5         WsTest_JuliaLaunchArgOrder = Left$(Result, 1) <> "#"
+6         Exit Function
 ErrHandler:
-          PrintTwice ReThrow("WsTest_JuliaLaunchArgOrder", Err, True)
-          WsTest_JuliaLaunchArgOrder = False
+7         PrintTwice ReThrow("WsTest_JuliaLaunchArgOrder", Err, True)
+8         WsTest_JuliaLaunchArgOrder = False
 End Function
 
 ' Regression test: JuliaLaunch must succeed when called immediately after JuliaEval("exit()"),
@@ -1358,18 +1361,18 @@ End Function
 ' error), even though it was really just a session finishing a normal, requested exit. Fixed
 ' by a short retry loop in JuliaLaunch.cs that only engages in that specific ambiguous state.
 Function WsTest_RelaunchAfterExit() As Boolean
-          Dim ws As Worksheet
           Dim Result As String
-          On Error GoTo ErrHandler
-          Set ws = ScratchSheet()
-          CallFromExcel.JuliaEval "exit()"
-          ws.Range("A1").Formula2 = "=JuliaLaunch()"
-          Result = ws.Range("A1").Text
-          WsTest_RelaunchAfterExit = Left$(Result, 1) <> "#" And CallFromExcel.JuliaIsRunning()
-          Exit Function
+          Dim ws As Worksheet
+1         On Error GoTo ErrHandler
+2         Set ws = ScratchSheet()
+3         CallFromExcel.JuliaEval "exit()"
+4         ws.Range("A1").Formula2 = "=JuliaLaunch()"
+5         Result = ws.Range("A1").Text
+6         WsTest_RelaunchAfterExit = Left$(Result, 1) <> "#" And CallFromExcel.JuliaIsRunning()
+7         Exit Function
 ErrHandler:
-          PrintTwice ReThrow("WsTest_RelaunchAfterExit", Err, True)
-          WsTest_RelaunchAfterExit = False
+8         PrintTwice ReThrow("WsTest_RelaunchAfterExit", Err, True)
+9         WsTest_RelaunchAfterExit = False
 End Function
 
 ' Smoke test for Julia under WSL. Not part of RunTests (which needs a native session): run it by
@@ -1379,32 +1382,32 @@ End Function
 ' wsl bash -lc "julia --project=/mnt/c/Projects/CallFromExcel -e 'using Pkg; Pkg.instantiate()'"
 Function RunWSLTest(Optional SilentMode As Boolean = False) As Boolean
           Const Title = "CallFromExcel RunWSLTest"
-          Dim ws As Worksheet
           Dim Prompt As String
+          Dim ws As Worksheet
 
-          On Error GoTo ErrHandler
+1         On Error GoTo ErrHandler
 
-          LoadAddIn
-          If CallFromExcel.JuliaIsRunning() Then
-              Throw "Julia is already running - close it, then run RunWSLTest again"
-          End If
+2         LoadAddIn
+3         If CallFromExcel.JuliaIsRunning() Then
+4             Throw "Julia is already running - close it, then run RunWSLTest again"
+5         End If
 
-          Set ws = ScratchSheet()
-          ws.Range("A1").Formula2 = "=JuliaLaunch(TRUE,,""--project=" & WindowsPathToWSL(RepoRoot()) & """)"
-          ThrowIfError ws.Range("A1").Value2
-          ws.Range("A2").Formula2 = "=JuliaEval(""Sys.islinux()"")"
-          RunWSLTest = (ws.Range("A2").Value2 = True) And (CallFromExcel.JuliaCall("identity", 1) = 1)
+6         Set ws = ScratchSheet()
+7         ws.Range("A1").Formula2 = "=JuliaLaunch(TRUE,,""--project=" & WindowsPathToWSL(RepoRoot()) & """)"
+8         ThrowIfError ws.Range("A1").Value2
+9         ws.Range("A2").Formula2 = "=JuliaEval(""Sys.islinux()"")"
+10        RunWSLTest = (ws.Range("A2").Value2 = True) And (CallFromExcel.JuliaCall("identity", 1) = 1)
 
-          Prompt = IIf(RunWSLTest, "RunWSLTest passed", "RunWSLTest FAILED: Julia did not report running under Linux")
-          PrintTwice Prompt
-          CallFromExcel.JuliaEval "exit()"
-          If Not SilentMode Then MsgBox Prompt, IIf(RunWSLTest, vbInformation, vbCritical), Title
-          Exit Function
+11        Prompt = IIf(RunWSLTest, "RunWSLTest passed", "RunWSLTest FAILED: Julia did not report running under Linux")
+12        PrintTwice Prompt
+13        CallFromExcel.JuliaEval "exit()"
+14        If Not SilentMode Then MsgBox Prompt, IIf(RunWSLTest, vbInformation, vbCritical), Title
+15        Exit Function
 ErrHandler:
-          Prompt = ReThrow("RunWSLTest", Err, True)
-          TestLog = TestLog & Prompt & vbCrLf
-          If Not SilentMode Then MsgBox Prompt, vbCritical, Title
-          RunWSLTest = False
+16        Prompt = ReThrow("RunWSLTest", Err, True)
+17        TestLog = TestLog & Prompt & vbCrLf
+18        If Not SilentMode Then MsgBox Prompt, vbCritical, Title
+19        RunWSLTest = False
 End Function
 
 ' Cross-path consistency check: JuliaIsRunning/JuliaExcelPID as real worksheet formulas
@@ -1413,28 +1416,28 @@ End Function
 ' (via COM) earlier in RunTests.
 Function WsTest_JuliaIsRunningAndPID() As Boolean
           Dim ws As Worksheet
-          On Error GoTo ErrHandler
-          Set ws = ScratchSheet()
-          ws.Range("A1").Formula2 = "=JuliaIsRunning()"
-          ws.Range("A2").Formula2 = "=JuliaExcelPID()"
-          WsTest_JuliaIsRunningAndPID = (ws.Range("A1").Value2 = True) And _
+1         On Error GoTo ErrHandler
+2         Set ws = ScratchSheet()
+3         ws.Range("A1").Formula2 = "=JuliaIsRunning()"
+4         ws.Range("A2").Formula2 = "=JuliaExcelPID()"
+5         WsTest_JuliaIsRunningAndPID = (ws.Range("A1").Value2 = True) And _
               (ws.Range("A2").Value2 = CallFromExcel.JuliaExcelPID())
-          Exit Function
+6         Exit Function
 ErrHandler:
-          PrintTwice ReThrow("WsTest_JuliaIsRunningAndPID", Err, True)
-          WsTest_JuliaIsRunningAndPID = False
+7         PrintTwice ReThrow("WsTest_JuliaIsRunningAndPID", Err, True)
+8         WsTest_JuliaIsRunningAndPID = False
 End Function
 
 Function WsTest_ErrorString() As Boolean
           Dim ws As Worksheet
-          On Error GoTo ErrHandler
-          Set ws = ScratchSheet()
-          ws.Range("A1").Formula2 = "=JuliaCall(""thisFunctionDoesNotExist12345"")"
-          WsTest_ErrorString = Left$(ws.Range("A1").Value2, 1) = "#"
-          Exit Function
+1         On Error GoTo ErrHandler
+2         Set ws = ScratchSheet()
+3         ws.Range("A1").Formula2 = "=JuliaCall(""thisFunctionDoesNotExist12345"")"
+4         WsTest_ErrorString = Left$(ws.Range("A1").Value2, 1) = "#"
+5         Exit Function
 ErrHandler:
-          PrintTwice ReThrow("WsTest_ErrorString", Err, True)
-          WsTest_ErrorString = False
+6         PrintTwice ReThrow("WsTest_ErrorString", Err, True)
+7         WsTest_ErrorString = False
 End Function
 
 ' The scenario from dotnet-addin\README.md's performance write-up: JuliaCall("sort", ...)
@@ -1444,16 +1447,97 @@ Function WsTest_SortRoundTrip() As Boolean
           Dim Expected As Variant
           Dim Observed As Variant
           Dim ws As Worksheet
-          On Error GoTo ErrHandler
-          Set ws = ScratchSheet()
-          ws.Range("A1:A5").Value2 = Application.WorksheetFunction.Transpose(Array(5, 3, 1, 4, 2))
-          ws.Range("C1").Formula2 = "=SORT(A1:A5)"
-          ws.Range("E1").Formula2 = "=JuliaCall(""sort"",A1:A5)"
-          Expected = ws.Range("C1:C5").Value2
-          Observed = ws.Range("E1:E5").Value2
-          WsTest_SortRoundTrip = ArraysIdentical(Expected, Observed)
-          Exit Function
+1         On Error GoTo ErrHandler
+2         Set ws = ScratchSheet()
+3         ws.Range("A1:A5").Value2 = Application.WorksheetFunction.Transpose(Array(5, 3, 1, 4, 2))
+4         ws.Range("C1").Formula2 = "=SORT(A1:A5)"
+5         ws.Range("E1").Formula2 = "=JuliaCall(""sort"",A1:A5)"
+6         Expected = ws.Range("C1:C5").Value2
+7         Observed = ws.Range("E1:E5").Value2
+8         WsTest_SortRoundTrip = ArraysIdentical(Expected, Observed)
+9         Exit Function
 ErrHandler:
-          PrintTwice ReThrow("WsTest_SortRoundTrip", Err, True)
-          WsTest_SortRoundTrip = False
+10        PrintTwice ReThrow("WsTest_SortRoundTrip", Err, True)
+11        WsTest_SortRoundTrip = False
 End Function
+
+' Regression test: Excel-DNA passes an error argument (e.g. 1/0) as its own ExcelError type,
+' which the encoder did not recognise, so =JuliaCall("identity",1/0) returned the string
+' "#Cannot serialise value of type ExcelError" instead of #DIV/0!.
+Function WsTest_ErrorArguments() As Boolean
+          Dim ws As Worksheet
+1         On Error GoTo ErrHandler
+2         Set ws = ScratchSheet()
+3         ws.Range("A1").Formula2 = "=JuliaCall(""identity"",1/0)"
+4         ws.Range("A2").Formula2 = "=JuliaCall(""identity"",NA())"
+5         ws.Range("A3").Formula2 = "=JuliaCall(""string"",1/0)"
+6         WsTest_ErrorArguments = IsErrorCode(ws.Range("A1").Value2, xlErrDiv0) And _
+              IsErrorCode(ws.Range("A2").Value2, xlErrNA) And _
+              ws.Range("A3").Value2 = "#DIV/0!"
+7         Exit Function
+ErrHandler:
+8         PrintTwice ReThrow("WsTest_ErrorArguments", Err, True)
+9         WsTest_ErrorArguments = False
+End Function
+
+' Regression test: Excel-DNA passes blank cells within a range as its own ExcelEmpty type,
+' which the encoder did not recognise, so any range containing a blank cell failed with
+' "#Cannot serialise value of type ExcelEmpty". Blank cells should arrive in Julia as missing,
+' and error cells as ExcelError.
+Function WsTest_RangeWithBlanksAndErrors() As Boolean
+          Dim ws As Worksheet
+1         On Error GoTo ErrHandler
+2         Set ws = ScratchSheet()
+3         ws.Range("A1").Value2 = 1
+4         ws.Range("A3").Formula2 = "=NA()"
+5         ws.Range("C1").Formula2 = "=JuliaCall(""string"",A1:A3)"
+6         ws.Range("E1").Formula2 = "=JuliaCall(""identity"",A1:A3)"
+7         WsTest_RangeWithBlanksAndErrors = ws.Range("C1").Value2 = "Any[1.0, missing, #N/A]" And _
+              ws.Range("E1").Value2 = 1 And ws.Range("E2").Value2 = 0 And _
+              IsErrorCode(ws.Range("E3").Value2, xlErrNA)
+8         Exit Function
+ErrHandler:
+9         PrintTwice ReThrow("WsTest_RangeWithBlanksAndErrors", Err, True)
+10        WsTest_RangeWithBlanksAndErrors = False
+End Function
+
+' Regression test: JuliaSetVar used to assign the printed form of the value, re-parsed as Julia
+' code, which failed for strings ("hello" became the variable name hello) and for error values.
+Function WsTest_JuliaSetVar() As Boolean
+          Dim ws As Worksheet
+1         On Error GoTo ErrHandler
+2         Set ws = ScratchSheet()
+3         ws.Range("A1").Value2 = 1
+4         ws.Range("A3").Formula2 = "=NA()"
+5         ws.Range("C1").Formula2 = "=JuliaSetVar(""ws_setvar_range"",A1:A3)"
+6         ws.Range("C2").Formula2 = "=JuliaSetVar(""ws_setvar_string"",""hello"")"
+7         ws.Range("D1").Formula2 = "=JuliaEval(""string(ws_setvar_range)"")"
+8         ws.Range("D2").Formula2 = "=JuliaEval(""ws_setvar_string"")"
+9         WsTest_JuliaSetVar = ws.Range("D1").Value2 = "Any[1.0, missing, #N/A]" And _
+              ws.Range("D2").Value2 = "hello"
+10        Exit Function
+ErrHandler:
+11        PrintTwice ReThrow("WsTest_JuliaSetVar", Err, True)
+12        WsTest_JuliaSetVar = False
+End Function
+
+' Regression test: a blank cell in a range of expressions passed to JuliaEval was sent to
+' Julia as the text "ExcelDna.Integration.ExcelEmpty" instead of as a blank line.
+Function WsTest_JuliaEvalRangeWithBlankLine() As Boolean
+          Dim ws As Worksheet
+1         On Error GoTo ErrHandler
+2         Set ws = ScratchSheet()
+3         ws.Range("B1").Value2 = "ws_blank_line_test = 41"
+4         ws.Range("B3").Value2 = "ws_blank_line_test + 1"
+5         ws.Range("A1").Formula2 = "=JuliaEval(B1:B3)"
+6         WsTest_JuliaEvalRangeWithBlankLine = ws.Range("A1").Value2 = 42
+7         Exit Function
+ErrHandler:
+8         PrintTwice ReThrow("WsTest_JuliaEvalRangeWithBlankLine", Err, True)
+9         WsTest_JuliaEvalRangeWithBlankLine = False
+End Function
+
+Private Function IsErrorCode(Value As Variant, ErrorNumber As Long) As Boolean
+1         If IsError(Value) Then IsErrorCode = (CLng(Value) = ErrorNumber)
+End Function
+

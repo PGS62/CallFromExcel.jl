@@ -440,6 +440,17 @@ end
     @test_throws String CallFromExcel._attach_to_excel(true, 4321)
     CallFromExcel.stop_server()
 
+    # setvar assigns the value itself. It used to re-parse the value's printed form as code, which
+    # failed for strings ("hello" became the variable name hello) and for ExcelError values.
+    for v in Any["hello", "a\"b\$c", 1.5, [1.0, 2.0], Any[1.0, missing, CallFromExcel.ExcelError(2042)],
+                 CallFromExcel.ExcelError(2007), Dict("a" => 1)]
+        CallFromExcel.setvar("setvar_test_value", v)
+        got = invokelatest(getglobal, Main, :setvar_test_value)
+        @test isequal(got, v) && typeof(got) == typeof(v)
+    end
+    @test CallFromExcel.setvar("setvar_test_value", [1.0, 2.0]) == "Set global variable `setvar_test_value` to 2-element Vector{Float64}"
+    @test startswith(CallFromExcel.setvar("1bad", 1), "#")
+
 end
 
 # The VBA-side test suite (modTest.RunTests, in workbooks\TestCallFromExcel.xlsm) exercises

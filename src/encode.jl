@@ -79,6 +79,14 @@ encode_for_xl(x::Int32) = string("&", x)   # Long in VBA 64-bit, no native 32-bi
 encode_for_xl(x::Int64) = string("^", x)   # LongLong in VBA 64-bit
 encode_for_xl(x::UInt8) = string("B", x)   # Byte in VBA - VBA's only unsigned type
 encode_for_xl(x::Int128) = encode_for_xl(Float64(x))   # Double in VBA
+# Other numeric types have no VBA counterpart of their own. They convert to the smallest VBA type
+# that holds every value of the type exactly, else to Double - by type, never by value, so every
+# element of an array comes back as the same VBA type. (Without these, the fallback below would
+# return their printed form as text, e.g. "0x00000003" for UInt32(3).)
+encode_for_xl(x::UInt16) = encode_for_xl(Int32(x))      # Long in VBA
+encode_for_xl(x::UInt32) = encode_for_xl(Int64(x))      # LongLong in VBA
+encode_for_xl(x::Float16) = encode_for_xl(Float32(x))   # Single in VBA
+encode_for_xl(x::Union{UInt64,UInt128,BigInt,Rational,BigFloat}) = encode_for_xl(Float64(x))   # Double in VBA, exact up to 2^53
 encode_for_xl(x::Irrational) = encode_for_xl(Float64(x)) #Double in VBA
 encode_for_xl(x::Missing) = "E"            # Empty in VBA
 encode_for_xl(x::Nothing) = "E"            # Empty in VBA
@@ -289,9 +297,14 @@ function encode_for_xl(x::Array{Int64,N}) where {N}
     "L" * string(N) * "," * join(dims, ",") * ";" * bytes2hex(reinterpret(UInt8, bswap.(x)))
 end
 
+# Arrays of the numeric types converted element-by-element above, converted as a whole instead so
+# they can use the compact "L" and "V" formats - the same values and VBA types, encoded faster.
+encode_for_xl(x::Array{UInt32,N}) where {N} = encode_for_xl(Int64.(x))
+encode_for_xl(x::Array{<:Union{UInt64,UInt128,BigInt,Rational,BigFloat},N}) where {N} = encode_for_xl(Float64.(x))
+
 """
     encode_for_xl(x::AbstractRange{Float64})
-    encode_for_xl(x::AbstractRange{<:Integer})
+    encode_for_xl(x::AbstractRange{<:Union{Int8,Int16,Int32,Int64,UInt8,UInt16,UInt32}})
 
 Compact encoding for a Julia Range (`UnitRange`, `StepRange`, `StepRangeLen`, `LinRange`, etc.) -
 encodes only `first(x)`, `step(x)` and `length(x)`, rather than materializing and encoding every
@@ -333,7 +346,10 @@ function encode_for_xl(x::AbstractRange{Float64})
     "RF," * string(n) * ";" * float64_to_hex(f) * float64_to_hex(s)
 end
 
-function encode_for_xl(x::AbstractRange{<:Integer})
+# Only the integer types that become LongLong (or narrower) in VBA: a range of a type that becomes
+# Double element by element, or of Bool, is encoded element by element too, so its elements keep
+# the same VBA type as the same values in any other array.
+function encode_for_xl(x::AbstractRange{<:Union{Int8,Int16,Int32,Int64,UInt8,UInt16,UInt32}})
     n = length(x)
     f, s = Int64(first(x)), Int64(step(x))
     (n == 0 || Int64(last(x)) != f + (n - 1) * s) && return encode_array_general(x)

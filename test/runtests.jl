@@ -232,6 +232,27 @@ end
     @test startswith(CallFromExcel.encode_for_xl(Int64[]), "*")      # empty arrays use the general format
     @test startswith(CallFromExcel.encode_for_xl(Int32[1, 2]), "*")  # only Int64 gets "L"
 
+    # Numeric types with no VBA counterpart become the smallest VBA type holding every value of the
+    # type, else Double - not their printed form as text (e.g. "0x00000003" for UInt32(3)).
+    let enc = CallFromExcel.encode_for_xl
+        @test enc(UInt16(3)) == enc(Int32(3))
+        @test enc(UInt32(3)) == enc(Int64(3))
+        @test enc(typemax(UInt32)) == enc(Int64(typemax(UInt32)))
+        @test enc(Float16(1.5)) == enc(1.5f0)
+        @test enc(UInt64(3)) == enc(3.0)
+        @test enc(UInt128(3)) == enc(3.0)
+        @test enc(big(2)^70) == enc(2.0^70)
+        @test enc(big"1.5") == enc(1.5)
+        @test enc(1//4) == enc(0.25)
+        @test enc(UInt32[1, 2, 3]) == enc([1, 2, 3])
+        @test enc(UInt64[1, 2, 3]) == enc([1.0, 2.0, 3.0])
+        @test enc([1//2, 1//4]) == enc([0.5, 0.25])
+        @test enc(Any[UInt32(1), "x"]) == enc(Any[1, "x"])
+        @test enc(UInt32(1):UInt32(3)) == enc(1:3)
+        @test CallFromExcel.decode_from_xl(enc(UInt64(1):UInt64(3))) == [1.0, 2.0, 3.0]
+        @test enc(false:true) == enc(Any[false, true])   # not 0/1
+    end
+
     # write_encoded! (used by the general array format) must write exactly encode_for_xl's output,
     # and return its xl_length, for every kind of element.
     for x in Any[0.0, -0.0, 1.5, -2.5e-300, 5e-324, floatmax(), NaN, Inf, -Inf, true, false, missing,

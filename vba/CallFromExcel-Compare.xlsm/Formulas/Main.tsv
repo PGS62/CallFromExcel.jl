@@ -1,10 +1,10 @@
 ﻿Address	Formula
-C7	"=JuliaLaunch(,,""--project=""&CallFromExcel_project_path)"
+C7	"=JuliaLaunch(,,""--project=""&SUBSTITUTE(CallFromExcel_project_path,""\"",""/""))"
 C8	"=JuliaEval(""1+1"")"
 C9	"=jleval(""1+1"")"
 C10	"=JuliaEval(""string(VERSION)"")"
 C11	"=jleval(""string(VERSION)"")"
 C12	"=GetEnvironmentVariable(""COMPUTERNAME"")"
 C13	=AND(CallFromExcel!AllResults=JuliaInXL!AllResults)
-C14	=MAX(ABS(CallFromExcel!AllResults-JuliaInXL!AllResults))
+C14	=MAX(IF(ISNUMBER(CallFromExcel!AllResults)*ISNUMBER(JuliaInXL!AllResults),ABS(CallFromExcel!AllResults-JuliaInXL!AllResults)))
 C15	=LOG(MaximumAbsoluteDifference)/LOG(2)

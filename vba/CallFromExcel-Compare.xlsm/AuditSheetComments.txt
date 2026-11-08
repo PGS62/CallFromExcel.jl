@@ -1,4 +1,6 @@
 ﻿Version	Date	Time	Author	Comment
+7	08-Nov-2026	18:53	Philip Swannell	Tweaks to testing of speed for vectors of strings.
+6	08-Nov-2026	17:48	Philip Swannell	Added tests for speed of transmission of vectors of strings.
 5	07-Nov-2026	16:46	Philip Swannell	Re-ran following optimisations to C# code of CallFromExcel which is now faster on all tests.
 4	07-Nov-2026	16:28	Philip Swannell	Re-ran following optimisations to C# code of CallFromExcel which is now faster on all tests.
 3	07-Nov-2026	15:12	Philip Swannell	Updated to compare CallFromExcel with JuniaInXL.

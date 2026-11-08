@@ -26,6 +26,7 @@ Sub RunOneTest(Description As String, VectorLength As Long, ByVal JEFormula As S
           NumCalls As Long, OneCallPerCell As Boolean, ResultCellJE As Range, ResultCellJInXL As Range, RatioCell As Range)
 
           Dim InputDataAddress As String
+          Dim StringDataAddress As String
           Dim NR As Long
           Dim TargetInputData As Range
           Dim TargetRangeJE As Range
@@ -35,7 +36,9 @@ Sub RunOneTest(Description As String, VectorLength As Long, ByVal JEFormula As S
 1         On Error GoTo ErrHandler
 
 2         UseInputData = InStr(JEFormula, "InputData") > 0 Or _
-              InStr(JInXLFormula, "InputData") > 0
+              InStr(JInXLFormula, "InputData") > 0 Or _
+              InStr(JEFormula, "StringData") > 0 Or _
+              InStr(JInXLFormula, "StringData") > 0
 
 3         JEFormula = Replace(JEFormula, "VectorLength", CStr(VectorLength))
 4         JInXLFormula = Replace(JInXLFormula, "VectorLength", CStr(VectorLength))
@@ -53,39 +56,51 @@ Sub RunOneTest(Description As String, VectorLength As Long, ByVal JEFormula As S
 15                TargetInputData.Value = Application.WorksheetFunction.RandArray(VectorLength)
 16                shInputData.Names.Add "InputData", TargetInputData
 17            End If
-18        End If
 
-19        If UseInputData Then
-20            InputDataAddress = shInputData.Name & "!" & Replace(shInputData.Range("Inputdata").Resize(VectorLength).Address, "$", "")
-21            JEFormula = Replace(JEFormula, "InputData", InputDataAddress)
-22            JInXLFormula = Replace(JInXLFormula, "InputData", InputDataAddress)
-23        End If
+18            With shInputData.Range("InputData").Offset(, 1)
+19                .ClearContents
+20                .Cells(1, 1).Formula2 = "=""String"" & InputData"
+21                .Columns.AutoFit
+22                .Value = .Value
+23                shInputData.Names.Add "StringData", .Cells
+24            End With
 
-24        Set TargetRangeJE = FindTargetRange(shCallFromExcel, VectorLength)
-25        Set TargetRangeJInXL = FindTargetRange(shJuliaInXL, VectorLength)
+25        End If
 
-26        If JEFormula <> "" Then
-27            LogMessage "Testing " & Description & " for CallFromExcel"
-28            ResultCellJE.Value = PasteAndTimeFormula(TargetRangeJE, JEFormula, OneCallPerCell, NumCalls)
-29        Else
-30            ResultCellJE.ClearContents
-31        End If
+26        If UseInputData Then
+27            InputDataAddress = shInputData.Name & "!" & Replace(shInputData.Range("Inputdata").Resize(VectorLength).Address, "$", "")
+28            StringDataAddress = shInputData.Name & "!" & Replace(shInputData.Range("Stringdata").Resize(VectorLength).Address, "$", "")
+29            JEFormula = Replace(JEFormula, "InputData", InputDataAddress)
+30            JInXLFormula = Replace(JInXLFormula, "InputData", InputDataAddress)
+31            JEFormula = Replace(JEFormula, "StringData", StringDataAddress)
+32            JInXLFormula = Replace(JInXLFormula, "StringData", StringDataAddress)
+33        End If
 
-32        If JInXLFormula <> "" Then
-33            LogMessage "Testing " & Description & " for JuliaInXL"
-34            ResultCellJInXL.Value = PasteAndTimeFormula(TargetRangeJInXL, JInXLFormula, OneCallPerCell, NumCalls)
-35        Else
-36            ResultCellJInXL.ClearContents
-37        End If
+34        Set TargetRangeJE = FindTargetRange(shCallFromExcel, VectorLength)
+35        Set TargetRangeJInXL = FindTargetRange(shJuliaInXL, VectorLength)
 
-38        RatioCell.ClearContents
-39        On Error Resume Next
-40        RatioCell.Value = ResultCellJInXL.Value / ResultCellJE.Value
-41        On Error GoTo ErrHandler
+36        If JEFormula <> "" Then
+37            LogMessage "Testing " & Description & " for CallFromExcel"
+38            ResultCellJE.Value = PasteAndTimeFormula(TargetRangeJE, JEFormula, OneCallPerCell, NumCalls)
+39        Else
+40            ResultCellJE.ClearContents
+41        End If
 
-42        Exit Sub
+42        If JInXLFormula <> "" Then
+43            LogMessage "Testing " & Description & " for JuliaInXL"
+44            ResultCellJInXL.Value = PasteAndTimeFormula(TargetRangeJInXL, JInXLFormula, OneCallPerCell, NumCalls)
+45        Else
+46            ResultCellJInXL.ClearContents
+47        End If
+
+48        RatioCell.ClearContents
+49        On Error Resume Next
+50        RatioCell.Value = ResultCellJInXL.Value / ResultCellJE.Value
+51        On Error GoTo ErrHandler
+
+52        Exit Sub
 ErrHandler:
-43        ReThrow "RunOneTest", Err
+53        ReThrow "RunOneTest", Err
 End Sub
 
 ' -----------------------------------------------------------------------------------------------------------------------

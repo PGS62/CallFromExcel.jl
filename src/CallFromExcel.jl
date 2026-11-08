@@ -7,11 +7,13 @@ using DataFrames: DataFrames, DataFrame, Missing
 using Dates: Dates, Date, DateTime
 using HTTP: HTTP
 using Printf: @sprintf
+using Random: RandomDevice
 using Sockets: Sockets
 
 const global xlpid = Ref(0)
 const global commsfolder = Ref("")
 const global xlport = Ref(0)
+const global session_token = Ref("")
 const global _display_results = Ref(false)
 const global _server = Ref{Any}(nothing)
 

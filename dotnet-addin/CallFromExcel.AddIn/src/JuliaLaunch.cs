@@ -161,7 +161,9 @@ namespace CallFromExcel.AddIn
                 // Login shell (bash -lc) so juliaup's PATH entry is picked up - a plain `wsl <command>`
                 // doesn't source it. Paths inside innerCommand use bash single quotes so they don't
                 // clash with the Windows-level double quotes grouping the whole argument.
-                processFileName = "wsl";
+                // The full path, not "wsl": ShellExecute resolves a bare name partly against
+                // the current directory, which follows Excel's last File > Open folder.
+                processFileName = WSLExecutable;
                 processArguments = "bash -lc \"" + innerCommand + "\"";
                 command = "wsl " + processArguments;
             }

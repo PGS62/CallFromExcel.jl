@@ -4,12 +4,12 @@ using System.IO;
 
 namespace CallFromExcel.AddIn
 {
-    // C# port of the port-caching logic in modHttp.bas (SetJuliaPort/GetJuliaPort/
-    // ReadJuliaPortFromFile). The port file is named by this process's own PID -- when
-    // this code eventually runs loaded into Excel via Excel-DNA, Process.GetCurrentProcess().Id
-    // is Excel's own PID, matching exactly what Julia's startup script is told to expect
-    // (see JuliaLaunch.BuildStartupScript's "CallFromExcel.setxlpid(...)" call) and what the
-    // VBA version keys its own port file on.
+    // The port file, written by Julia's start_server, holds the port Julia listens on and, on
+    // a second line, a secret token for the session that every request must carry (see
+    // _reject_request in comms.jl). It is named by this process's own PID - Excel's PID once
+    // loaded via Excel-DNA - matching what Julia's startup script is told to expect (see
+    // JuliaLaunch.BuildStartupScript's "CallFromExcel.setxlpid(...)" call), and it lives in the
+    // user's own temp folder, so only this user can read the token.
     public static class JuliaPort
     {
         private const string NoConnectionMessage =
@@ -18,58 +18,79 @@ namespace CallFromExcel.AddIn
             "\"CallFromExcel HTTP server listening\" printed in its window, then try again.";
 
         private static int _cachedPort;
+        private static string _cachedToken = "";
 
         private static string PortFilePath()
         {
             return Path.Combine(FileUtils.LocalTemp(), "Port_" + Process.GetCurrentProcess().Id + ".txt");
         }
 
+        // Caches the port (and the token the port file holds for it). Zero forgets the
+        // session and deletes the port file.
         public static void SetJuliaPort(int port)
         {
-            _cachedPort = port;
-            string portFile = PortFilePath();
             if (port == 0)
             {
-                try { File.Delete(portFile); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+                _cachedPort = 0;
+                _cachedToken = "";
+                try { File.Delete(PortFilePath()); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+                return;
             }
-            else
+            _cachedPort = port;
+            _cachedToken = TokenFromFile(port);
+        }
+
+        private static void ReadPortFile(out int port, out string token)
+        {
+            port = 0;
+            token = "";
+            try
             {
-                FileUtils.SaveTextFile(portFile, port.ToString());
+                string[] lines = FileUtils.ReadTextFile(PortFilePath()).Split('\n');
+                if (int.TryParse(lines[0].Trim(), out int p) && p > 0) port = p;
+                if (lines.Length > 1) token = lines[1].Trim();
             }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
         }
 
         public static int ReadJuliaPortFromFile()
         {
-            try
-            {
-                string text = FileUtils.ReadTextFile(PortFilePath());
-                if (int.TryParse(text, out int port) && port > 0) return port;
-            }
-            catch (IOException) { }
-            catch (UnauthorizedAccessException) { }
-            return 0;
+            ReadPortFile(out int port, out string _);
+            return port;
         }
 
-        // Port of GetJuliaPort (modHttp.bas): returns the cached port, recovering from the
-        // port file on disk if the in-memory cache was reset (e.g. by an AppDomain reload),
-        // or throws the same "no connection" message VBA's GetJuliaPort does.
+        // The token the port file currently holds for `port`, bypassing the cache - the XLL
+        // and the COM server each have their own copy of this class, so after Julia is
+        // relaunched one of them may still have the old session's token cached.
+        public static string TokenFromFile(int port)
+        {
+            ReadPortFile(out int filePort, out string token);
+            return filePort == port ? token : "";
+        }
+
+        // The token to send to the Julia listening on `port`.
+        public static string TokenFor(int port)
+        {
+            if (port == _cachedPort && _cachedToken.Length > 0) return _cachedToken;
+            return TokenFromFile(port);
+        }
+
+        // Returns the cached port, recovering from the port file on disk if the in-memory
+        // cache is empty, or throws the "no connection" message.
         public static int GetJuliaPort()
         {
-            if (_cachedPort != 0) return _cachedPort;
-            _cachedPort = ReadJuliaPortFromFile();
-            if (_cachedPort > 0) return _cachedPort;
+            int port = GetJuliaPortOrZero();
+            if (port > 0) return port;
             throw new InvalidOperationException(NoConnectionMessage);
         }
 
-        // Non-throwing variant used by JuliaCall/JuliaEval's own "please call JuliaLaunch
-        // first" check (modMain.bas's JuliaCall_LowLevel checks "GetJuliaPort() = 0"
-        // directly in VBA, which works there because VBA's Err mechanism is separate from
-        // a function's return value -- GetJuliaPort's C# port throws instead, so that
-        // check needs its own non-throwing path here).
+        // Non-throwing variant, for JuliaCall/JuliaEval's own "please call JuliaLaunch first"
+        // check.
         public static int GetJuliaPortOrZero()
         {
             if (_cachedPort != 0) return _cachedPort;
-            _cachedPort = ReadJuliaPortFromFile();
+            ReadPortFile(out _cachedPort, out _cachedToken);
             return _cachedPort;
         }
 

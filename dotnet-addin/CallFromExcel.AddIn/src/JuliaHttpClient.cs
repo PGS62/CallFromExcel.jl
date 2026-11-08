@@ -27,6 +27,12 @@ namespace CallFromExcel.AddIn
         private const int ConnectTimeoutMs = 150;
         private const string Host = "127.0.0.1";
 
+        // Every request carries the session token from the port file (JuliaPort.TokenFor);
+        // Julia answers 409 to a request without the right one (see _reject_request in
+        // comms.jl), e.g. from an Excel whose own Julia has gone and whose port another
+        // Excel's Julia has since taken.
+        private const int WrongTokenStatus = 409;
+
         private static readonly object PoolLock = new object();
         private static readonly Stack<Connection> Pool = new Stack<Connection>();
 
@@ -42,12 +48,15 @@ namespace CallFromExcel.AddIn
             // CallFromExcel.serve_xl was called from Julia on a different port, without this
             // process's cached port being told. Re-read the port file directly (bypassing
             // the cache) and retry once before giving up.
+            // The token is compared too: a Julia relaunched on the same port has a new one,
+            // which the other copy of this assembly (XLL vs COM server) hasn't cached yet.
+            string token = JuliaPort.TokenFor(port);
             int refreshedPort = JuliaPort.ReadJuliaPortFromFile();
-            if (refreshedPort == 0 || refreshedPort == port)
+            JuliaPort.SetJuliaPort(refreshedPort);
+            if (refreshedPort == 0 || (refreshedPort == port && JuliaPort.TokenFor(port) == token))
             {
                 throw new InvalidOperationException(JuliaPort.NoConnectionErrorMessage);
             }
-            JuliaPort.SetJuliaPort(refreshedPort);
             if (TryPost(refreshedPort, path, payload, out result))
             {
                 return result;
@@ -59,7 +68,7 @@ namespace CallFromExcel.AddIn
         // error for the caller to see, so it throws instead.
         private static bool TryPost(int port, string path, string payload, out string result)
         {
-            byte[] request = BuildRequest(path, payload);
+            byte[] request = BuildRequest(path, payload, JuliaPort.TokenFor(port));
 
             // A pooled connection may have been closed by a Julia that has since exited (or
             // been replaced by a new session on the same port). That shows up as a failure
@@ -94,6 +103,14 @@ namespace CallFromExcel.AddIn
 
         private static bool Finish(Connection connection, Response response, out string result)
         {
+            if (response.StatusCode == WrongTokenStatus)
+            {
+                // Whatever holds this port is not this Excel's Julia session: as far as this
+                // Excel is concerned, its own Julia is not reachable.
+                connection.Dispose();
+                result = null;
+                return false;
+            }
             if (response.KeepAlive) Return(connection); else connection.Dispose();
             if (response.StatusCode != 200)
             {
@@ -103,11 +120,12 @@ namespace CallFromExcel.AddIn
             return true;
         }
 
-        private static byte[] BuildRequest(string path, string payload)
+        private static byte[] BuildRequest(string path, string payload, string token)
         {
             byte[] body = Encoding.UTF8.GetBytes(payload);
             byte[] header = Encoding.ASCII.GetBytes(
-                "POST " + path + " HTTP/1.1\r\nHost: " + Host + "\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: " +
+                "POST " + path + " HTTP/1.1\r\nHost: " + Host + "\r\nX-CallFromExcel-Token: " + token +
+                "\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: " +
                 body.Length.ToString(CultureInfo.InvariantCulture) + "\r\n\r\n");
             var request = new byte[header.Length + body.Length];
             Buffer.BlockCopy(header, 0, request, 0, header.Length);
@@ -154,6 +172,11 @@ namespace CallFromExcel.AddIn
                 Port = port;
                 _client = client;
                 _stream = client.GetStream();
+            }
+
+            public void SetReadTimeout(int timeoutMs)
+            {
+                _stream.ReadTimeout = timeoutMs;
             }
 
             public static Connection TryOpen(int port)
@@ -325,52 +348,30 @@ namespace CallFromExcel.AddIn
             }
         }
 
-        private static bool FastConnectProbe(int port)
-        {
-            try
-            {
-                using (var client = new TcpClient())
-                {
-                    IAsyncResult ar = client.BeginConnect(Host, port, null, null);
-                    bool connected = ar.AsyncWaitHandle.WaitOne(ConnectTimeoutMs);
-                    if (!connected) return false;
-                    client.EndConnect(ar);
-                    return client.Connected;
-                }
-            }
-            catch (SocketException)
-            {
-                return false;
-            }
-        }
-
-        // Port of JuliaIsListening (modHttp.bas): used by JuliaLaunch to check whether a
-        // previously-known port is still alive before deciding whether to launch a new
-        // Julia session, and by JuliaIsRunning (ComServer.cs/JuliaFunctions.cs).
+        // True if a Julia serving this Excel process is answering on `port`. Used by
+        // JuliaLaunch to decide whether a new session is needed, and by JuliaIsRunning.
+        // Uses /ping, which has no side effects in Julia (unlike evaluating code, which
+        // would overwrite last_question/last_answer), and which, like every endpoint, answers
+        // 200 only to a request carrying this Excel's session token.
         public static bool IsListening(int port, int timeoutMs = 2000)
         {
-            if (!FastConnectProbe(port)) return false;
-            try
+            string token = JuliaPort.TokenFromFile(port);
+            if (token.Length == 0) return false;
+            Connection connection = Connection.TryOpen(port);
+            if (connection == null) return false;
+            using (connection)
             {
-                var req = (HttpWebRequest)WebRequest.Create("http://" + Host + ":" + port + "/eval");
-                req.Method = "POST";
-                req.ContentType = "text/plain; charset=utf-8";
-                req.Timeout = timeoutMs;
-                req.ServicePoint.Expect100Continue = false;
-                byte[] bytes = Encoding.UTF8.GetBytes("1+1");
-                req.ContentLength = bytes.Length;
-                using (Stream requestStream = req.GetRequestStream())
+                try
                 {
-                    requestStream.Write(bytes, 0, bytes.Length);
+                    connection.SetReadTimeout(timeoutMs);
+                    Response response;
+                    if (!connection.TrySend(BuildRequest("/ping", "", token), out response)) return false;
+                    return response.StatusCode == 200;
                 }
-                using (var resp = (HttpWebResponse)req.GetResponse())
+                catch (Exception ex) when (ex is IOException || ex is SocketException || ex is ObjectDisposedException)
                 {
-                    return resp.StatusCode == HttpStatusCode.OK;
+                    return false;
                 }
-            }
-            catch (WebException)
-            {
-                return false;
             }
         }
     }

@@ -34,14 +34,21 @@ namespace CallFromExcel.AddIn
             [ExcelArgument(Name = "BashStatements", Description = "Relevant only when UseLinux is TRUE. Bash statements to run before launching Julia under WSL, e.g. to set environment variables. Delimit multiple statements with the line feed character.")] object bashStatements,
             [ExcelArgument(Name = "TimeOut", Description = "Seconds to wait for Julia to fully start before giving up waiting. Defaults to 30.")] object timeOut)
         {
+            if (ExcelDnaUtil.IsInFunctionWizard()) return FunctionWizardMessage;
+            object[] all = { useLinux, minimiseWindow, commandLineOptions, packages, bashStatements, timeOut };
+            foreach (object arg in all)
+            {
+                if (arg is ExcelError) return arg;
+            }
             try
             {
-                bool linux = (useLinux is ExcelMissing) ? false : Convert.ToBoolean(useLinux);
-                string bash = (bashStatements is ExcelMissing) ? "" : Convert.ToString(bashStatements);
-                bool minimise = (minimiseWindow is ExcelMissing) ? false : Convert.ToBoolean(minimiseWindow);
-                string cmdOpts = (commandLineOptions is ExcelMissing) ? "" : Convert.ToString(commandLineOptions);
-                string pkgs = (packages is ExcelMissing) ? "" : Convert.ToString(packages);
-                int timeout = (timeOut is ExcelMissing) ? 30 : Convert.ToInt32(Convert.ToDouble(timeOut));
+                // A blank cell (ExcelEmpty) means the same as an omitted argument (ExcelMissing).
+                bool linux = IsOmitted(useLinux) ? false : Convert.ToBoolean(useLinux);
+                string bash = IsOmitted(bashStatements) ? "" : Convert.ToString(bashStatements);
+                bool minimise = IsOmitted(minimiseWindow) ? false : Convert.ToBoolean(minimiseWindow);
+                string cmdOpts = IsOmitted(commandLineOptions) ? "" : Convert.ToString(commandLineOptions);
+                string pkgs = IsOmitted(packages) ? "" : Convert.ToString(packages);
+                int timeout = IsOmitted(timeOut) ? 30 : Convert.ToInt32(Convert.ToDouble(timeOut));
                 return CallFromExcel.AddIn.JuliaLaunch.Launch(useLinux: linux, minimiseWindow: minimise, commandLineOptions: cmdOpts, packages: pkgs, bashStatements: bash, timeoutSeconds: timeout);
             }
             catch (Exception ex)
@@ -66,7 +73,10 @@ namespace CallFromExcel.AddIn
             return CallCore(juliaFunction, args, "/callkw");
         }
 
-        [ExcelFunction(Description = "Returns TRUE if a Julia session is running and listening to this Excel session.", IsThreadSafe = false)]
+        // Volatile, as is JuliaExcelPID below: neither has arguments, so otherwise Excel would
+        // never recalculate them - JuliaIsRunning would keep its value from before JuliaLaunch,
+        // and a saved JuliaExcelPID would show a previous Excel session's process id.
+        [ExcelFunction(Description = "Returns TRUE if a Julia session is running and listening to this Excel session.", IsThreadSafe = false, IsVolatile = true)]
         public static bool JuliaIsRunning()
         {
             // Improves on the VBA original's approach (matching a console window titled
@@ -79,7 +89,7 @@ namespace CallFromExcel.AddIn
             return port != 0 && JuliaHttpClient.IsListening(port);
         }
 
-        [ExcelFunction(Description = "Returns the process id of the current Excel session. Only needed if more than one Excel instance is running - pass it to serve_xl(pid) to say which one to attach to.", IsThreadSafe = false)]
+        [ExcelFunction(Description = "Returns the process id of the current Excel session. Only needed if more than one Excel instance is running - pass it to serve_xl(pid) to say which one to attach to.", IsThreadSafe = false, IsVolatile = true)]
         public static int JuliaExcelPID()
         {
             return System.Diagnostics.Process.GetCurrentProcess().Id;
@@ -100,8 +110,19 @@ namespace CallFromExcel.AddIn
             return CallCore("CallFromExcel.include", new object[] { fileName.Replace("\\", "/") }, "/call");
         }
 
+        // Excel evaluates functions on every edit in the Insert Function (fx) dialog, to show
+        // "Formula result =". These functions can have side effects (launching Julia, setting
+        // variables, running partly-typed code), so they do nothing there - as in JuliaExcel.
+        private const string FunctionWizardMessage = "#Disabled in Function Wizard!";
+
+        private static bool IsOmitted(object arg)
+        {
+            return arg is ExcelMissing || arg is ExcelEmpty;
+        }
+
         private static object CallCore(string juliaFunction, object[] args, string endpoint)
         {
+            if (ExcelDnaUtil.IsInFunctionWizard()) return FunctionWizardMessage;
             try
             {
                 if (JuliaPort.GetJuliaPortOrZero() == 0)
@@ -131,6 +152,8 @@ namespace CallFromExcel.AddIn
         public static object JuliaEval(
             [ExcelArgument(Name = "JuliaExpression", Description = "Any valid Julia code, as a string. Can also be a one-column range to evaluate multiple Julia statements.")] object juliaExpression)
         {
+            if (ExcelDnaUtil.IsInFunctionWizard()) return FunctionWizardMessage;
+            if (juliaExpression is ExcelError) return juliaExpression;
             try
             {
                 if (JuliaPort.GetJuliaPortOrZero() == 0)
@@ -258,7 +281,7 @@ namespace CallFromExcel.AddIn
                 }
                 throw new ArgumentException("Too many dimensions");
             }
-            return Convert.ToString(juliaExpression);
+            return ExpressionLine(juliaExpression);
         }
 
         // A blank cell in a range of expressions is a blank line, not the text of

@@ -194,7 +194,7 @@ namespace CallFromExcel.AddIn
                 encoded[0] = fnEncoded;
                 for (int i = 0; i < args.Length; i++)
                 {
-                    encoded[i + 1] = WireFormatEncode.Encode(args[i]);
+                    encoded[i + 1] = WireFormatEncode.Encode(RangeToValue(args[i]));
                 }
                 var lens = new System.Text.StringBuilder();
                 foreach (string e in encoded) { lens.Append(e.Length); lens.Append(','); }
@@ -218,7 +218,7 @@ namespace CallFromExcel.AddIn
             encoded[0] = fnEncoded;
             for (int i = 0; i < args.Length; i++)
             {
-                encoded[i + 1] = WireFormatEncode.Encode(args[i]);
+                encoded[i + 1] = WireFormatEncode.Encode(RangeToValue(args[i]));
             }
             var lens = new System.Text.StringBuilder();
             foreach (string e in encoded) { lens.Append(e.Length); lens.Append(','); }
@@ -254,6 +254,7 @@ namespace CallFromExcel.AddIn
         // mis-handling the bounds the way a naive 0-based assumption would.
         private static string JuliaExpressionToString(object juliaExpression)
         {
+            juliaExpression = RangeToValue(juliaExpression);
             var arr = juliaExpression as System.Array;
             if (arr != null)
             {
@@ -279,6 +280,26 @@ namespace CallFromExcel.AddIn
                 throw new System.ArgumentException("Too many dimensions");
             }
             return System.Convert.ToString(juliaExpression);
+        }
+
+        // VBA code may pass a Range object, e.g. JuliaCall("sum", Range("A1:A10")). It arrives
+        // as a COM object; use its Value2, as JuliaExcel's VBA did. Other COM objects (a
+        // Scripting.Dictionary) have no Value2 property and are returned unchanged.
+        private static object RangeToValue(object value)
+        {
+            if (value == null || !value.GetType().IsCOMObject) return value;
+            try
+            {
+                return value.GetType().InvokeMember("Value2", System.Reflection.BindingFlags.GetProperty, null, value, null);
+            }
+            catch (System.Runtime.InteropServices.COMException)
+            {
+                return value;
+            }
+            catch (System.MissingMethodException)
+            {
+                return value;
+            }
         }
 
         // Converts a decoded result tree to what JuliaExcel's VBA returned, so migrated code

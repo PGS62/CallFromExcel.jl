@@ -425,14 +425,34 @@ end
 
     # start_server dispatches on the request path, with no default: "/eval", "/call" and "/callkw"
     # reach srv_eval_inner and srv_call_inner, and any other path gets a 404.
-    let post(path, body) = CallFromExcel.HTTP.post("http://127.0.0.1:$(CallFromExcel.xlport[])$path", [], body;
-            status_exception=false)
+    let url(path) = "http://127.0.0.1:$(CallFromExcel.xlport[])$path",
+        token = CallFromExcel.session_token[],
+        post(path, body; headers=["X-CallFromExcel-Token" => token]) =
+            CallFromExcel.HTTP.post(url(path), headers, body; status_exception=false)
+        # The port file holds the port, then the session token, for Excel to read.
+        @test readlines(CallFromExcel.portfile()) == [string(CallFromExcel.xlport[]), token]
+        @test length(token) == 32
         @test CallFromExcel.decode_from_xl(String(post("/eval", "1+1").body)) == 2
         @test CallFromExcel.decode_from_xl(String(post("/call", CallFromExcel.encode_for_xl(Any["+", 1, 2])).body)) == 3
         @test CallFromExcel.decode_from_xl(String(post("/callkw",
             CallFromExcel.encode_for_xl(Any["round", 1.25, ";", "digits", 1])).body)) == 1.2
         @test post("/", "1+1").status == 404
         @test post("/evil", "1+1").status == 404
+
+        # Requests without this session's token are refused with 409, which the add-in treats as
+        # "Julia not reachable" (e.g. another Excel, or another local user); a web page (Origin
+        # header), a DNS-rebound host name, or a non-POST is refused outright.
+        @test post("/eval", "1+1"; headers=[]).status == 409
+        @test post("/eval", "1+1"; headers=["X-CallFromExcel-Token" => reverse(token)]).status == 409
+        @test post("/ping", ""; headers=[]).status == 409
+        @test post("/eval", "1+1"; headers=["X-CallFromExcel-Token" => token, "Origin" => "https://example.com"]).status == 403
+        @test post("/eval", "1+1"; headers=["X-CallFromExcel-Token" => token, "Host" => "evil.example.com"]).status == 403
+        @test CallFromExcel.HTTP.get(url("/eval"); status_exception=false).status == 405
+
+        # /ping has no side effects.
+        post("/eval", "40+2")
+        @test post("/ping", "").status == 200
+        @test CallFromExcel.last_question == "40+2"
     end
 
     # _attach_to_excel refuses to start a second, useless listener when one is already serving the

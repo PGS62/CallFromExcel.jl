@@ -79,7 +79,8 @@ function _attach_to_excel(show_results::Bool, pid::Integer)
     setxlpid(Int64(pid))
     comms_folder(_default_commsfolder())
     if isfile(portfile())
-        existing_port = tryparse(Int, strip(read(portfile(), String)))
+        lines = readlines(portfile())   # port, then session token
+        existing_port = isempty(lines) ? nothing : tryparse(Int, strip(lines[1]))
         if existing_port !== nothing && existing_port > 0 && _port_is_listening(existing_port)
             throw("Excel (process id $pid) already has a Julia session listening on port \
                 $existing_port - stop that session first (e.g. call stop_server() there, or \
@@ -445,29 +446,28 @@ its own port open indefinitely.
 """
 function start_server(start::Int=2700)
     _server[] !== nothing && close(_server[])
+    # A secret for this session, written to the port file (in the user's own temp folder) for
+    # Excel to read and send with every request - see _reject_request.
+    session_token[] = bytes2hex(rand(RandomDevice(), UInt8, 16))
     port = start
     while true
         try
+            bound_port = port
             _server[] = HTTP.serve!("127.0.0.1", port) do req
+                rejection = _reject_request(req, bound_port)
+                rejection === nothing || return rejection
+                # /ping has no side effects: Excel uses it to check that the Julia on a port is
+                # alive and serving it, without disturbing last_question/last_answer.
+                req.target == "/ping" && return _text_response("CallFromExcel")
+
                 body = String(req.body)
-                # No default endpoint: VBA always names one, so anything else is a bug worth reporting
-                # (VBA's JuliaHttpPost turns a non-200 status into an error) rather than guessing.
+                # No default endpoint: the add-in always names one, so anything else is a bug worth
+                # reporting rather than guessing.
                 result = req.target == "/eval" ? srv_eval_inner(body) :
                          req.target == "/call" ? srv_call_inner(body) :
                          req.target == "/callkw" ? srv_call_inner(body; named_args=true) :
                          return HTTP.Response(404, "Unknown CallFromExcel endpoint $(req.target)")
-
-                # The explicit Content-Length is vital for performance, not just correctness. Without
-                # it, HTTP.jl falls back to chunked transfer-encoding (since it never inspects the
-                # already-fully-known response body to work out the length itself). The VBA client's
-                # MSXML2.ServerXMLHTTP appears to reassemble a chunked body by repeatedly growing and
-                # copying its buffer, which is quadratic in response size - so a large result made
-                # JuliaCall/JuliaEval far worse than linear in the size of that result. Setting
-                # Content-Length lets it read directly into a preallocated buffer instead, restoring
-                # linear performance.
-
-                HTTP.Response(200, ["Content-Type" => "text/plain; charset=utf-8",
-                    "Content-Length" => string(ncodeunits(result))], result)
+                _text_response(result)
             end
             break
         catch
@@ -477,12 +477,55 @@ function start_server(start::Int=2700)
     end
     mkpath(comms_folder())
     open(portfile(), "w") do f
-        write(f, string(port))
+        write(f, string(port, "\n", session_token[]))
     end
     xlport[] = port
     settitle()
     println("CallFromExcel HTTP server listening on port $port")
     nothing
+end
+
+# The explicit Content-Length matters for performance, not just correctness: without it, HTTP.jl
+# falls back to chunked transfer-encoding, which clients reassemble less efficiently.
+_text_response(s::String) = HTTP.Response(200, ["Content-Type" => "text/plain; charset=utf-8",
+    "Content-Length" => string(ncodeunits(s))], s)
+
+"""
+    _reject_request(req, port) -> Union{HTTP.Response,Nothing}
+Returns an error response for a request that must not be served, or `nothing` to serve it.
+
+- Only POST is accepted.
+- A request carrying an `Origin` header comes from a web page (browsers add one to every
+  cross-origin POST; Excel's add-in never sends one). Without this check, any web page open in a
+  browser could POST code to /eval, since a text/plain POST needs no CORS preflight.
+- The `Host` header must name this machine's loopback address, which defeats DNS rebinding.
+- The `X-CallFromExcel-Token` header must equal this session's token, which only the user's own
+  Excel can read (from the port file in the user's temp folder). This stops other local
+  processes, including other users' on a shared machine, and it means an Excel whose own Julia
+  has gone away never silently talks to another Excel's Julia that has since taken over the same
+  port: that Excel's port file holds a different token. Excel treats this 409 as "Julia not
+  reachable".
+"""
+function _reject_request(req, port::Integer)
+    req.method == "POST" || return HTTP.Response(405, "CallFromExcel accepts only POST requests")
+    HTTP.hasheader(req, "Origin") &&
+        return HTTP.Response(403, "CallFromExcel does not accept requests from web pages")
+    HTTP.header(req, "Host") in ("127.0.0.1", "127.0.0.1:$port", "localhost", "localhost:$port") ||
+        return HTTP.Response(403, "CallFromExcel accepts only requests addressed to 127.0.0.1")
+    _tokens_equal(HTTP.header(req, "X-CallFromExcel-Token"), session_token[]) ||
+        return HTTP.Response(409, "Request refused: not from the Excel session this Julia serves")
+    nothing
+end
+
+# Constant-time comparison, so response timing reveals nothing about the token.
+function _tokens_equal(a::AbstractString, b::AbstractString)
+    x, y = codeunits(a), codeunits(b)
+    (isempty(y) || length(x) != length(y)) && return false
+    diff = 0x00
+    for i in eachindex(x, y)
+        diff |= xor(x[i], y[i])
+    end
+    diff == 0x00
 end
 
 """

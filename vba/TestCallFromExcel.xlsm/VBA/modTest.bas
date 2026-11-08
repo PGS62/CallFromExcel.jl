@@ -152,6 +152,9 @@ Function RunTests(Optional SilentMode As Boolean = False, Optional CommandLineOp
           AccResult "WsTest_RangeWithBlanksAndErrors", WsTest_RangeWithBlanksAndErrors, NumPassed, NumFailed
           AccResult "WsTest_JuliaSetVar", WsTest_JuliaSetVar, NumPassed, NumFailed
           AccResult "WsTest_JuliaEvalRangeWithBlankLine", WsTest_JuliaEvalRangeWithBlankLine, NumPassed, NumFailed
+          AccResult "TestRangeArgumentsVBA", TestRangeArgumentsVBA, NumPassed, NumFailed
+          AccResult "WsTest_JuliaLaunchBlankArgs", WsTest_JuliaLaunchBlankArgs, NumPassed, NumFailed
+          AccResult "WsTest_JuliaEvalBlankOrErrorCell", WsTest_JuliaEvalBlankOrErrorCell, NumPassed, NumFailed
 
 68        Prompt = NumPassed & " test(s) passed" & vbLf & _
               NumFailed & " test(s) failed"
@@ -1535,6 +1538,62 @@ Function WsTest_JuliaEvalRangeWithBlankLine() As Boolean
 ErrHandler:
 8         PrintTwice ReThrow("WsTest_JuliaEvalRangeWithBlankLine", Err, True)
 9         WsTest_JuliaEvalRangeWithBlankLine = False
+End Function
+
+' Regression test: a Range object passed from VBA to the COM methods arrived as a COM object
+' the encoder tried to read as a dictionary, so JuliaCall("sum", Range(...)) failed. JuliaExcel
+' (and the README) use the Range's Value2.
+Function TestRangeArgumentsVBA() As Boolean
+          Dim ws As Worksheet
+1         On Error GoTo ErrHandler
+2         Set ws = ScratchSheet()
+3         ws.Range("A1:A3").Value2 = Application.WorksheetFunction.Transpose(Array(1, 2, 3))
+4         ws.Range("B1").Value2 = "vba_range_test = 41"
+5         ws.Range("B3").Value2 = "vba_range_test + 1"
+6         ThrowIfError CallFromExcel.JuliaSetVar("vba_range_var", ws.Range("A1:A3"))
+7         TestRangeArgumentsVBA = CallFromExcel.JuliaCall("sum", ws.Range("A1:A3")) = 6 And _
+              CallFromExcel.JuliaCallVBA("sum", ws.Range("A1:A3")) = 6 And _
+              CallFromExcel.JuliaEval("sum(vba_range_var)") = 6 And _
+              CallFromExcel.JuliaEvalVBA(ws.Range("B1:B3")) = 42
+8         Exit Function
+ErrHandler:
+9         PrintTwice ReThrow("TestRangeArgumentsVBA", Err, True)
+10        TestRangeArgumentsVBA = False
+End Function
+
+' Regression test: JuliaLaunch's arguments given as references to blank cells used to fail
+' (Convert.ToBoolean of a blank) or pass the text "ExcelDna.Integration.ExcelEmpty" on as an
+' option. A blank cell now means the same as an omitted argument. Julia is already running
+' here, so this checks the argument handling, which happens before that check.
+Function WsTest_JuliaLaunchBlankArgs() As Boolean
+          Dim ws As Worksheet
+1         On Error GoTo ErrHandler
+2         Set ws = ScratchSheet()
+3         ws.Range("A1").Formula2 = "=JuliaLaunch(Z1,Z2,Z3,Z4,Z5,Z6)"
+4         ws.Range("A2").Formula2 = "=JuliaLaunch(NA())"
+5         WsTest_JuliaLaunchBlankArgs = Left$(ws.Range("A1").Text, 1) <> "#" And _
+              IsErrorCode(ws.Range("A2").Value2, xlErrNA)
+6         Exit Function
+ErrHandler:
+7         PrintTwice ReThrow("WsTest_JuliaLaunchBlankArgs", Err, True)
+8         WsTest_JuliaLaunchBlankArgs = False
+End Function
+
+' Regression test: =JuliaEval(A1) with A1 blank evaluated the text
+' "ExcelDna.Integration.ExcelEmpty". A blank is now an empty expression (giving nothing,
+' shown as 0), and an error value is returned as itself.
+Function WsTest_JuliaEvalBlankOrErrorCell() As Boolean
+          Dim ws As Worksheet
+1         On Error GoTo ErrHandler
+2         Set ws = ScratchSheet()
+3         ws.Range("A1").Formula2 = "=JuliaEval(Z1)"
+4         ws.Range("A2").Formula2 = "=JuliaEval(NA())"
+5         WsTest_JuliaEvalBlankOrErrorCell = ws.Range("A1").Value2 = 0 And _
+              IsErrorCode(ws.Range("A2").Value2, xlErrNA)
+6         Exit Function
+ErrHandler:
+7         PrintTwice ReThrow("WsTest_JuliaEvalBlankOrErrorCell", Err, True)
+8         WsTest_JuliaEvalBlankOrErrorCell = False
 End Function
 
 Private Function IsErrorCode(Value As Variant, ErrorNumber As Long) As Boolean

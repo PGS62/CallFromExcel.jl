@@ -30,6 +30,16 @@ if (-not (Test-Path $XlPath)) {
 }
 $xlPath = (Resolve-Path $XlPath).Path
 
+# The tests' CallFromExcel.* calls go through the COM server, which Windows loads from the
+# installed copy of the DLL (registered by Install.ps1), not from dist. So a rebuilt dist that
+# hasn't been installed would leave most of the suite testing the old code.
+$distDll = Join-Path $PSScriptRoot "..\dist\CallFromExcel.AddIn.dll"
+$installedDll = Join-Path $env:APPDATA "Microsoft\AddIns\CallFromExcel\CallFromExcel.AddIn.dll"
+if (-not (Test-Path $installedDll) -or
+    (Get-FileHash $installedDll).Hash -ne (Get-FileHash $distDll).Hash) {
+    throw "The installed CallFromExcel.AddIn.dll differs from dotnet-addin\dist. Close Excel and run dotnet-addin\installer\Install.ps1, then re-run the tests."
+}
+
 $excel = New-Object -ComObject Excel.Application
 $excel.Visible = $false
 $excel.DisplayAlerts = $false

@@ -139,18 +139,63 @@ end
 encode_for_xl(x::ExcelError) = "!" * string(x.code)
 
 function encode_array_general(x::AbstractArray)
-    sx = size(x)
-    dimssection = string(xl_length(sx)) * "," * join(sx, ",")
     lengths_buf = IOBuffer()
     contents_buf = IOBuffer()
-
-    for i in eachindex(x)
-        this = encode_for_xl(x[i])
-        write(contents_buf, this)
-        write(lengths_buf, string(xl_length(this)), ",")
+    for v in x   # column-major, matching the wire format
+        write_length!(lengths_buf, write_encoded!(contents_buf, v))
     end
+    assemble_general(size(x), lengths_buf, contents_buf)
+end
 
-    "*" * dimssection * ";" * String(take!(lengths_buf)) * ";" * String(take!(contents_buf))
+assemble_general(dims, lengths_buf, contents_buf) =
+    string("*", length(dims), ",", join(dims, ","), ";", String(take!(lengths_buf)), ";", String(take!(contents_buf)))
+
+"""
+    write_encoded!(io, x)::Int
+
+Writes `encode_for_xl(x)` to `io` and returns its `xl_length`. The same bytes as encode_for_xl, but
+the commonest element types are written directly, without building a String per element - which
+made the general format ~20x slower than "V" for a 5,000 x 1,024 DataFrame.
+"""
+write_encoded!(io::IO, x) = (s = encode_for_xl(x); write(io, s); xl_length(s))
+write_encoded!(io::IO, x::Bool) = (write(io, x ? UInt8('T') : UInt8('F')); 1)
+write_encoded!(io::IO, ::Union{Missing,Nothing}) = (write(io, UInt8('E')); 1)
+write_encoded!(io::IO, x::String) = (write(io, "£"); write(io, x); 1 + xl_length(x))
+function write_encoded!(io::IO, x::Int64)
+    s = string(x)
+    write(io, UInt8('^'))
+    write(io, s)
+    1 + ncodeunits(s)
+end
+function write_encoded!(io::IO, x::Float64)
+    isfinite(x) || return invoke(write_encoded!, Tuple{IO,Any}, io, x)
+    write(io, UInt8('#'))
+    write_hex16!(io, reinterpret(UInt64, x))
+    17
+end
+
+const UPPER_HEX = b"0123456789ABCDEF"
+
+# Writes u as 16 upper-case hex characters, most significant first (as float64_to_hex does), as
+# two 8-byte writes.
+function write_hex16!(io::IO, u::UInt64)
+    for half in (u >> 32, u & 0xffffffff)
+        w = zero(UInt64)
+        for k in 0:7   # byte k of w (little-endian memory order) is the k-th hex character
+            nibble = (half >> (28 - 4k)) & 0xf
+            w |= UInt64(UPPER_HEX[nibble+1]) << (8k)
+        end
+        write(io, htol(w))
+    end
+    nothing
+end
+
+const LENGTH_ENTRIES = [Vector{UInt8}(string(n, ",")) for n in 0:255]
+
+# Writes "<n>," to the lengths section.
+function write_length!(io::IO, n::Int)
+    0 <= n <= 255 ? write(io, LENGTH_ENTRIES[n+1]) : write(io, string(n), ",")
+    nothing
 end
 
 """
@@ -295,14 +340,25 @@ function encode_for_xl(x::AbstractRange{<:Integer})
     "RI," * string(n) * "," * string(f) * "," * string(s) * ";"
 end
 
+# A header row of column names above the data, encoded in the general format column by column
+# straight from the DataFrame: the same output as encoding vcat(permutedims(names(x)), Matrix(x)),
+# without boxing every value into a Matrix{Any}, and with each column's loop specialised to its
+# element type.
 function encode_for_xl(x::DataFrame)
-    nc = size(x)[2]
-    data = Matrix{Any}(x)
-    headers = Matrix{Any}(undef, 1, nc)
-    for i in 1:nc
-        headers[1, i] = names(x)[i]
+    nr, nc = size(x)
+    lengths_buf = IOBuffer()
+    contents_buf = IOBuffer()
+    for (name, col) in zip(names(x), eachcol(x))
+        write_length!(lengths_buf, write_encoded!(contents_buf, name))
+        encode_column!(lengths_buf, contents_buf, col)
     end
-    encode_for_xl(vcat(headers, data))
+    assemble_general((nr + 1, nc), lengths_buf, contents_buf)
+end
+
+function encode_column!(lengths_buf, contents_buf, col::AbstractVector)
+    for v in col
+        write_length!(lengths_buf, write_encoded!(contents_buf, v))
+    end
 end
 
 function encode_for_xl(x::T) where {T<:AbstractDict}

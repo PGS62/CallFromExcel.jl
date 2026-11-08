@@ -319,26 +319,60 @@ namespace CallFromExcel.AddIn
                 lowerBounds[d] = 1;
             }
             System.Array rebased = System.Array.CreateInstance(arr.GetType().GetElementType(), lengths, lowerBounds);
+            // Copies in the same linear order for both, so element (i, j) lands at (i+1, j+1).
+            System.Array.Copy(arr, rebased, arr.Length);
+            if (arr.GetType().GetElementType() != typeof(object)) return rebased;
 
-            bool recurseIntoElements = arr.GetType().GetElementType() == typeof(object);
-            var srcIdx = new int[rank];
-            var dstIdx = new int[rank];
-            int total = arr.Length;
-            for (int count = 0; count < total; count++)
+            // Nested arrays and dictionaries need the same conversion. Direct indexing for the
+            // shapes the decoder produces; GetValue/SetValue (much slower) otherwise.
+            var vector = arr as object[];
+            var matrix = arr as object[,];
+            if (vector != null)
             {
-                object element = arr.GetValue(srcIdx);
-                object mappedElement = recurseIntoElements ? ForVba(element) : element;
-                for (int d = 0; d < rank; d++) dstIdx[d] = srcIdx[d] + 1;
-                rebased.SetValue(mappedElement, dstIdx);
-
-                for (int d = 0; d < rank; d++)
+                for (int i = 0; i < vector.Length; i++)
                 {
-                    srcIdx[d]++;
-                    if (srcIdx[d] < arr.GetLength(d)) break;
-                    srcIdx[d] = 0;
+                    if (NeedsForVba(vector[i])) rebased.SetValue(ForVba(vector[i]), i + 1);
+                }
+            }
+            else if (matrix != null)
+            {
+                var rebasedMatrix = (object[,])rebased;
+                int nr = matrix.GetLength(0);
+                int nc = matrix.GetLength(1);
+                for (int i = 0; i < nr; i++)
+                {
+                    for (int j = 0; j < nc; j++)
+                    {
+                        if (NeedsForVba(matrix[i, j])) rebasedMatrix[i + 1, j + 1] = ForVba(matrix[i, j]);
+                    }
+                }
+            }
+            else
+            {
+                var srcIdx = new int[rank];
+                var dstIdx = new int[rank];
+                for (int count = 0; count < arr.Length; count++)
+                {
+                    object element = arr.GetValue(srcIdx);
+                    if (NeedsForVba(element))
+                    {
+                        for (int d = 0; d < rank; d++) dstIdx[d] = srcIdx[d] + 1;
+                        rebased.SetValue(ForVba(element), dstIdx);
+                    }
+                    for (int d = 0; d < rank; d++)
+                    {
+                        srcIdx[d]++;
+                        if (srcIdx[d] < arr.GetLength(d)) break;
+                        srcIdx[d] = 0;
+                    }
                 }
             }
             return rebased;
+        }
+
+        private static bool NeedsForVba(object element)
+        {
+            return element is System.Array || element is JuliaDictionary;
         }
     }
 }

@@ -75,6 +75,26 @@ namespace CallFromExcel.AddIn
             }
         }
 
+        // Decodes the array element at wire[pos, pos + len). The commonest kinds are read where
+        // they are, rather than first copied out with Substring; everything else goes to Decode.
+        private static object DecodeElement(string wire, int pos, int len, bool allowNesting, int stringLengthLimit, bool vectorToColumn, bool forWorksheet, int depth)
+        {
+            switch (wire[pos])
+            {
+                case '#': if (len == 17) return Hex.HexToDouble(wire, pos + 1); break;
+                case 'T': if (len == 1) return true; break;
+                case 'F': if (len == 1) return false; break;
+                case 'E': if (len == 1) return null; break;
+                case '^': if (len > 1) return ParseLongFast(wire, pos + 1, pos + len); break;
+                case '!': if (len > 1) return new ExcelErrorValue((int)ParseLongFast(wire, pos + 1, pos + len)); break;
+                case (char)163:
+                    // A string over the limit goes to Decode, which reports it.
+                    if (stringLengthLimit > 0 && len > stringLengthLimit) break;
+                    return wire.Substring(pos + 1, len - 1);
+            }
+            return Decode(wire.Substring(pos, len), allowNesting, stringLengthLimit, vectorToColumn, forWorksheet, depth);
+        }
+
         private static object DecodeArray(string wire, bool allowNesting, int stringLengthLimit, bool vectorToColumn, bool forWorksheet, int depth)
         {
             if (depth > 1 && !allowNesting) throw new InvalidOperationException("Excel cannot display arrays containing arrays");
@@ -100,7 +120,7 @@ namespace CallFromExcel.AddIn
                 {
                     int comma = wire.IndexOf(',', m);
                     int len = ParseIntFast(wire, m, comma);
-                    flat[i] = Decode(wire.Substring(pos, len), allowNesting, stringLengthLimit, vectorToColumn, forWorksheet, depth);
+                    flat[i] = DecodeElement(wire, pos, len, allowNesting, stringLengthLimit, vectorToColumn, forWorksheet, depth);
                     pos += len;
                     m = comma + 1;
                 }
@@ -127,7 +147,7 @@ namespace CallFromExcel.AddIn
                     {
                         int comma = wire.IndexOf(',', m);
                         int len = ParseIntFast(wire, m, comma);
-                        result[i, j] = Decode(wire.Substring(pos, len), allowNesting, stringLengthLimit, vectorToColumn, forWorksheet, depth);
+                        result[i, j] = DecodeElement(wire, pos, len, allowNesting, stringLengthLimit, vectorToColumn, forWorksheet, depth);
                         pos += len;
                         m = comma + 1;
                     }
@@ -153,7 +173,7 @@ namespace CallFromExcel.AddIn
             {
                 int comma = wire.IndexOf(',', mPos);
                 int len = ParseIntFast(wire, mPos, comma);
-                object val = Decode(wire.Substring(payloadPos, len), allowNesting, stringLengthLimit, vectorToColumn, forWorksheet, depth);
+                object val = DecodeElement(wire, payloadPos, len, allowNesting, stringLengthLimit, vectorToColumn, forWorksheet, depth);
                 nd.SetValue(val, idx);
                 payloadPos += len;
                 mPos = comma + 1;
@@ -485,6 +505,16 @@ namespace CallFromExcel.AddIn
                 if (idx[d] < dims[d]) return;
                 idx[d] = 0;
             }
+        }
+
+        // Parses an optionally negative integer between [start, end) without allocating a
+        // substring. Accumulates negatively so that long.MinValue doesn't overflow.
+        private static long ParseLongFast(string s, int start, int end)
+        {
+            bool negative = s[start] == '-';
+            long v = 0;
+            for (int i = negative ? start + 1 : start; i < end; i++) v = v * 10 - (s[i] - '0');
+            return negative ? v : -v;
         }
 
         // Parses digits between [start, end) without allocating a substring.

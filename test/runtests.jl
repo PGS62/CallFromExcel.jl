@@ -232,6 +232,26 @@ end
     @test startswith(CallFromExcel.encode_for_xl(Int64[]), "*")      # empty arrays use the general format
     @test startswith(CallFromExcel.encode_for_xl(Int32[1, 2]), "*")  # only Int64 gets "L"
 
+    # write_encoded! (used by the general array format) must write exactly encode_for_xl's output,
+    # and return its xl_length, for every kind of element.
+    for x in Any[0.0, -0.0, 1.5, -2.5e-300, 5e-324, floatmax(), NaN, Inf, -Inf, true, false, missing,
+                 nothing, 0, -1, typemax(Int64), typemin(Int64), Int32(7), UInt8(9), "", "abc", "£€",
+                 "😀x", Date(2021, 3, 11), DateTime(2021, 3, 11, 12), CallFromExcel.ExcelError(2042),
+                 1.5f0, 2 + 3im, :sym, [1, 2], Any[1.0, "a"]]
+        io = IOBuffer()
+        n = CallFromExcel.write_encoded!(io, x)
+        expected = CallFromExcel.encode_for_xl(x)
+        @test String(take!(io)) == expected
+        @test n == CallFromExcel.xl_length(expected)
+    end
+
+    # A DataFrame encodes column by column, but must match its header-plus-data matrix.
+    let df = CallFromExcel.DataFrame(a = [1, 2], b = ["x", "£y"], c = [1.5, NaN], d = [true, missing])
+        m = vcat(permutedims(Any[names(df)...]), Matrix{Any}(df))
+        @test CallFromExcel.encode_for_xl(df) == CallFromExcel.encode_array_general(m)
+    end
+    @test CallFromExcel.encode_for_xl(CallFromExcel.DataFrame()) == "*2,1,0;;"
+
     # "R" format - compact encoding for Ranges (UnitRange/StepRange/StepRangeLen/LinRange etc.):
     # encodes only first/step/length, not every element, so wire size is O(1) regardless of the
     # range's length - see encode_for_xl(::AbstractRange{Float64})/(::AbstractRange{<:Integer}) in

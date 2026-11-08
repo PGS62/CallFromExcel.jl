@@ -14,9 +14,13 @@ namespace CallFromExcel.AddIn
 
             // First search PATH.
             string pathEnv = Environment.GetEnvironmentVariable("PATH") ?? "";
-            foreach (string folder in pathEnv.Split(';'))
+            foreach (string entry in pathEnv.Split(';'))
             {
-                if (folder.Length == 0) continue;
+                // Windows accepts a PATH entry in double quotes, e.g. "C:\Program Files\Foo\bin",
+                // but Path.Combine throws on the quote character. Strip them, and skip any entry
+                // that still isn't a valid path rather than letting it abort the search.
+                string folder = entry.Trim().Trim('"');
+                if (folder.Length == 0 || folder.IndexOfAny(Path.GetInvalidPathChars()) >= 0) continue;
                 string exeFile = Path.Combine(folder, "julia.exe");
                 if (File.Exists(exeFile)) return exeFile;
             }

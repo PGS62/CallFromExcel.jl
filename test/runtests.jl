@@ -494,6 +494,22 @@ end
 
 end
 
+# The add-in finds julia.exe by searching PATH. Windows accepts PATH entries in double quotes, but
+# .NET Framework's Path.Combine throws on them, which used to make every JuliaLaunch fail with
+# "Illegal characters in path." whenever such an entry came before Julia's folder. Calls the
+# built add-in's search directly (Windows PowerShell runs the same .NET Framework as Excel-DNA),
+# with PATH set to a quoted missing folder, an invalid entry, then Julia's own folder, quoted.
+if Sys.iswindows()
+    @testset "The add-in finds julia.exe despite quoted or invalid PATH entries" begin
+        dll = joinpath(@__DIR__, "..", "dotnet-addin", "dist", "CallFromExcel.AddIn.dll")
+        path = "\"C:\\No Such Folder\";C:\\bad<chars>;\"$(Sys.BINDIR)\""
+        script = "\$env:PATH = '$path'; [void][Reflection.Assembly]::LoadFrom('$dll'); " *
+                 "[CallFromExcel.AddIn.JuliaExeLocation]::Find(\$false)"
+        found = readchomp(`powershell -NoProfile -NonInteractive -Command $script`)
+        @test lowercase(found) == lowercase(joinpath(Sys.BINDIR, "julia.exe"))
+    end
+end
+
 # The VBA-side test suite (modTest.RunTests, in workbooks\TestCallFromExcel.xlsm) exercises
 # both call paths against a real Excel/Julia session (via COM automation): CallFromExcel.JuliaCall/
 # JuliaEval called from VBA code (the ComServer COM class), and =JuliaCall(...)/=JuliaEval(...)

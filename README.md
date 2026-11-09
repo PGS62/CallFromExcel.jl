@@ -6,7 +6,7 @@ CallFromExcel is an Excel add-in that lets you use any Julia function in a works
 
 CallFromExcel is compatible with Excel's [dynamic array formulas](https://support.microsoft.com/en-us/office/dynamic-array-formulas-and-spilled-array-behavior-205c6b06-03ba-4151-89a1-87a7eb36e531), it supports 64-bit Excel for Windows (not Mac, not 32-bit Excel). It works with Julia running under either Windows or Linux (via [WSL](https://docs.microsoft.com/en-us/windows/wsl/about)).
 
-CallFromExcel is the successor to [JuliaExcel](https://github.com/PGS62/JuliaExcel.jl), rewritten in C# for speed. See [Upgrading from JuliaExcel](#upgrading-from-juliaexcel).
+CallFromExcel is the successor to [JuliaExcel](https://github.com/PGS62/JuliaExcel.jl), with its Excel add-in rewritten from VBA to C# for speed. See [Upgrading from JuliaExcel](#upgrading-from-juliaexcel).
 
 ## Contents
 [Demo](#demo)  

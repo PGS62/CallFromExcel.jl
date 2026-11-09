@@ -538,6 +538,23 @@ if Sys.iswindows()
         rm(ps1)
         @test results == last.(cases)
     end
+
+    # serve_xl must write its port file to the same folder the add-in reads it from. The add-in
+    # uses .NET's Path.GetTempPath(), which reads TMP before TEMP; serve_xl used ENV["TEMP"], so
+    # where the two differ, Excel never found the session. Sets them to different folders and
+    # compares serve_xl's folder with the built add-in's (as folders: .NET expands 8.3 short names
+    # such as PHILIP~1 in the path and Julia doesn't, so the strings can differ).
+    @testset "serve_xl uses the add-in's comms folder when TMP and TEMP differ" begin
+        dll = joinpath(@__DIR__, "..", "dotnet-addin", "dist", "CallFromExcel.AddIn.dll")
+        tmp, temp = mktempdir(), mktempdir()
+        withenv("TMP" => tmp, "TEMP" => temp) do
+            script = "[void][Reflection.Assembly]::LoadFrom('$dll'); [CallFromExcel.AddIn.FileUtils]::LocalTemp()"
+            addin_folder = readchomp(`powershell -NoProfile -NonInteractive -Command $script`)
+            @test samefile(CallFromExcel._default_commsfolder(), addin_folder)
+            @test samefile(dirname(addin_folder), tmp)
+        end
+        rm(tmp; recursive=true); rm(temp; recursive=true)
+    end
 end
 
 # The VBA-side test suite (modTest.RunTests, in workbooks\TestCallFromExcel.xlsm) exercises

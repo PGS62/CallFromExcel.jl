@@ -157,20 +157,25 @@ comms_folder(folder::String) = (commsfolder[] = folder)
 
 """
     _default_commsfolder()::String
-Guesses the comms folder CallFromExcel should use when none has been set explicitly - on Windows,
-matches the folder VBA's LocalTemp() computes for a native (non-WSL) session. Used by `serve_xl`,
-as a convenience when developing this package.
+The comms folder the add-in uses (FileUtils.LocalTemp in the C# code): "@CallFromExcel" in the
+folder .NET's `Path.GetTempPath()` returns. Used by `serve_xl`, which, unlike `JuliaLaunch`, isn't
+told the folder by Excel.
+
+On Windows, Julia's `tempdir()` calls the same Win32 function as `Path.GetTempPath()`
+(GetTempPathW, which reads TMP before TEMP), so the two always agree. Under WSL, asks Windows
+PowerShell for `Path.GetTempPath()` and converts the result with `wslpath`.
 """
 function _default_commsfolder()
     if Sys.iswindows()
-        joinpath(ENV["TEMP"], "@CallFromExcel")
+        joinpath(tempdir(), "@CallFromExcel")
     elseif Sys.islinux()
-        trythese = ["phili", "philip", "PhilipSwannell"]
-        for trythis = trythese
-            f = joinpath("/mnt/c/Users", trythis, "AppData/Local/Temp/@CallFromExcel")
-            isdir(f) && return f
+        wintemp = try
+            readchomp(`powershell.exe -NoProfile -NonInteractive -Command "[IO.Path]::GetTempPath()"`)
+        catch
+            throw("Cannot find Windows' temp folder: running powershell.exe failed. serve_xl \
+                needs Julia running on Windows, or under WSL with Windows executables on the PATH.")
         end
-        throw("Cannot find commsfolder")
+        joinpath(readchomp(`wslpath -u $(strip(wintemp))`), "@CallFromExcel")
     else
         throw("operating system not supported")
     end

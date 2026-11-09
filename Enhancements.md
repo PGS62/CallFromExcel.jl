@@ -74,3 +74,25 @@ Ideas considered but not yet scheduled, each with a sketch of how it might be im
 
 - **README section** "Corporate and locked-down machines": worksheet functions work in an elevated Excel but VBA's `CreateObject` doesn't (don't run Excel elevated, or install as that account); and, for when the installer fails under CLM, what it does - copy the add-in files to `%APPDATA%\Microsoft\AddIns\CallFromExcel` and set the listed registry values - so IT can apply it by hand.
 - **Make Install.ps1 CLM-safe:** use only cmdlets - read Office's version and Excel's bitness from the registry rather than via COM and the executable's header. A moderate rewrite of the installer; testing needs CLM enabled on a machine (e.g. `__PSLockdownPolicy` or a WDAC policy in a VM).
+
+## Complex numbers with a comma decimal separator
+
+**Problem.** Complex results are returned as text in the format of Excel's `COMPLEX` function (`encode_for_xl(::Complex)` in `src/encode.jl`), always with a point: `"1.5+2i"`. Excel's IM functions read such text using Excel's own decimal separator, so where that is a comma (most of continental Europe) any complex result with a fractional part is #NUM! to them. Verified on 2026-11-09 by switching a hidden Excel's separator to a comma:
+
+| Formula | Point separator | Comma separator |
+|---|---|---|
+| `=COMPLEX(1.5,2)` | `1.5+2i` | `1,5+2i` |
+| `=IMREAL("1.5+2i")` (Julia's text) | 1.5 | #NUM! |
+| `=IMREAL("3+4i")` | 3 | 3 |
+
+Workaround meanwhile: `=IMREAL(SUBSTITUTE(JuliaEval(...),".",","))`.
+
+**Why not in Julia.** Only Excel knows the separator in effect: File > Options > Advanced > "Use system separators" can override Windows' setting, it can change during a session, and Julia under WSL or attached with `serve_xl` can't easily find out.
+
+**Sketch.** About 5 lines changed in Julia and 25 in C#.
+
+- Julia sends complex numbers as numbers: a new wire tag, e.g. `X` followed by the real and imaginary parts as 16-character hex each. Infinite or NaN parts still give `!2036` (#NUM!).
+- The add-in's decoder formats them as text in `COMPLEX`'s format - 15 significant digits, `i` rather than `1i`, no imaginary part when it's zero - using `Application.DecimalSeparator` when `Application.UseSystemSeparators` is False, and Windows' own separator (`CultureInfo.CurrentCulture`) otherwise. The same for worksheet and VBA results.
+- Ordinary strings are never touched, so a Julia string `"1.5+2i"` still comes back unchanged.
+
+**Test.** A VBA test sets `Application.UseSystemSeparators = False` and `Application.DecimalSeparator = ","`, checks that `=JuliaEval("1.5+2im")` gives `"1,5+2i"` and that `IMREAL` of it gives 1.5, and restores both settings even if it fails (they're application settings and may persist). Existing tests cover the point-separator case.

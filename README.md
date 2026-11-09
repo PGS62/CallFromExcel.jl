@@ -70,7 +70,7 @@ CallFromExcel replaces [JuliaExcel](https://github.com/PGS62/JuliaExcel.jl). Its
 
 **Installation.** Installing CallFromExcel (see [Installation](#installation)) also uninstalls JuliaExcel's Excel add-in, `JuliaExcel.xlam`. The JuliaExcel Julia package is no longer used, and can be removed with `using Pkg; Pkg.rm("JuliaExcel")`.
 
-**Worksheet formulas.** In a workbook saved with JuliaExcel, Excel records the location of `JuliaExcel.xlam` in each formula that uses its functions, so after upgrading a formula such as `=JuliaLaunch()` appears as `='C:\Users\Public\JuliaExcel\JuliaExcel.xlam'!JuliaLaunch()`. Remove that path with Find and Replace (Ctrl+H): set "Within" to Workbook and "Look in" to Formulas, and replace the exact text - here `'C:\Users\Public\JuliaExcel\JuliaExcel.xlam'!`, JuliaExcel's default install location - with nothing.
+**Worksheet formulas.** In a workbook saved with JuliaExcel, Excel records the location of `JuliaExcel.xlam` in each formula that uses its functions, so after upgrading a formula such as `=JuliaLaunch()` appears as `='C:\Users\Public\JuliaExcel\JuliaExcel.xlam'!JuliaLaunch()`. Remove that path with Find and Replace (Ctrl+H): set "Within" to Workbook and "Look in" to Formulas, and replace the text `'C:\Users\Public\JuliaExcel\JuliaExcel.xlam'!` with nothing.
 
 **VBA.**
  * Remove the reference to JuliaExcel (VBA editor, Tools menu -> References).

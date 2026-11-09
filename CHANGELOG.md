@@ -22,7 +22,7 @@ First release of CallFromExcel. If you're upgrading from JuliaExcel, see [Upgrad
 
 | Test | JuliaExcel 2.4.1 | CallFromExcel 0.1.0 | Speed-up |
 |------|------------------|---------------------|----------|
-| Latency: `JuliaEval("1+1")` | 0.65 ms | 0.75 ms | - |
+| Latency: `JuliaEval("1+1")` | 0.65 ms | 0.21 ms | 3.1x |
 | Two-way: `JuliaCall("identity", column of 100,000 Doubles)` | 0.11 s | 0.043 s | 2.5x |
 | One-way (Excel to Julia): `JuliaCall("sum", column of 100,000 Doubles)` | 0.053 s | 0.019 s | 2.8x |
 | One-way (Julia to Excel): `JuliaEval("collect((1:100000).*pi)")` | 0.057 s | 0.020 s | 2.9x |

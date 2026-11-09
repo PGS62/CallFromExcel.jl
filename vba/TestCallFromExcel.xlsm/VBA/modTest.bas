@@ -160,6 +160,7 @@ Function RunTests(Optional SilentMode As Boolean = False, Optional CommandLineOp
           AccResult "WsTest_JuliaLaunchBlankArgs", WsTest_JuliaLaunchBlankArgs, NumPassed, NumFailed
           AccResult "WsTest_JuliaEvalBlankOrErrorCell", WsTest_JuliaEvalBlankOrErrorCell, NumPassed, NumFailed
           AccResult "WsTest_FloatRangeVsCollect", WsTest_FloatRangeVsCollect, NumPassed, NumFailed
+          AccResult "TestBigIntegerRangeVsCollect", TestBigIntegerRangeVsCollect, NumPassed, NumFailed
 
 68        Prompt = NumPassed & " test(s) passed" & vbLf & _
               NumFailed & " test(s) failed"
@@ -1622,6 +1623,29 @@ Function WsTest_FloatRangeVsCollect() As Boolean
 ErrHandler:
 7         PrintTwice ReThrow("WsTest_FloatRangeVsCollect", Err, True)
 8         WsTest_FloatRangeVsCollect = False
+End Function
+
+' Regression test: integer ranges beyond 2^53 were rebuilt in Double arithmetic, so
+' JuliaEvalVBA("2^60:2^60+5") gave six copies of 2^60 rather than the exact LongLongs that
+' collect(...) gives. On a worksheet every number is a Double, but the range must still give the
+' same (nearest) Doubles as collect.
+Function TestBigIntegerRangeVsCollect() As Boolean
+          Dim y1 As Variant
+          Dim y2 As Variant
+          Dim ws As Worksheet
+1         On Error GoTo ErrHandler
+2         y1 = ThrowIfError(CallFromExcel.JuliaEvalVBA("2^60+1:2^60+300"))
+3         y2 = ThrowIfError(CallFromExcel.JuliaEvalVBA("collect(2^60+1:2^60+300)"))
+4         TestBigIntegerRangeVsCollect = ArraysIdentical(y1, y2) And (y1(UBound(y1)) - y1(LBound(y1)) = 299)
+5         Set ws = ScratchSheet()
+6         ws.Range("A1").Formula2 = "=JuliaEval(""2^60+1:2^60+300"")"
+7         ws.Range("B1").Formula2 = "=JuliaEval(""collect(2^60+1:2^60+300)"")"
+8         TestBigIntegerRangeVsCollect = TestBigIntegerRangeVsCollect And _
+              ArraysIdentical(ws.Range("A1:A300").Value2, ws.Range("B1:B300").Value2)
+9         Exit Function
+ErrHandler:
+10        PrintTwice ReThrow("TestBigIntegerRangeVsCollect", Err, True)
+11        TestBigIntegerRangeVsCollect = False
 End Function
 
 Private Function IsErrorCode(Value As Variant, ErrorNumber As Long) As Boolean

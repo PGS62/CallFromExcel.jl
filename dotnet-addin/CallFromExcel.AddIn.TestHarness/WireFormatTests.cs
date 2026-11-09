@@ -196,6 +196,10 @@ namespace CallFromExcel.AddIn.TestHarness
             var riArr = (object[])riDecoded;
             CheckTrue("RI range decode", riArr.Length == 5 && Equals(riArr[0], 10L) && Equals(riArr[4], 18L));
 
+            // Beyond 2^53 a Double can't hold every integer: elements must be computed in Int64.
+            var bigArr = (object[])WireFormatDecode.Decode("RI,3,1152921504606846977,1;"); // 2^60+1 .. 2^60+3
+            CheckTrue("RI range decode beyond 2^53 is exact", Equals(bigArr[0], 1152921504606846977L) && Equals(bigArr[2], 1152921504606846979L));
+
             var riSheet = WireFormatDecode.Decode("RI,5,10,2;", allowNesting: false, vectorToColumn: true, forWorksheet: true) as double[,];
             CheckTrue("RI range decode for a worksheet is a double column", riSheet != null && riSheet.GetLength(0) == 5 && riSheet[0, 0] == 10 && riSheet[4, 0] == 18);
         }

@@ -353,9 +353,11 @@ namespace CallFromExcel.AddIn
             int p1 = wire.IndexOf(';');
             string[] parts = wire.Substring(3, p1 - 3).Split(',');
             int n = int.Parse(parts[0], CultureInfo.InvariantCulture);
-            double first = long.Parse(parts[1], CultureInfo.InvariantCulture);
-            double step = long.Parse(parts[2], CultureInfo.InvariantCulture);
-            const bool isInteger = true;
+            // Elements are computed in Int64, so they're exact (and match the same values
+            // collected into a vector) beyond 2^53, where Double can't hold every integer.
+            // Julia only sends "RI" when last == first + (n-1)*step in Int64, so this can't overflow.
+            long first = long.Parse(parts[1], CultureInfo.InvariantCulture);
+            long step = long.Parse(parts[2], CultureInfo.InvariantCulture);
 
             if (forWorksheet)
             {
@@ -373,11 +375,7 @@ namespace CallFromExcel.AddIn
             }
 
             var flat = new object[n];
-            for (int i = 0; i < n; i++)
-            {
-                double v = first + i * step;
-                flat[i] = isInteger ? (object)(long)v : v;
-            }
+            for (int i = 0; i < n; i++) flat[i] = first + i * step;
             if (!vectorToColumn) return flat;
             var column = new object[n, 1];
             for (int i = 0; i < n; i++) column[i, 0] = flat[i];

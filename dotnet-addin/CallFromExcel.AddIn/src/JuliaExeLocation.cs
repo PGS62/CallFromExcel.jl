@@ -17,12 +17,10 @@ namespace CallFromExcel.AddIn
             foreach (string entry in pathEnv.Split(';'))
             {
                 // Windows accepts a PATH entry in double quotes, e.g. "C:\Program Files\Foo\bin",
-                // but Path.Combine throws on the quote character. Strip them, and skip any entry
-                // that still isn't a valid path rather than letting it abort the search.
+                // so strip them. Plain concatenation, not Path.Combine, which throws on a quote or
+                // other invalid character - File.Exists just returns false for an invalid path.
                 string folder = entry.Trim().Trim('"');
-                if (folder.Length == 0 || folder.IndexOfAny(Path.GetInvalidPathChars()) >= 0) continue;
-                string exeFile = Path.Combine(folder, "julia.exe");
-                if (File.Exists(exeFile)) return exeFile;
+                if (folder.Length > 0 && File.Exists(folder + "\\julia.exe")) return folder + "\\julia.exe";
             }
 
             // If not found on PATH, search the locations the Windows installer uses by

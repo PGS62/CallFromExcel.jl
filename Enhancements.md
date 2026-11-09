@@ -18,3 +18,17 @@ Ideas considered but not yet scheduled, each with a sketch of how it might be im
 **Alternative considered.** Exit Julia entirely when Excel closes. Tidier, but loses REPL work, and would also end a `serve_xl` session attached from e.g. VS Code.
 
 **Test.** Start a short-lived dummy process standing in for Excel, attach the server to its pid, end the process, and check that within a few seconds the server has stopped and the port file is gone.
+
+## Untrusted workbooks can run Julia code
+
+**Problem.** CallFromExcel's worksheet functions run arbitrary Julia code, but a workbook that uses them needs no macros, so Excel opens it without any macro-security warning. A workbook received from someone else containing `=JuliaLaunch()` and `=JuliaEval("...")` runs that code, with the user's permissions, as soon as it calculates (once the user clicks "Enable Editing", if it opened in Protected View). This is inherent to any add-in whose functions execute code, and JuliaExcel has the same exposure.
+
+**Rejected:** asking with a dialog, once per workbook, before running anything - the user doesn't want dialogs.
+
+**Sketches (not yet evaluated):**
+
+- **Trusted folders setting.** A setting (e.g. a registry value or a config file next to the installed add-in) listing folders whose workbooks may call Julia, analogous to Excel's Trusted Locations. Formulas in other workbooks return an error such as `#Workbook not in a CallFromExcel trusted folder` instead of running. The add-in finds the calling workbook via `XlCall.Excel(XlCall.xlfCaller)` and its sheet reference. Needs a default that doesn't break existing users (e.g. no setting = allow everything, so it's opt-in), which limits its value.
+- **Use Excel's own Trusted Locations.** Allow calls only from workbooks in a folder Excel already trusts (read from the registry under `HKCU\Software\Microsoft\Office\16.0\Excel\Security\Trusted Locations`). No new setting, but most users' workbooks aren't in a trusted location, so this would need to be opt-in too.
+- **Launch only by the user.** `JuliaLaunch` as a worksheet formula is what lets a workbook start Julia by itself; without it, a workbook can only use a Julia session the user started. An option could make the formula version refuse, leaving launching to VBA, a ribbon button, or `serve_xl`. Reduces exposure only while no Julia session is running.
+
+**Test.** Depends on the approach - e.g. a workbook outside the trusted folders gets the error and Julia receives nothing.

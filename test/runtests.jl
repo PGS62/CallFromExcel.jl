@@ -526,6 +526,24 @@ if Sys.iswindows()
         @test results == last.(cases)
     end
 
+    # JuliaLaunch writes the comms folder and flag/error file paths into a Julia startup script.
+    # They're under the temp folder, so a '$' in it (e.g. from the user name) used to be read as
+    # string interpolation, breaking the script. Generates the script with such paths and checks
+    # each comes through as a plain string.
+    @testset "JuliaLaunch's startup script survives a \$ in the temp folder's path" begin
+        dll = joinpath(@__DIR__, "..", "dotnet-addin", "dist", "CallFromExcel.AddIn.dll")
+        folder = "C:/Users/a\$b/AppData/Local/Temp/@CallFromExcel"
+        errorfile, flagfile = folder * "/LoadError_1234.txt", folder * "/Flag_1234.txt"
+        script = "[void][Reflection.Assembly]::LoadFrom('$dll'); " *
+                 "[CallFromExcel.AddIn.JuliaLaunch]::BuildStartupScript('', 1234, '$folder', '$errorfile', '$flagfile', 'cmd')"
+        startup = read(`powershell -NoProfile -NonInteractive -Command $script`, String)
+        strings(x) = x isa String ? [x] : x isa Expr ? reduce(vcat, strings.(x.args); init=String[]) : String[]
+        found = strings(Meta.parseall(startup))
+        @test folder in found
+        @test errorfile in found
+        @test flagfile in found
+    end
+
     # serve_xl must write its port file to the same folder the add-in reads it from. The add-in
     # uses .NET's Path.GetTempPath(), which reads TMP before TEMP; serve_xl used ENV["TEMP"], so
     # where the two differ, Excel never found the session. Sets them to different folders and

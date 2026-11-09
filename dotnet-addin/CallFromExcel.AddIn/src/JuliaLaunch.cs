@@ -375,7 +375,10 @@ namespace CallFromExcel.AddIn
             return "/mnt/" + driveLetter + rest;
         }
 
-        private static string BuildStartupScript(string packages, int pid, string commsFolderX, string errorFileX, string flagFileX, string literalCommand)
+        // The file paths go through MakeJuliaLiteral: a '$' in the temp folder's path (e.g. from
+        // the user name) would otherwise be Julia string interpolation. Public so
+        // test/runtests.jl can check the generated script parses.
+        public static string BuildStartupScript(string packages, int pid, string commsFolderX, string errorFileX, string flagFileX, string literalCommand)
         {
             // PGS 8 Dec 2021 (ported comment): it's important to make "using CallFromExcel"
             // the last "using" statement, believed to help avoid "world-age" problems.
@@ -394,11 +397,11 @@ namespace CallFromExcel.AddIn
             return "try\n" +
                    usingStatements +
                    "    CallFromExcel.setxlpid(" + pid + ")\n" +
-                   "    CallFromExcel.comms_folder(\"" + commsFolderX + "\")\n" +
+                   "    CallFromExcel.comms_folder(" + JuliaLiteral.MakeJuliaLiteral(commsFolderX) + ")\n" +
                    "    println(\"Julia $VERSION, using " + PackageName + " to serve Excel running as process ID " + pid + ".\")\n" +
                    "    println(\"Julia launched with command: " + literalCommand + " \")\n" +
                    "    CallFromExcel.start_server()\n" +
-                   "    rm(\"" + flagFileX + "\")\n" +
+                   "    rm(" + JuliaLiteral.MakeJuliaLiteral(flagFileX) + ")\n" +
                    "catch e\n" +
                    // Julia's own message suggests Pkg.add(\"CallFromExcel\"), which fails: the package isn't registered.
                    "    theerror = if e isa ArgumentError && startswith(e.msg, \"Package " + PackageName + " not found\")\n" +
@@ -409,11 +412,11 @@ namespace CallFromExcel.AddIn
                    "        \"$e\"\n" +
                    "    end\n" +
                    "    @error theerror \n" +
-                   "    errorfile = \"" + errorFileX + "\"\n" +
+                   "    errorfile = " + JuliaLiteral.MakeJuliaLiteral(errorFileX) + "\n" +
                    "    io = open(errorfile, \"w\")\n" +
                    "    write(io,theerror)\n" +
                    "    close(io)\n" +
-                   "    rm(\"" + flagFileX + "\")\n" +
+                   "    rm(" + JuliaLiteral.MakeJuliaLiteral(flagFileX) + ")\n" +
                    "end";
         }
     }

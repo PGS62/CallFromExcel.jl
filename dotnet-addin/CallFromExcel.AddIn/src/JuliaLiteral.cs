@@ -3,8 +3,8 @@ using System.Text;
 namespace CallFromExcel.AddIn
 {
     // C# port of MakeJuliaLiteral (modJuliaLiteral.bas): escape a string so it can be
-    // embedded, double-quoted, as a Julia string literal. Sole use: embedding the launch
-    // command line in a println statement written into the generated Julia startup script.
+    // embedded, double-quoted, as a Julia string literal. Used for the launch command line and
+    // the file paths written into the generated Julia startup script (JuliaLaunch.cs).
     public static class JuliaLiteral
     {
         public static string MakeJuliaLiteral(string x)

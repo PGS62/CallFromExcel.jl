@@ -69,8 +69,14 @@ julia> CallFromExcel.encode_for_xl([1 2;true π;"Hello" "World"])
 "*2,3,2;2,1,6,2,18,6,;&1T£Hello&2#3.141592653589793£World" =#
 
 # See also VBA method Unserialise which unserialises i.e. inverts this function
-encode_for_xl(x::AbstractString) = "£" * x         # String in VBA/Excel
-encode_for_xl(x::AbstractChar) = "£" * x           # String in VBA/Excel
+encode_for_xl(x::AbstractString) = "£" * xl_valid(x)  # String in VBA/Excel
+encode_for_xl(x::AbstractChar) = "£" * (isvalid(x) ? x : '�')
+
+# Strings sent to Excel must be valid UTF-8. The add-in decodes the message as UTF-8, turning each
+# invalid sequence or lone surrogate into one or more U+FFFD - which threw array elements' lengths
+# out of step with what Julia had counted, so one bad string (e.g. Latin-1 text read into a String)
+# made a whole array result fail. Replace each such character with a single U+FFFD here instead.
+xl_valid(s::AbstractString) = isvalid(s) ? s : map(c -> isvalid(c) ? c : '�', String(s))
 encode_for_xl(x::Int8) = string("%", x)   # Integer in VBA
 encode_for_xl(x::Int16) = string("%", x)   # Integer in VBA
 encode_for_xl(x::Int32) = string("&", x)   # Long in VBA 64-bit, no native 32-bit integer
@@ -167,7 +173,7 @@ made the general format ~20x slower than "V" for a 5,000 x 1,024 DataFrame.
 write_encoded!(io::IO, x) = (s = encode_for_xl(x); write(io, s); xl_length(s))
 write_encoded!(io::IO, x::Bool) = (write(io, x ? UInt8('T') : UInt8('F')); 1)
 write_encoded!(io::IO, ::Union{Missing,Nothing}) = (write(io, UInt8('E')); 1)
-write_encoded!(io::IO, x::String) = (write(io, "£"); write(io, x); 1 + xl_length(x))
+write_encoded!(io::IO, x::String) = (x = xl_valid(x); write(io, "£"); write(io, x); 1 + xl_length(x))
 function write_encoded!(io::IO, x::Int64)
     s = string(x)
     write(io, UInt8('^'))

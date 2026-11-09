@@ -162,6 +162,7 @@ Function RunTests(Optional SilentMode As Boolean = False, Optional CommandLineOp
           AccResult "WsTest_FloatRangeVsCollect", WsTest_FloatRangeVsCollect, NumPassed, NumFailed
           AccResult "TestBigIntegerRangeVsCollect", TestBigIntegerRangeVsCollect, NumPassed, NumFailed
           AccResult "TestDateBefore1900WithTime", TestDateBefore1900WithTime, NumPassed, NumFailed
+          AccResult "TestInvalidCharactersInArray", TestInvalidCharactersInArray, NumPassed, NumFailed
 
 68        Prompt = NumPassed & " test(s) passed" & vbLf & _
               NumFailed & " test(s) failed"
@@ -1668,6 +1669,26 @@ Function TestDateBefore1900WithTime() As Boolean
 ErrHandler:
 10        PrintTwice ReThrow("TestDateBefore1900WithTime", Err, True)
 11        TestDateBefore1900WithTime = False
+End Function
+
+' Regression test: an array result containing a string with an invalid character - a lone
+' surrogate, or invalid UTF-8 such as Latin-1 text read into a String - failed as a whole. Each
+' invalid character now arrives as U+FFFD (the replacement character).
+Function TestInvalidCharactersInArray() As Boolean
+          Dim y As Variant
+          Dim ws As Worksheet
+1         On Error GoTo ErrHandler
+2         y = ThrowIfError(CallFromExcel.JuliaEvalVBA("[""a\ud800b"", String(UInt8[0x63,0x61,0x66,0xe9]), ""next""]"))
+3         TestInvalidCharactersInArray = (y(LBound(y)) = "a" & ChrW(&HFFFD) & "b") And _
+              (y(LBound(y) + 1) = "caf" & ChrW(&HFFFD)) And (y(LBound(y) + 2) = "next")
+4         Set ws = ScratchSheet()
+5         ws.Range("A1").Formula2 = "=JuliaEval(""[""""a\ud800b"""", """"next""""]"")"
+6         TestInvalidCharactersInArray = TestInvalidCharactersInArray And _
+              (ws.Range("A1").Value2 = "a" & ChrW(&HFFFD) & "b") And (ws.Range("A2").Value2 = "next")
+7         Exit Function
+ErrHandler:
+8         PrintTwice ReThrow("TestInvalidCharactersInArray", Err, True)
+9         TestInvalidCharactersInArray = False
 End Function
 
 Private Function IsErrorCode(Value As Variant, ErrorNumber As Long) As Boolean

@@ -273,6 +273,19 @@ end
     end
     @test CallFromExcel.encode_for_xl(CallFromExcel.DataFrame()) == "*2,1,0;;"
 
+    # Invalid characters in strings - a lone surrogate, or invalid UTF-8 such as Latin-1 text read
+    # into a String - are sent as U+FFFD, one per character. The add-in decodes UTF-8, which turned
+    # them into one or more U+FFFD, so an array's element lengths came out wrong and the whole
+    # result failed to decode (or, for invalid UTF-8, failed to encode).
+    let lone = "a\ud800b", latin1 = String(UInt8[0x63, 0x61, 0x66, 0xe9])
+        @test CallFromExcel.encode_for_xl([lone, latin1, "next"]) ==
+              CallFromExcel.encode_for_xl(["a�b", "caf�", "next"])
+        @test CallFromExcel.encode_for_xl(lone) == "£a�b"
+        @test CallFromExcel.encode_for_xl(SubString(latin1, 1)) == "£caf�"
+        @test CallFromExcel.encode_for_xl('\ud800') == "£�"
+        @test CallFromExcel.encode_for_xl(Dict(lone => 1)) == CallFromExcel.encode_for_xl(Dict("a�b" => 1))
+    end
+
     # "R" format - compact encoding for integer ranges: encodes only first/step/length, not every
     # element, so wire size is O(1) regardless of the range's length. Julia -> Excel only, so
     # decode_from_xl has no 'R' case: these are encode-only checks.

@@ -4,7 +4,7 @@ CallFromExcel is the successor to [JuliaExcel](https://github.com/PGS62/JuliaExc
 
 ## [Unreleased]
 
-## [0.1.0] - (release date)
+## [0.1.0] - 2026-11-09
 
 First release of CallFromExcel. If you're upgrading from JuliaExcel, see [Upgrading from JuliaExcel](README.md#upgrading-from-juliaexcel).
 

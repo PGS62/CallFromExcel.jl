@@ -215,22 +215,19 @@ namespace CallFromExcel.AddIn
                     string wslLaunchFile = Path.Combine(FileUtils.LocalTemp(), "launchjulia.sh");
                     string wslLaunchFileX = WSLAddress(wslLaunchFile);
                     string wslLaunchFileContents = "#!/bin/bash\n" + bashStatements.TrimEnd('\n') + "\n" +
-                        juliaExe + " " + trimmedOptions + " --load \"" + loadFileX + "\"";
+                        WslJuliaCommand(juliaExe, trimmedOptions, loadFileX);
                     FileUtils.SaveTextFile(wslLaunchFile, wslLaunchFileContents);
                     // Run via bash rather than directly: files written from Windows onto /mnt/c lack execute permission.
-                    innerCommand = "bash '" + wslLaunchFileX + "' && exit";
+                    innerCommand = "bash " + BashQuote(wslLaunchFileX) + " && exit";
                 }
                 else
                 {
-                    innerCommand = juliaExe + " " + trimmedOptions + " --load '" + loadFileX + "'";
+                    innerCommand = WslJuliaCommand(juliaExe, trimmedOptions, loadFileX);
                 }
-                // Login shell (bash -lc) so juliaup's PATH entry is picked up - a plain `wsl <command>`
-                // doesn't source it. Paths inside innerCommand use bash single quotes so they don't
-                // clash with the Windows-level double quotes grouping the whole argument.
                 // The full path, not "wsl": ShellExecute resolves a bare name partly against
                 // the current directory, which follows Excel's last File > Open folder.
                 processFileName = WSLExecutable;
-                processArguments = "bash -lc \"" + innerCommand + "\"";
+                processArguments = WslArguments(innerCommand);
                 command = "wsl " + processArguments;
             }
             else
@@ -363,6 +360,29 @@ namespace CallFromExcel.AddIn
         }
 
         // "C:\foo\bar" -> "/mnt/c/foo/bar". Port of WSLAddress (modUtils.bas).
+        // Quotes s as a single bash word: in single quotes, with each ' written as '\'' - so a
+        // path like /mnt/c/Users/O'Brien/... (or one containing $) reaches Julia unchanged.
+        public static string BashQuote(string s)
+        {
+            return "'" + s.Replace("'", "'\\''") + "'";
+        }
+
+        // The bash command that starts Julia under WSL. Public, as is WslArguments, so
+        // test/runtests.jl can send a path with awkward characters through the real wsl.exe.
+        public static string WslJuliaCommand(string juliaExe, string options, string loadFileX)
+        {
+            return juliaExe + " " + options + " --load " + BashQuote(loadFileX);
+        }
+
+        // wsl.exe's arguments to run innerCommand. A login shell (bash -lc) so juliaup's PATH
+        // entry is picked up. --exec runs bash directly: without it, wsl.exe first passes the
+        // command through the default shell, which expands any $ in the paths. innerCommand is
+        // in Windows-level double quotes, so it mustn't contain any itself - paths can't.
+        public static string WslArguments(string innerCommand)
+        {
+            return "--exec bash -lc \"" + innerCommand + "\"";
+        }
+
         private static string WSLAddress(string windowsAddress)
         {
             if (windowsAddress.Length < 3 || windowsAddress[1] != ':' ||

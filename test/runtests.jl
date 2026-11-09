@@ -544,6 +544,33 @@ if Sys.iswindows()
         @test flagfile in found
     end
 
+    # Under WSL, JuliaLaunch passes the startup file's path to Julia through wsl.exe and bash. An
+    # apostrophe in it (a user called O'Brien) broke bash's quoting, and a '$' was expanded by
+    # the shell wsl.exe ran first. Sends such a path through the real wsl.exe and bash, with
+    # printf standing in for Julia. Needs a WSL distribution, so skipped in CI and without one.
+    if get(ENV, "CI", "false") != "true" && (try success(`wsl.exe --exec true`) catch; false end)
+        @testset "JuliaLaunch under WSL copes with ' and \$ in the startup file's path" begin
+            dll = joinpath(@__DIR__, "..", "dotnet-addin", "dist", "CallFromExcel.AddIn.dll")
+            path = "/mnt/c/Users/O'Brien/a\$b/StartUp_1234.jl"
+            ps1 = tempname() * ".ps1"
+            write(ps1, """
+                [void][Reflection.Assembly]::LoadFrom('$dll')
+                \$inner = [CallFromExcel.AddIn.JuliaLaunch]::WslJuliaCommand('printf', "'[%s]\\n'", '$(replace(path, "'" => "''"))')
+                \$psi = New-Object System.Diagnostics.ProcessStartInfo
+                \$psi.FileName = 'C:\\Windows\\System32\\wsl.exe'
+                \$psi.Arguments = [CallFromExcel.AddIn.JuliaLaunch]::WslArguments(\$inner)
+                \$psi.UseShellExecute = \$false
+                \$psi.RedirectStandardOutput = \$true
+                \$p = [System.Diagnostics.Process]::Start(\$psi)
+                \$p.StandardOutput.ReadToEnd()
+                \$p.WaitForExit()
+                """)
+            out = readlines(`powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $ps1`)
+            rm(ps1)
+            @test filter(!isempty, out) == ["[--load]", "[$path]"]
+        end
+    end
+
     # serve_xl must write its port file to the same folder the add-in reads it from. The add-in
     # uses .NET's Path.GetTempPath(), which reads TMP before TEMP; serve_xl used ENV["TEMP"], so
     # where the two differ, Excel never found the session. Sets them to different folders and

@@ -1,4 +1,4 @@
-# CallFromExcel - call Julia from Excel
+# CallFromExcel.jl - call Julia from Excel
 
 Call [Julia](https://julialang.org/) from Microsoft Excel worksheets and from VBA.  
 

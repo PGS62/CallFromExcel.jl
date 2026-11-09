@@ -383,6 +383,17 @@ Private Sub SimpleSpeedTest()
 'One-way data transport (AbstractRange), Julia to Excel
 'Average time for JuliaEval("(1:100000).*pi") = 1.42919200006872E-02 seconds (averaged over 10 calls)
 
+' Two report lines saying which CallFromExcel code is running, as reported by Julia: the
+' package version, and the commit from "git describe --always --dirty", which appends
+' "-dirty" if there are uncommitted changes. That is "not a git checkout" for a package
+' installed with Pkg.add rather than run from the repo via --project=. Julia must be running.
+Private Function VersionReport(Prefix As String) As String
+          Dim Version As Variant, Commit As Variant
+1         Version = CallFromExcel.JuliaEval("string(pkgversion(CallFromExcel))")
+2         Commit = CallFromExcel.JuliaEval("try readchomp(`git -C $(pkgdir(CallFromExcel)) describe --always --dirty`) catch; ""not a git checkout"" end")
+3         VersionReport = Prefix & "CallFromExcel Version = " & Version & vbLf & Prefix & "Commit = " & Commit
+End Function
+
 Function PerformanceTest() As String
           Const NumCallsOnePlusOne As Long = 500
           Const NumCallsVectors = 10
@@ -422,7 +433,7 @@ Function PerformanceTest() As String
 17        Next i
 18        t2 = ElapsedTime
 
-19        Report = Report & "CallFromExcel Version = TODO - write code to get this" & vbLf
+19        Report = Report & VersionReport("") & vbLf
 20        Report = Report & "Computer = " & Environ$("ComputerName") & vbLf
 21        Report = Report & "Latency test" & vbLf
 22        Report = Report & "Average time for JuliaEval(""1+1"") = " & CStr(1000 * (t2 - t1) / NumCallsOnePlusOne) & _
@@ -597,7 +608,6 @@ Sub DataframePerformanceTest()
 3         Report = "'" & String(120, "=") & vbLf
 4         Report = Report & "'Running method DataframePerformanceTest" & vbLf
 5         Report = Report & "'Time now = " & Format$(Now(), "yyyy-mm-dd hh:mm:ss") & vbLf
-6         Report = Report & "'CallFromExcel Version = TODO write code to get this" & vbLf
 7         Report = Report & "'Computer = " & Environ$("ComputerName")
 
           'Warm up
@@ -616,6 +626,7 @@ Sub DataframePerformanceTest()
 
 17        ThrowIfError (CallFromExcel.JuliaEval(JuliaExpression))
 
+6         Report = Report & vbLf & VersionReport("'")
 18        Debug.Print Report
 
 19        For i = 0 To 10

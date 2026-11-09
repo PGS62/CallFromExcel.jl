@@ -32,3 +32,15 @@ Ideas considered but not yet scheduled, each with a sketch of how it might be im
 - **Launch only by the user.** `JuliaLaunch` as a worksheet formula is what lets a workbook start Julia by itself; without it, a workbook can only use a Julia session the user started. An option could make the formula version refuse, leaving launching to VBA, a ribbon button, or `serve_xl`. Reduces exposure only while no Julia session is running.
 
 **Test.** Depends on the approach - e.g. a workbook outside the trusted folders gets the error and Julia receives nothing.
+
+## Another user's program on a freed port
+
+**Problem.** Only matters on a machine shared by several users (terminal server, Citrix). When the Julia session ends, its port file `Port_<excelpid>.txt` stays in the user's comms folder, and its port on 127.0.0.1 is free for anyone to listen on - every user on the machine shares 127.0.0.1. If another user's program takes that port, the Excel's next `JuliaCall`/`JuliaEval` reads the leftover port file and sends it the call - arguments and expressions included - and shows whatever it replies. The session token doesn't help: it proves the caller to the server, not the server to the caller. (Other users can't read the port file, which is in the user's own TEMP, so they'd have to guess the port, but ports are allocated from a small range.)
+
+**Sketches:**
+
+- **Server proves itself too.** The port file gets a second secret, a server token, which Julia sends back as a response header (e.g. `X-CallFromExcel-Server`) on every reply. `JuliaHttpClient` treats a reply without the right value as "Julia not running", so a fake server's results are never shown. About 10 lines across `comms.jl` and `JuliaHttpClient.cs`/`JuliaPort.cs`. Doesn't stop the first request's contents reaching the fake server; preventing that would need a check before sending (e.g. a `/ping` handshake, an extra round trip, which could be done once per port rather than per call).
+- **Delete the port file when Julia exits.** An `atexit` hook in Julia removes the port file on a normal exit (including closing its window, if Julia gets the chance to run it), so Excel finds no port file and reports Julia isn't running instead of using the freed port. Doesn't cover a crash or a killed process.
+- Related: "Stop serving when Excel closes", above, removes the port file when Excel closes.
+
+**Test.** Start a plain HTTP server on a port, write a port file pointing at it, and check that `JuliaEval` reports Julia isn't running rather than returning that server's reply.

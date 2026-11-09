@@ -59,7 +59,7 @@ namespace CallFromExcel.AddIn
             if (value is JuliaDictionary) return EncodeDictionary((JuliaDictionary)value);
             if (value is DateTime)
             {
-                double serial = ((DateTime)value).ToOADate(); // Excel's date serial IS the OLE Automation date
+                double serial = DateSerial.FromDateTime((DateTime)value);
                 return serial == Math.Floor(serial)
                     ? "D" + ((long)serial).ToString(CultureInfo.InvariantCulture)
                     : "G" + Hex.DoubleToHex(serial);

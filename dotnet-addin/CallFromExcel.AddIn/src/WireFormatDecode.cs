@@ -12,7 +12,7 @@ namespace CallFromExcel.AddIn
     //   Chr(163) (pound sterling sign) String
     //   T / F Boolean True / False
     //   D Date, payload is decimal of Excel's date serial e.g. 22-Dec-2025 is D64013
-    //   G DateTime, payload is hex (Excel date serial, which is exactly .NET's OADate)
+    //   G DateTime, payload is hex (Excel date serial - see DateSerial.cs for dates before 1899-12-30)
     //   E Empty (-> null)   N Null (-> DBNull.Value)
     //   % Integer (Int16)   & Long (Int32)   B Byte   S Single (hex)   ^ LongLong (Int64)
     //   C Currency (decimal string) -- reserved, not currently produced by Julia
@@ -53,8 +53,8 @@ namespace CallFromExcel.AddIn
                     return wire.Substring(1);
                 case 'T': return true;
                 case 'F': return false;
-                case 'D': return DateTime.FromOADate(long.Parse(wire.Substring(1), CultureInfo.InvariantCulture));
-                case 'G': return DateTime.FromOADate(Hex.HexToDouble(wire, 1));
+                case 'D': return DateSerial.ToDateTime(long.Parse(wire.Substring(1), CultureInfo.InvariantCulture));
+                case 'G': return DateSerial.ToDateTime(Hex.HexToDouble(wire, 1));
                 case 'E': return null;
                 case 'N': return DBNull.Value;
                 case '%': return short.Parse(wire.Substring(1), CultureInfo.InvariantCulture);

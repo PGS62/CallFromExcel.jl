@@ -67,6 +67,16 @@ namespace CallFromExcel.AddIn.TestHarness
             RoundTrip("Null (DBNull)", DBNull.Value);
             RoundTripDate("Date only", new DateTime(2025, 12, 22));
             RoundTripDate("DateTime with time", new DateTime(2025, 12, 22, 14, 30, 45));
+            RoundTripDate("DateTime before 1899-12-30", new DateTime(1899, 12, 29, 6, 0, 0));
+
+            // Date serials count straight through, as Julia computes them: 1899-12-29 06:00 is
+            // -0.75 days (not -1.25 as OLE Automation dates have it).
+            var early = new DateTime(1899, 12, 29, 6, 0, 0);
+            CheckTrue("DateTime before 1899-12-30 encodes as Julia's serial",
+                WireFormatEncode.Encode(early) == "G" + Hex.DoubleToHex(-0.75));
+            CheckTrue("DateTime before 1899-12-30 decodes from Julia's serial",
+                Equals(WireFormatDecode.Decode("G" + Hex.DoubleToHex(-0.75)), early));
+            CheckTrue("Date before 1899-12-30 decodes", Equals(WireFormatDecode.Decode("D-365"), new DateTime(1898, 12, 30)));
             RoundTripError(new ExcelErrorValue(2007)); // #DIV/0!
 
             // --- Round-trip: arrays ---

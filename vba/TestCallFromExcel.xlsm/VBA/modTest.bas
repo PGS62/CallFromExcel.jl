@@ -161,6 +161,7 @@ Function RunTests(Optional SilentMode As Boolean = False, Optional CommandLineOp
           AccResult "WsTest_JuliaEvalBlankOrErrorCell", WsTest_JuliaEvalBlankOrErrorCell, NumPassed, NumFailed
           AccResult "WsTest_FloatRangeVsCollect", WsTest_FloatRangeVsCollect, NumPassed, NumFailed
           AccResult "TestBigIntegerRangeVsCollect", TestBigIntegerRangeVsCollect, NumPassed, NumFailed
+          AccResult "TestDateBefore1900WithTime", TestDateBefore1900WithTime, NumPassed, NumFailed
 
 68        Prompt = NumPassed & " test(s) passed" & vbLf & _
               NumFailed & " test(s) failed"
@@ -1646,6 +1647,27 @@ Function TestBigIntegerRangeVsCollect() As Boolean
 ErrHandler:
 10        PrintTwice ReThrow("TestBigIntegerRangeVsCollect", Err, True)
 11        TestBigIntegerRangeVsCollect = False
+End Function
+
+' Regression test: dates before 1899-12-30 with a time of day were hours or days out in both
+' directions - Julia's DateTime(1899,12,29,6) arrived in VBA as 1899-12-30 18:00, and VBA's
+' #12/29/1899 6:00 AM# arrived in Julia as 1899-12-28T18:00. VBA counts such dates differently
+' (OLE Automation dates) from Julia.
+Function TestDateBefore1900WithTime() As Boolean
+          Dim y As Variant
+          Dim d As Date
+1         On Error GoTo ErrHandler
+2         d = #12/29/1899 6:00:00 AM#
+3         y = ThrowIfError(CallFromExcel.JuliaEvalVBA("DateTime(1899,12,29,6)"))
+4         TestDateBefore1900WithTime = (VarType(y) = vbDate) And (y = d)
+5         y = ThrowIfError(CallFromExcel.JuliaCall("string", d))
+6         TestDateBefore1900WithTime = TestDateBefore1900WithTime And (y = "1899-12-29T06:00:00")
+7         y = ThrowIfError(CallFromExcel.JuliaCall("identity", d))
+8         TestDateBefore1900WithTime = TestDateBefore1900WithTime And (y = d)
+9         Exit Function
+ErrHandler:
+10        PrintTwice ReThrow("TestDateBefore1900WithTime", Err, True)
+11        TestDateBefore1900WithTime = False
 End Function
 
 Private Function IsErrorCode(Value As Variant, ErrorNumber As Long) As Boolean

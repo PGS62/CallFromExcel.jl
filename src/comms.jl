@@ -287,7 +287,7 @@ function friendly_error(e)
     showerror(io, e)
     print("\n\n")
     lines = split(String(take!(io)), '\n')
-    error_desc = join(first(lines, 2), ' ')
+    error_desc = join(filter(!isempty, strip.(first(lines, 2))), ' ')
     if length(error_desc) > 500
         error_desc = truncate(error_desc, 500) * "..."
     end

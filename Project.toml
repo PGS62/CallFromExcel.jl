@@ -1,7 +1,7 @@
 name = "CallFromExcel"
 uuid = "f3634bd0-8fd6-492a-8a51-244143c927d5"
-authors = ["Philip Swannell"]
 version = "0.1.0"
+authors = ["Philip Swannell"]
 
 [deps]
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
@@ -9,12 +9,14 @@ Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
 HTTP = "cd3eb016-35fb-5094-929b-558a96fad6f3"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+Revise = "295af30f-e4ad-537b-8983-00126c2a3abe"
 Sockets = "6462fe0b-24de-5631-8697-dd941f90decc"
 
 [compat]
-julia = "1.7"
 DataFrames = "1"
 HTTP = "1"
+Revise = "3.18.0"
+julia = "1.10"
 
 [extras]
 SHA = "ea8e919c-243c-51af-8825-aaa63cd721ce"

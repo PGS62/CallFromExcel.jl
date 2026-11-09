@@ -15,6 +15,7 @@ First release of CallFromExcel. If you're upgrading from JuliaExcel, see [Upgrad
 - The Julia package is renamed `CallFromExcel`, so for example `JuliaExcel.serve_xl()` becomes `CallFromExcel.serve_xl()`.
 - Installation shows no dialogs, needs no admin rights, and uninstalls `JuliaExcel.xlam` if present. Install with `Pkg.add` followed by `Pkg.build("CallFromExcel")` - see [Installation](README.md#installation).
 - CallFromExcel requires 64-bit Excel. JuliaExcel also supported 32-bit Excel.
+- CallFromExcel requires Julia 1.10 or later. JuliaExcel required 1.7 or later, but its `JuliaLaunch` always passed `--threads=auto,1`, which Julia only accepts from 1.9.
 - `JuliaLaunch` gives a clear error message, with installation instructions, if the CallFromExcel package isn't installed in Julia's active environment.
 
 ### Performance

@@ -311,10 +311,17 @@ end
     # itself errors (as opposed to returning a value that fails to encode - see
     # _encode_result_for_xl above). Checks the exact text so a regression (a stray backtrace frame,
     # a changed cap, a wording change) is caught, not just "it's some string starting with #".
+    # Julia 1.11 added a second line to MethodError's message; on 1.10 that line is empty, and
+    # must not leave a double space.
     let msg = CallFromExcel.decode_from_xl(CallFromExcel.srv_eval_inner("1+\"1\""))
-        @test msg == "#MethodError: no method matching +(::Int64, ::String) The function `+` \
-                     exists, but no method is defined for this combination of argument types. \
-                     Julia REPL has more details and stacktrace!"
+        if VERSION >= v"1.11"
+            @test msg == "#MethodError: no method matching +(::Int64, ::String) The function `+` \
+                         exists, but no method is defined for this combination of argument types. \
+                         Julia REPL has more details and stacktrace!"
+        else
+            @test msg == "#MethodError: no method matching +(::Int64, ::String) \
+                         Julia REPL has more details and stacktrace!"
+        end
     end
 
     # display_results (comms.jl) - toggles REPL echoing of calls from Excel; check both the

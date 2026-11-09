@@ -1,6 +1,5 @@
-# Installer for the C#/Excel-DNA CallFromExcel add-in (dotnet-addin), replacing the old
-# installer\Install.ps1 (pure-VBA JuliaExcel.xlam world) at the repo root. That script stays
-# as-is, serving users who haven't upgraded yet.
+# Installer for the C#/Excel-DNA CallFromExcel add-in (dotnet-addin). Replaces JuliaExcel's
+# installer for its VBA add-in JuliaExcel.xlam, which it uninstalls if present.
 #
 # Non-interactive by design: no MsgBox dialogs (unlike the old installer) - this is meant to
 # be callable unattended from a build script or Julia's own installme(), as well as directly

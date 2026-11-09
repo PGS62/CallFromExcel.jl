@@ -44,3 +44,14 @@ Ideas considered but not yet scheduled, each with a sketch of how it might be im
 - Related: "Stop serving when Excel closes", above, removes the port file when Excel closes.
 
 **Test.** Start a plain HTTP server on a port, write a port file pointing at it, and check that `JuliaEval` reports Julia isn't running rather than returning that server's reply.
+
+## WSL Julia choosing a port already used on Windows
+
+**Problem.** `start_server` tries ports 2700, 2701, ... until a bind succeeds - but a Julia under WSL2 binds inside the Linux VM, which can't see ports in use on the Windows side. With two Excels, one served by a native Windows Julia on 2700 and one launching a WSL Julia, the WSL Julia also gets 2700 (free in Linux), and Excel's requests to `localhost:2700` reach the Windows Julia instead. Since the session token, that Julia rejects them (409), so the second Excel sees Julia as not running and `JuliaLaunch` times out; before the token, calls silently ran in the wrong session. Two WSL Julias don't clash (they share Linux's ports). Judged too contrived to fix for now: it needs native and WSL sessions running at once from different Excels.
+
+**Sketches:**
+
+- **Julia checks it's reachable.** After binding under WSL, Julia checks from the Windows side that `localhost:<port>` reaches itself - e.g. a `/ping` with its own token via `curl.exe`/`powershell.exe` - and moves on to the next port if not.
+- **Excel chooses the port.** The add-in picks a port free on Windows and passes it to Julia in the startup script; Julia binds that port (or fails clearly). Changes the startup handshake for every launch, not just WSL.
+
+**Test.** Hard to automate: needs a native Julia listening on a port and a WSL Julia launched at the same time.

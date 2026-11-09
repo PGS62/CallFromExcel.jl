@@ -10,7 +10,7 @@ First release of CallFromExcel. If you're upgrading from JuliaExcel, see [Upgrad
 
 ### Changes
 
-- The Excel add-in is rewritten in C#, using [Excel-DNA](https://excel-dna.net/), replacing JuliaExcel's VBA add-in `JuliaExcel.xlam`. The worksheet functions keep their names (`JuliaCall`, `JuliaEval`, `JuliaLaunch` etc.), and data now transfers between Excel and Julia two to three times faster - see Performance below.
+- The Excel add-in is rewritten in C#, using [Excel-DNA](https://excel-dna.net/), replacing JuliaExcel's VBA add-in `JuliaExcel.xlam`. The worksheet functions keep their names (`JuliaCall`, `JuliaEval`, `JuliaLaunch` etc.), and data now transfers between Excel and Julia two to three times faster, and about eight times faster for large DataFrames - see Performance below.
 - From VBA, functions are called through an object created with `CreateObject("CallFromExcel.ComServer")`, rather than through a reference to the add-in.
 - The Julia package is renamed `CallFromExcel`, so for example `JuliaExcel.serve_xl()` becomes `CallFromExcel.serve_xl()`.
 - Installation shows no dialogs, needs no admin rights, and uninstalls `JuliaExcel.xlam` if present. Install with `Pkg.add` followed by `Pkg.build("CallFromExcel")` - see [Installation](README.md#installation).
@@ -31,8 +31,9 @@ First release of CallFromExcel. If you're upgrading from JuliaExcel, see [Upgrad
 | One-way (Excel to Julia): `JuliaCall("length", column of 100,000 mixed values)` | 0.11 s | 0.034 s | 3.1x |
 | One-way (Julia to Excel): `JuliaEval("[isodd(i) ? i*pi : string(i) for i in 1:100000]")` | 0.27 s | 0.11 s | 2.3x |
 | Two-way: `JuliaCall("sort", column of 1,000,000 Doubles)` | 1.23 s | 0.42 s | 2.9x |
+| One-way (Julia to Excel): `JuliaEval("DataFrame(rand(Float64,(5000,1024)),:auto)")` | 10.9 s\* | 1.34 s | 8.1x |
 
-*Each test times the recalculation of a worksheet formula, averaged over several recalculations and two runs. The "mixed values" cycle through a string, a Boolean and a Double. All figures measured on the same machine as JuliaExcel 2.0.0's: Intel Core Ultra 9 288V, 32GB RAM*
+*Each test times the recalculation of a worksheet formula, averaged over several recalculations and two runs. The "mixed values" cycle through a string, a Boolean and a Double. All figures measured on the same machine as JuliaExcel 2.0.0's: Intel Core Ultra 9 288V, 32GB RAM. The DataFrame row is different: it times a single call to `JuliaEval` from VBA (`DataframePerformanceTest` in `workbooks/TestCallFromExcel.xlsm`), and \*its JuliaExcel figure is for version 2.1.2, the last version that test was run on.*
 
 ## JuliaExcel (predecessor), versions 2.4.1 and earlier
 

@@ -42,10 +42,9 @@ interpreted as follows:
      TrySerialiseArrayAsV, modSerialise.bas), decoded by decode_xl_array_v (src/decode.jl).
  L   Array of Int64 only, rank 1-9 - the Int64 counterpart of V. See
      encode_for_xl(x::Array{Int64,N}) below. Julia -> Excel only.
- R   Range (UnitRange/StepRange/StepRangeLen/LinRange etc.) - encodes only first/step/length,
-     not every element, so wire size doesn't scale with the range's length at all. Julia -> Excel
-     only. See encode_for_xl(x::AbstractRange{Float64})/(x::AbstractRange{<:Integer}) below.
-     Decoded by the 'R' branch of the production VBA decoder (modUnserialise.bas).
+ R   Integer range (UnitRange/StepRange etc.) - encodes only first/step/length, not every
+     element, so wire size doesn't scale with the range's length at all. Julia -> Excel only.
+     See encode_for_xl(x::AbstractRange{<:Union{Int8,...}}) below.
 
   Examples:
   julia> CallFromExcel.encode_for_xl(1.0)
@@ -302,53 +301,28 @@ end
 encode_for_xl(x::Array{UInt32,N}) where {N} = encode_for_xl(Int64.(x))
 encode_for_xl(x::Array{<:Union{UInt64,UInt128,BigInt,Rational,BigFloat},N}) where {N} = encode_for_xl(Float64.(x))
 
+# A Float64 range is sent element by element, exactly as the same values collected into a Vector.
+# It used to be sent as just first/step/length ("RF"), with the add-in computing each element as
+# first + i*step - but Julia computes range elements more precisely than that, so e.g. element 4 of
+# 0:0.1:1 arrived as 0.30000000000000004 rather than 0.3.
+encode_for_xl(x::AbstractRange{Float64}) = encode_for_xl(collect(x))
+
 """
-    encode_for_xl(x::AbstractRange{Float64})
     encode_for_xl(x::AbstractRange{<:Union{Int8,Int16,Int32,Int64,UInt8,UInt16,UInt32}})
 
-Compact encoding for a Julia Range (`UnitRange`, `StepRange`, `StepRangeLen`, `LinRange`, etc.) -
-encodes only `first(x)`, `step(x)` and `length(x)`, rather than materializing and encoding every
-element as "V"/"*" would. One method per element kind covers every concrete range type, since
-`first`/`step`/`length` are defined generically for all of them regardless of internal
-representation - dispatch on the *element type* (`Float64` vs `<:Integer`), not the concrete range
-type. This is the only array format in this file whose wire size doesn't scale with the number of
-elements at all: `1:1_000_000` encodes to a few dozen bytes instead of the ~17 MB the general
-format (or ~16 MB even with "V") would need.
+Compact encoding for an integer range (`UnitRange`, `StepRange` etc.) - encodes only `first(x)`,
+`step(x)` and `length(x)`, rather than every element, so `1:1_000_000` encodes to a few dozen
+bytes. Format "RI,<n>,<first>,<step>;", decoded by the add-in as `first + i*step`, which is exact
+for integers. Julia -> Excel only.
 
-VBA reconstructs each element by plain arithmetic (`first + (i-1)*step`) rather than decoding any
-per-element wire data - verified (informally, not proven for every possible start/step/length) to
-exactly reproduce Julia's own range materialization, including for `StepRangeLen`'s
-twice-precision internal representation, over a 1,000,000-element case.
+Float ranges aren't sent this way - see the `AbstractRange{Float64}` method above. Nor are ranges
+of other integer types (they become Double element by element) or of Bool, so their elements get
+the same VBA type as the same values in any other array.
 
-Integer ranges encode `first`/`step` as plain decimal (exact, matching the "^" LongLong
-convention) - format "RI,<n>,<first>,<step>;". Float64 ranges encode them as 16-character
-big-endian hex (matching scalar "#"/`float64_to_hex`) - format "RF,<n>;<hex first><hex step>".
-Both are decoded by the 'R' branch of the VBA function Unserialise (modUnserialise.bas).
-
-Julia -> Excel only: VBA arrays are always fully materialized, so there's no equivalent lazy
-"range" concept on the encode (VBA -> Julia) side to compress this way - unlike "V", this format
-isn't a candidate for the reverse direction.
-
-Falls back to encode_array_general for an empty range, non-finite first/step (Float64 only), or -
-defensively - if `last(x)` doesn't come out to exactly `first(x) + (length(x)-1)*step(x)`. Julia's
-abstract type hierarchy doesn't compiler-enforce that a type subtyping AbstractRange actually
-behaves as an arithmetic progression (nothing stops a third-party AbstractRange subtype from
-implementing `step` to mean something else entirely) - this O(1) check verifies the assumption
-this whole format rests on actually holds for the specific range in hand, rather than trusting
-`AbstractRange` as a semantic promise it doesn't compiler-enforce. Base itself takes the same care
-in the other direction: `Base.LogRange` (representing a geometric, not arithmetic, progression)
-deliberately does *not* subtype `AbstractRange`, and doesn't even implement `step`.
+Falls back to encode_array_general for an empty range, or if `last(x)` isn't
+`first(x) + (length(x)-1)*step(x)`: nothing stops a third-party AbstractRange subtype from
+implementing `step` to mean something else.
 """
-function encode_for_xl(x::AbstractRange{Float64})
-    n = length(x)
-    f, s = Float64(first(x)), Float64(step(x))
-    (n == 0 || !isfinite(f) || !isfinite(s) || last(x) !== f + (n - 1) * s) && return encode_array_general(x)
-    "RF," * string(n) * ";" * float64_to_hex(f) * float64_to_hex(s)
-end
-
-# Only the integer types that become LongLong (or narrower) in VBA: a range of a type that becomes
-# Double element by element, or of Bool, is encoded element by element too, so its elements keep
-# the same VBA type as the same values in any other array.
 function encode_for_xl(x::AbstractRange{<:Union{Int8,Int16,Int32,Int64,UInt8,UInt16,UInt32}})
     n = length(x)
     f, s = Int64(first(x)), Int64(step(x))

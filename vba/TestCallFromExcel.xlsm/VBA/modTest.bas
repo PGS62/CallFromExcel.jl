@@ -159,6 +159,7 @@ Function RunTests(Optional SilentMode As Boolean = False, Optional CommandLineOp
           AccResult "TestRangeArgumentsVBA", TestRangeArgumentsVBA, NumPassed, NumFailed
           AccResult "WsTest_JuliaLaunchBlankArgs", WsTest_JuliaLaunchBlankArgs, NumPassed, NumFailed
           AccResult "WsTest_JuliaEvalBlankOrErrorCell", WsTest_JuliaEvalBlankOrErrorCell, NumPassed, NumFailed
+          AccResult "WsTest_FloatRangeVsCollect", WsTest_FloatRangeVsCollect, NumPassed, NumFailed
 
 68        Prompt = NumPassed & " test(s) passed" & vbLf & _
               NumFailed & " test(s) failed"
@@ -944,7 +945,9 @@ ErrHandler:
 7         TestRangeStepVsCollect = False
 End Function
 
-' As TestRangeIntegerVsCollect, but for the float sub-format.
+' As TestRangeIntegerVsCollect, but for float ranges. 0:0.01:1 is the regression case: float
+' ranges used to be sent as first/step/length and rebuilt as first + i*step, which differs in the
+' last bit from Julia's own elements for decimal steps (0.3 arrived as 0.30000000000000004).
 Function TestRangeFloatVsCollect()
           Dim y1 As Variant
           Dim y2 As Variant
@@ -953,6 +956,9 @@ Function TestRangeFloatVsCollect()
 2         y1 = ThrowIfError(CallFromExcel.JuliaEval("(1:1000).*pi"))
 3         y2 = ThrowIfError(CallFromExcel.JuliaEval("collect((1:1000).*pi)"))
 4         TestRangeFloatVsCollect = ArraysIdentical(y1, y2)
+          y1 = ThrowIfError(CallFromExcel.JuliaEvalVBA("0:0.01:1"))
+          y2 = ThrowIfError(CallFromExcel.JuliaEvalVBA("collect(0:0.01:1)"))
+          TestRangeFloatVsCollect = TestRangeFloatVsCollect And ArraysIdentical(y1, y2) And y1(LBound(y1) + 30) = 0.3
 
 5         Exit Function
 ErrHandler:
@@ -990,7 +996,8 @@ ErrHandler:
 6         TestRangeJuliaEvalIsColumn = False
 End Function
 
-' Directly confirms the compact "R" wire format is actually used, for both sub-formats.
+' Directly confirms the compact "R" wire format is used for integer ranges, and not for float
+' ranges (see TestRangeFloatVsCollect).
 Function TestRangeWireFormat()
           Dim s As Variant
 
@@ -998,7 +1005,7 @@ Function TestRangeWireFormat()
 2         s = ThrowIfError(CallFromExcel.JuliaEvalVBA("CallFromExcel.encode_for_xl(1:1000)"))
 3         If Left$(s, 3) <> "RI," Then Throw "Expected integer range to use 'RI' wire format, got: " & Left$(s, 10)
 4         s = ThrowIfError(CallFromExcel.JuliaEvalVBA("CallFromExcel.encode_for_xl((1:1000).*pi)"))
-5         If Left$(s, 3) <> "RF," Then Throw "Expected float range to use 'RF' wire format, got: " & Left$(s, 10)
+5         If Left$(s, 1) = "R" Then Throw "Expected float range not to use the 'R' wire format, got: " & Left$(s, 10)
 6         TestRangeWireFormat = True
 
 7         Exit Function
@@ -1598,6 +1605,23 @@ Function WsTest_JuliaEvalBlankOrErrorCell() As Boolean
 ErrHandler:
 7         PrintTwice ReThrow("WsTest_JuliaEvalBlankOrErrorCell", Err, True)
 8         WsTest_JuliaEvalBlankOrErrorCell = False
+End Function
+
+' Regression test: a float range returned to a worksheet differed in the last bit from the same
+' values collected into a vector (=JuliaEval("0:0.1:1") gave 0.30000000000000004 in row 4).
+' Compares exactly in VBA - Excel's own "=" can hide last-bit differences.
+Function WsTest_FloatRangeVsCollect() As Boolean
+          Dim ws As Worksheet
+1         On Error GoTo ErrHandler
+2         Set ws = ScratchSheet()
+3         ws.Range("A1").Formula2 = "=JuliaEval(""0:0.01:1"")"
+4         ws.Range("B1").Formula2 = "=JuliaEval(""collect(0:0.01:1)"")"
+5         WsTest_FloatRangeVsCollect = ArraysIdentical(ws.Range("A1:A101").Value2, ws.Range("B1:B101").Value2) And _
+              ws.Range("A31").Value2 = 0.3
+6         Exit Function
+ErrHandler:
+7         PrintTwice ReThrow("WsTest_FloatRangeVsCollect", Err, True)
+8         WsTest_FloatRangeVsCollect = False
 End Function
 
 Private Function IsErrorCode(Value As Variant, ErrorNumber As Long) As Boolean

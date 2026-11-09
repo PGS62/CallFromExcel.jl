@@ -22,8 +22,7 @@ namespace CallFromExcel.AddIn
     //   H Dictionary: "H<n>;<key/value lengths-comma-terminated>;<concatenated encodings>"
     //   V Array of Float64 only, no per-element type indicator/length (Julia -> Excel
     //     only): "V<rank>,<dims>;<hex>", 16 hex chars/element, no delimiters
-    //   R Range (Julia -> Excel only), "RI,<n>,<first>,<step>;" (integer) or
-    //     "RF,<n>;<hex first><hex step>" (float), reconstructed via arithmetic
+    //   R Integer range (Julia -> Excel only), "RI,<n>,<first>,<step>;", reconstructed via arithmetic
     public static class WireFormatDecode
     {
         public static object Decode(string wire, bool allowNesting = true, int stringLengthLimit = 0, bool vectorToColumn = false, bool forWorksheet = false)
@@ -347,27 +346,16 @@ namespace CallFromExcel.AddIn
 
         private static object DecodeRange(string wire, bool vectorToColumn, bool forWorksheet)
         {
+            // Integer ranges only. Julia sends float ranges element by element: first + i*step
+            // isn't how Julia computes them, so it can differ in the last bit.
+            if (wire[1] != 'I')
+                throw new FormatException("Character '" + wire[1] + "' is not a recognised 'R'-format sub-type (expected 'I')");
             int p1 = wire.IndexOf(';');
-            int n;
-            double first, step;
-            bool isInteger = wire[1] == 'I';
-            if (isInteger)
-            {
-                string[] parts = wire.Substring(3, p1 - 3).Split(',');
-                n = int.Parse(parts[0], CultureInfo.InvariantCulture);
-                first = long.Parse(parts[1], CultureInfo.InvariantCulture);
-                step = long.Parse(parts[2], CultureInfo.InvariantCulture);
-            }
-            else if (wire[1] == 'F')
-            {
-                n = int.Parse(wire.Substring(3, p1 - 3), CultureInfo.InvariantCulture);
-                first = Hex.HexToDouble(wire, p1 + 1);
-                step = Hex.HexToDouble(wire, p1 + 17);
-            }
-            else
-            {
-                throw new FormatException("Character '" + wire[1] + "' is not a recognised 'R'-format sub-type (expected 'I' or 'F')");
-            }
+            string[] parts = wire.Substring(3, p1 - 3).Split(',');
+            int n = int.Parse(parts[0], CultureInfo.InvariantCulture);
+            double first = long.Parse(parts[1], CultureInfo.InvariantCulture);
+            double step = long.Parse(parts[2], CultureInfo.InvariantCulture);
+            const bool isInteger = true;
 
             if (forWorksheet)
             {

@@ -196,12 +196,6 @@ namespace CallFromExcel.AddIn.TestHarness
             var riArr = (object[])riDecoded;
             CheckTrue("RI range decode", riArr.Length == 5 && Equals(riArr[0], 10L) && Equals(riArr[4], 18L));
 
-            string first = Hex.DoubleToHex(1.0);
-            string step = Hex.DoubleToHex(0.5);
-            object rfDecoded = WireFormatDecode.Decode("RF,4;" + first + step); // 1.0, 1.5, 2.0, 2.5
-            var rfArr = (object[])rfDecoded;
-            CheckTrue("RF range decode", rfArr.Length == 4 && Equals(rfArr[0], 1.0) && Equals(rfArr[3], 2.5));
-
             var riSheet = WireFormatDecode.Decode("RI,5,10,2;", allowNesting: false, vectorToColumn: true, forWorksheet: true) as double[,];
             CheckTrue("RI range decode for a worksheet is a double column", riSheet != null && riSheet.GetLength(0) == 5 && riSheet[0, 0] == 10 && riSheet[4, 0] == 18);
         }

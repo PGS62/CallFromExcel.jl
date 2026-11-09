@@ -1,8 +1,9 @@
 ﻿,"Audit",,,,
 ,,,,,
-,"All 7 rows shown.",,,,
+,"All 8 rows shown.",,,,
 ,"Dbl-click","Double-click","Dbl-click","Double-click","Double-click to filter"
 ,"Version","Date","Time","Author","Comment"
+,8,2026-11-09,0.611921296294895,"Philip Swannell","Added comparison of speed for sorting 1,000,000 doubles."
 ,7,2026-11-08,0.787314814813726,"Philip Swannell","Tweaks to testing of speed for vectors of strings."
 ,6,2026-11-08,0.74168981481489,"Philip Swannell","Added tests for speed of transmission of vectors of strings."
 ,5,2026-11-07,0.699247685188311,"Philip Swannell","Re-ran following optimisations to C# code of CallFromExcel which is now faster on all tests."

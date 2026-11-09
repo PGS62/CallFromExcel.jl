@@ -1,4 +1,5 @@
 ﻿Version	Date	Time	Author	Comment
+8	09-Nov-2026	14:41	Philip Swannell	Added comparison of speed for sorting 1,000,000 doubles.
 7	08-Nov-2026	18:53	Philip Swannell	Tweaks to testing of speed for vectors of strings.
 6	08-Nov-2026	17:48	Philip Swannell	Added tests for speed of transmission of vectors of strings.
 5	07-Nov-2026	16:46	Philip Swannell	Re-ran following optimisations to C# code of CallFromExcel which is now faster on all tests.

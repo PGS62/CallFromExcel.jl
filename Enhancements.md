@@ -99,7 +99,7 @@ Workaround meanwhile: `=IMREAL(SUBSTITUTE(JuliaEval(...),".",","))`.
 
 ## A ribbon tab
 
-**Problem.** Julia can only be started by a `JuliaLaunch` formula, and nothing in Excel's own interface says where to find help: the Add-ins dialog shows no description for any third-party XLL (see "Help on this function" for what does work). JuliaInXL, Julia Computing's earlier Excel add-in, had a JULIA ribbon tab with "Launch Local Julia", "Select Julia File", "Include Julia File", a `tcp://localhost:9999` connection box, "Reconnect" and "Terminate".
+**Problem.** Julia can only be started by a `JuliaLaunch` formula, and nothing in Excel's own interface says where to find help: the Add-ins dialog shows no description for any third-party XLL. (Only "Help on this function" in the Insert Function dialog and the function name in the IntelliSense pop-up link to the README.) JuliaInXL, Julia Computing's earlier Excel add-in, had a JULIA ribbon tab with "Launch Local Julia", "Select Julia File", "Include Julia File", a `tcp://localhost:9999` connection box, "Reconnect" and "Terminate".
 
 **Proposed buttons.**
 

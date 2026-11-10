@@ -1,0 +1,50 @@
+﻿,"JuliaExcel GIFMaker",0.12,1,,,
+,"WindowToActivate","GIF6.xlsm",,,,
+,"Keys","DelayBetween","DelayAfter","OtherCommand",,"GIFMaker - Hints"
+,"{HOME}",,0.12,,,"Use in conjunction with ScreenToGif.exe"
+,"Round Tripping of vectors and matrices~",0.05,,,,"This workbook must be open in a separate Excel instance from the instance that's being recorded."
+,"{DOWN 3}",,1,,,"Launch ScreenToGiF.exe, click the ""Record"" button"
+,"=JuliaLaunch()~",0.12,,,,"Click the ""Record"" button."
+,"{DOWN 2}",,,,,"Position the recording area as required."
+,"Column Vector~",0.12,,,,"Hit the record button at the bottom right of the recording area overlay thingy"
+,"{DOWN}1",,,,,"Run the method MakeGIF over here in this Excel instance, by clicking Button 1"
+,"{DOWN}2",,,,,"That sends recorded keystrokes - more consistently than I'm ever able to type!"
+,"{DOWN}3",,,,,"Don't forget to click the stop recording asap after send keys method MakeGIF exits."
+,"{DOWN}4",,,,,"In ScreenToGIF, delete frames before action starts and after action ends"
+,"{DOWN}5~",,,,,"Delete duplicate frames but make timing be ""sum"""
+,"{Up 4}{RIGHT 2}",,,,,"Save GIF!"
+,"=JuliaCall(""identity"",A7:A11)~",0.12,,,,"Upload to GitHub etc."
+,"{RIGHT 5}",,,,,
+,"=JuliaCall(""typeof"",A7:A11)~",0.12,,,,
+,"{LEFT 7}{DOWN 7}",,,,,
+,"Row Vector~",0.12,,,,
+,"{DOWN}",,,,,
+,"1{RIGHT}TRUE{RIGHT}Foo{RIGHT}4~",,,,,
+,"{RIGHT 2}",,,,,
+,"=JuliaCall(""identity"",A15:D15)~",0.12,,,,
+,"{DOWN 3}",,,,,
+,"=JuliaCall(""typeof"",A15:D15)~",0.12,,,,
+,"{DOWN 2}{LEFT 6}",,,,,
+,"Matrix",0.12,,,,
+,"{DOWN}",,,,,
+,"1{DOWN}2{DOWN}3{RIGHT}6{UP}5{UP}4{RIGHT}7{DOWN}8{DOWN}9~",,,,,
+,"{UP 2}{RIGHT 3}",,,,,
+,"=JuliaCall(""identity"",A21:C23)~",0.12,,,,
+,"{DOWN 5}",,,,,
+,"=JuliaCall(""typeof"",A21:C23)~",0.12,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,"",,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,"",,,,,

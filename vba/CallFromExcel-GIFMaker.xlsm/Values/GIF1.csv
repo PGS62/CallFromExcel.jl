@@ -1,0 +1,27 @@
+﻿,"JuliaExcel GIFMaker",,,,,
+,"WindowToActivate","Julia 1.13.0-rc4",,,,
+,"Keys","DelayBetween","DelayAfter","OtherCommand",,"GIFMaker - Hints"
+,"{ESCAPE}{BACKSPACE}",0,0,,,"Use in conjunction with ScreenToGif.exe"
+,"{ESCAPE}{BACKSPACE}",0,0,,,"This workbook must be open in a separate Excel instance from the instance that's being recorded."
+,"{ESCAPE}{BACKSPACE}",0,0,,,"Launch ScreenToGiF.exe"
+,"{ESCAPE}{BACKSPACE}",0,0,,,"Click the ""Record"" button."
+,"{ESCAPE}{BACKSPACE}",0,0,,,"Position the recording area as required."
+,"{ESCAPE}{BACKSPACE}",0,0,,,"Hit the record button at the bottom right of the recording area overlay thingy"
+,"{ESCAPE}{BACKSPACE}",0,0,,,"Run the method MakeGIF over here in this Excel instance, by clicking Button 1"
+,"{ESCAPE}{BACKSPACE}",0,0,,,"That sends recorded keystrokes - more consistently than I'm ever able to type!"
+,"{BACKSPACE}{BACKSPACE}",0,0,,,"Don't forget to click the stop recording asap after send keys method MakeGIF exits."
+,"{]}",0,3,,,"In ScreenToGIF, delete frames before action starts and after action ends"
+,"add https://github.com/PGS62/JuliaExcel.jl~",0.06,8,,,"Delete duplicate frames but make timing be ""sum"""
+,,,,,,"Save GIF!"
+,,,,,,"Upload to GitHub etc."
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,"Flag file!",,,,,
+,"C:\Temp\RecordingGIF.tmp",,,,,
+,,,,,,
+,#NAME?,,,,,

@@ -1,0 +1,12 @@
+﻿,"Audit",,,,
+,,,,,
+,"All 7 rows shown.",,,,
+,"Dbl-click","Double-click","Dbl-click","Double-click","Double-click to filter"
+,"Version","Date","Time","Author","Comment"
+,7,2026-11-10,0.737407407410501,"Philip Swannell","Re-recorded roundtripping."
+,6,2026-09-03,0.726921296292858,"Philip Swannell",
+,5,2021-11-12,0.65854166666395,"Philip Swannell","Re-recorded installation."
+,4,2021-11-07,0.770405092589499,"Philip Swannell","GIF4 now used in the repo README file."
+,3,2021-11-07,0.645891203705105,"Philip Swannell","GIF2 now records a introductory demo."
+,2,2021-11-07,0.48297453703708,"Philip Swannell","GIF1 now records the install process."
+,1,2021-11-07,0.438599537039408,"Philip Swannell","Converted from equivalent workbook for VBA-CSV project"

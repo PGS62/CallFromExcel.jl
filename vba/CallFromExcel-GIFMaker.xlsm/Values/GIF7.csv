@@ -1,0 +1,59 @@
+﻿,"JuliaExcel GIFMaker",0.1,1,,,
+,"WindowToActivate","GIF7.xlsm",,,,
+,"Keys","DelayBetween","DelayAfter","OtherCommand",,"GIFMaker - Hints"
+,"{HOME}",,0.1,,,"Use in conjunction with ScreenToGif.exe"
+,"Matrix arithmetic",0.05,,,,"This workbook must be open in a separate Excel instance from the instance that's being recorded."
+,"{DOWN 3}",,,,,"Launch ScreenToGiF.exe, click the ""Record"" button"
+,"=JuliaLaunch()~",0.1,1,,,"Click the ""Record"" button."
+,"{DOWN 3}",,,,,"Position the recording area as required."
+,"Column Vector~",0.1,,,,"Hit the record button at the bottom right of the recording area overlay thingy"
+,"{DOWN}={{}1;2;3;4;5{}}~",,,,,"Run the method MakeGIF over here in this Excel instance, by clicking Button 1"
+,"{Up 2}{RIGHT 2}",,,,,"That sends recorded keystrokes - more consistently than I'm ever able to type!"
+,"Row Vector",0.1,,,,"Don't forget to click the stop recording asap after send keys method MakeGIF exits."
+,"{DOWN}={{}8,7,6,5,4{}}~",,,,,"In ScreenToGIF, delete frames before action starts and after action ends"
+,"{DOWN 3}",,,,,"Delete duplicate frames but make timing be ""sum"""
+,"=JuliaCall(""*"",A8:A12,C7:G7)~",0.1,,,,"Save GIF!"
+,"{DOWN 7}",,,,,"Upload to GitHub etc."
+,"=MMULT(A8:A12,C7:G7)~",0.1,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,"",,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,"",,,,,

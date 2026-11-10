@@ -46,18 +46,21 @@ Sub MakeGIF()
           Dim DelayBetween As Double
           Dim waitTime As Double
           Dim OtherCommand As String
+          Dim shInstructions As Worksheet
+          
 
 1         On Error GoTo ErrHandler
-2         AppActivate ActiveSheet.Range("WindowToActivate").Value
-3         ActiveSheet.Calculate
-4         With ActiveSheet.Range("keys")
+Set shInstructions = ActiveSheet
+2         AppActivate shInstructions.Range("WindowToActivate").Value
+3         shInstructions.Calculate
+4         With shInstructions.Range("keys")
 5             Keys = Range(.Offset(0, 0), .Offset(-1, 0).End(xlDown)).Value
 6         End With
 
 7         For i = 1 To UBound(Keys, 1)
-8             DelayAfter = ActiveSheet.Range("DelayAfter").Offset(i - 1).Value
-9             DelayBetween = ActiveSheet.Range("DelayBetween").Offset(i - 1).Value
-10            OtherCommand = ActiveSheet.Range("OtherCommand").Offset(i - 1).Value
+8             DelayAfter = shInstructions.Range("DelayAfter").Offset(i - 1).Value
+9             DelayBetween = shInstructions.Range("DelayBetween").Offset(i - 1).Value
+10            OtherCommand = shInstructions.Range("OtherCommand").Offset(i - 1).Value
 11            Key = Keys(i, 1)
 
 12            If InStr(Key, "{") > 0 Then

@@ -1,0 +1,45 @@
+﻿,"JuliaExcel GIFMaker",0.15,1,,,
+,"WindowToActivate","GIF4-take2",,,,
+,"Keys","DelayBetween","DelayAfter","OtherCommand",,"GIFMaker - Hints"
+,"{HOME}",,0,,,"Use in conjunction with ScreenToGif.exe"
+,"Demo~",0.075,0,,,"This workbook must be open in a separate Excel instance from the instance that's being recorded."
+,"{Down 2}",,0,,,"Launch ScreenToGiF.exe, click the ""Record"" button"
+,"JuliaLaunch:~",0.075,0,,,"Click the ""Record"" button."
+,"{RIGHT}",,0,,,"Position the recording area as required."
+,"=JuliaLaunch()~",0.15,1,,,"Hit the record button at the bottom right of the recording area overlay thingy"
+,"{DOWN 3}{LEFT}",,0,,,"Run the method MakeGIF over here in this Excel instance, by clicking Button 1"
+,"Call display_results~",0.075,0,,,"That sends recorded keystrokes - more consistently than I'm ever able to type!"
+,"{RIGHT}",,0,,,"Don't forget to click the stop recording asap after send keys method MakeGIF exits."
+,"=JuliaCall(""display_results"",TRUE)~",0.15,1,,,"In ScreenToGIF, delete frames before action starts and after action ends"
+,"{DOWN 3}{LEFT}",,,,,"Delete duplicate frames but make timing be ""sum"""
+,"using LinearAlgebra~",0.075,,,,"Save GIF!"
+,"{RIGHT}",,,,,"Upload to GitHub etc."
+,"=JuliaEval(A9)~",0.15,1,,,
+,"{DOWN 3}{LEFT}",,,,,
+,"x=(1:4).+(1:4)'+10I~",0.075,,,,
+,"{RIGHT}",,,,,
+,"=JuliaEval(A12)~",0.15,1,,,
+,"{DOWN 6}{LEFT}",,,,,
+,"y=inv(x)~",0.075,,,,
+,"{RIGHT}",,,,,
+,"=JuliaEval(A18)~",0.15,1,,,
+,"{DOWN 6}{LEFT}",,,,,
+,"typeof(x)~",0.075,,,,
+,"{RIGHT}",,,,,
+,"=JuliaEval(A24)~",0.15,1,,,
+,"{DOWN 3}{LEFT}",,,,,
+,"typeof(y)~",0.075,,,,
+,"{RIGHT}",,,,,
+,"=JuliaEval(A27)~",0.15,1,,,
+,"{DOWN 3}{LEFT}",,,,,
+,"y2~",0.075,,,,
+,"{RIGHT}",,,,,
+,"=JuliaSetVar(A30,B18#)",0.15,1,,,
+,"{DOWN 3}{LEFT}",,,,,
+,"y-y2~",0.075,,,,
+,"{RIGHT}",,,,,
+,"=JuliaEval(A33)~",0.15,1,,,
+,"{DOWN 6}{LEFT}",,,,,
+,"*~",,,,,
+,"{RIGHT}",,,,,
+,"=JuliaCall(A39,B12#,B18#)~",0.15,1,,,

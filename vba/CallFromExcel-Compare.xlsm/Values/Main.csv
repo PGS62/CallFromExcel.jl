@@ -4,24 +4,28 @@
 ,,,,,,,,,
 ,,,,,,,,,
 ,"CallFromExcel project path","C:\Projects\CallFromExcel",,,,,,,
-,"CallFromExcelLaunch","Julia is already running in window ""Julia 1.13.3 on Windows serving Excel PID 275708, port 2700""",,,,,,,
+,"CallFromExcelLaunch","Julia is already running in window ""Julia 1.13.3 on Windows serving Excel PID 342880, port 2704""",,,,,,,
 ,"CallFromExcelTestCell",2,,,,,,,
 ,"JuliaInXLTestCell",2,,,,,,,
 ,"CallFromExcel running under Julia version","1.13.3",,,,,,,
 ,"JuliaInXL running under Julia version","1.13.3",,,,,,,
+,"CallFromExcel version","0.1.0",,,,,,,
+,"CallFromExcel commit","4c3f01f",,,,,,,
+,"JuliaInXL version","1.2.0",,,,,,,
+,"JuliaInXL commit","not a git checkout",,,,,,,
 ,"Computer","MSI",,,,,,,
 ,"Results Identical?",False,,,,,,,
-,"MaximumAbsoluteDifference",1.11022302462516E-16,,,,,,,
-,"LogBase2(MaxAbsDiff)",-53,,,,,,,
-,,,,,,,,,
+,"MaximumAbsoluteDifference",7.27595761418343E-12,,,,,,,
+,"LogBase2(MaxAbsDiff)",-37,,,,,,,
+,1,,,,,,,,
 ,"TestSpecWithHeaders",,,,,,,,
 ,"Description","VectorLength","CallFromExcelFormula","JuliaInXLFormula","NumCalls","OneCallPerCell","CallFromExcel (s)","JuliaInXL (s)","JuliaInXL / CallFromExcel"
-,"Latency",5000,"=JuliaEval(""1+1"")","=jleval(""1+1"")",1,True,2.12174500001129E-04,6.35907959996257E-04,2.99709889733627
-,"Transmit UnitRange to Excel",100000,"=JuliaEval(""1:VectorLength"")","{=jleval(""1:VectorLength"")}",5,False,2.27518600062467E-02,6.20464000036009E-02,2.72709132293208
-,"Transmit Vector{Float64} to Excel",100000,"=JuliaEval(""(1:VectorLength).^2"")","{=jleval(""(1:VectorLength).^2"")}",5,False,3.68023400078528E-02,8.55595599976368E-02,2.32484021340438
-,"Roundtrip Vector{Float64}",100000,"=JuliaCall(""identity"",InputData)","{=jlcall(""identity"",InputData)}",5,False,6.24226999934763E-02,0.734680199995637,11.7694396441105
-,"Transmit Vector{Float64} to Julia",100000,"=JuliaCall(""sum"",InputData)","=jlcall(""sum"",InputData)",20,False,3.26129099936225E-02,0.556709944989416,17.070232159543
-,"Transmit Vector{String} to Excel",100000,"=JuliaEval(""string.(1:VectorLength)"")","{=jleval(""string.(1:VectorLength)"")}",5,False,4.61026599979959E-02,9.39689199905843E-02,2.03825375791048
-,"Roundtrip Vector{String}",100000,"=JuliaCall(""identity"",StringData)","{=jlcall(""identity"",StringData)}",5,False,0.112881579995155,0.241972840006929,2.14359898237882
-,"sort CallFromExcel v JuliaInXL",1000000,"=JuliaCall(""sort"",InputData)","{=jlcall(""sort"",InputData)}",1,False,0.424073700036388,8.82313380000414,20.8056613726507
-,"sort CallFromExcel v Excel's SORT",1000000,"=JuliaCall(""sort"",InputData)","=SORT(InputData)",10,False,0.573054810008034,0.684160330006853,1.19388288529898
+,"Latency",5000,"=JuliaEval(""1+1"")","=jleval(""1+1"")",1,True,2.32549259997904E-04,7.20894180005416E-04,3.09996333685135
+,"Transmit UnitRange to Excel",100000,"=JuliaEval(""1:VectorLength"")","{=jleval(""1:VectorLength"")}",5,False,1.38613199815154E-02,6.64230200229213E-02,4.79196931544029
+,"Transmit Vector{Float64} to Excel",100000,"=JuliaEval(""(1:VectorLength).^2"")","{=jleval(""(1:VectorLength).^2"")}",5,False,3.94999400246888E-02,6.97360799880698E-02,1.76547306007256
+,"Roundtrip Vector{Float64}",100000,"=JuliaCall(""identity"",InputData)","{=jlcall(""identity"",InputData)}",5,False,8.54487399803475E-02,0.746572960028425,8.73708565158633
+,"Transmit Vector{Float64} to Julia",100000,"=JuliaCall(""sum"",InputData)","=jlcall(""sum"",InputData)",20,False,3.49933599994984E-02,0.572457050014054,16.3590192545746
+,"Transmit Vector{String} to Excel",100000,"=JuliaEval(""string.(1:VectorLength)"")","{=jleval(""string.(1:VectorLength)"")}",5,False,5.37939399946481E-02,0.111214080033824,2.06740908074197
+,"Roundtrip Vector{String}",100000,"=JuliaCall(""identity"",StringData)","{=jlcall(""identity"",StringData)}",5,False,0.147636400000192,0.636629620008171,4.31214537883165
+,"sort CallFromExcel v JuliaInXL",1000000,"=JuliaCall(""sort"",InputData)","{=jlcall(""sort"",InputData)}",1,False,0.417495400062762,9.72130119998474,23.2848103201217
+,"sort CallFromExcel v Excel's SORT",1000000,"=JuliaCall(""sort"",InputData)","=SORT(InputData)",10,False,0.349311479984317,1.27703049997799,3.6558503603584

@@ -4,7 +4,11 @@ C8	"=JuliaEval(""1+1"")"
 C9	"=jleval(""1+1"")"
 C10	"=JuliaEval(""string(VERSION)"")"
 C11	"=jleval(""string(VERSION)"")"
-C12	"=GetEnvironmentVariable(""COMPUTERNAME"")"
-C13	=AND(CallFromExcel!AllResults=JuliaInXL!AllResults)
-C14	=MAX(IF(ISNUMBER(CallFromExcel!AllResults)*ISNUMBER(JuliaInXL!AllResults),ABS(CallFromExcel!AllResults-JuliaInXL!AllResults)))
-C15	=LOG(MaximumAbsoluteDifference)/LOG(2)
+C12	"=JuliaEval(""string(pkgversion(CallFromExcel))"")"
+C13	"=JuliaEval(""try readchomp(`git -C $(pkgdir(CallFromExcel)) describe --always --dirty`) catch; """"not a git checkout"""" end"")"
+C14	"=jleval(""string(pkgversion(JuliaInXL))"")"
+C15	"=jleval(""try readchomp(`git -C $(pkgdir(JuliaInXL)) describe --always --dirty`) catch; """"not a git checkout"""" end"")"
+C16	"=GetEnvironmentVariable(""COMPUTERNAME"")"
+C17	=AND(CallFromExcel!AllResults=JuliaInXL!AllResults)
+C18	=MAX(IF(ISNUMBER(CallFromExcel!AllResults)*ISNUMBER(JuliaInXL!AllResults),ABS(CallFromExcel!AllResults-JuliaInXL!AllResults)))
+C19	=LOG(MaximumAbsoluteDifference)/LOG(2)

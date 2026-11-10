@@ -1,4 +1,5 @@
 ﻿Version	Date	Time	Author	Comment
+10	10-Nov-2026	11:34	Philip Swannell	Re-ran against commit 4c3f01f of JuliaExcel.
 9	09-Nov-2026	15:09	Philip Swannell	Added comparison of speed for sorting 1,000,000 doubles CallFromExcel vs Excel's SORT.
 8	09-Nov-2026	14:41	Philip Swannell	Added comparison of speed for sorting 1,000,000 doubles.
 7	08-Nov-2026	18:53	Philip Swannell	Tweaks to testing of speed for vectors of strings.

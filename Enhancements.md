@@ -96,3 +96,29 @@ Workaround meanwhile: `=IMREAL(SUBSTITUTE(JuliaEval(...),".",","))`.
 - Ordinary strings are never touched, so a Julia string `"1.5+2i"` still comes back unchanged.
 
 **Test.** A VBA test sets `Application.UseSystemSeparators = False` and `Application.DecimalSeparator = ","`, checks that `=JuliaEval("1.5+2im")` gives `"1,5+2i"` and that `IMREAL` of it gives 1.5, and restores both settings even if it fails (they're application settings and may persist). Existing tests cover the point-separator case.
+
+## A ribbon tab
+
+**Problem.** Julia can only be started by a `JuliaLaunch` formula, and nothing in Excel's own interface says where to find help: the Add-ins dialog shows no description for any third-party XLL (see "Help on this function" for what does work). JuliaInXL, Julia Computing's earlier Excel add-in, had a JULIA ribbon tab with "Launch Local Julia", "Select Julia File", "Include Julia File", a `tcp://localhost:9999` connection box, "Reconnect" and "Terminate".
+
+**Proposed buttons.**
+
+- **Launch Julia** (large). Launches with remembered options - see below.
+- **Include File.** One step: a file picker, then `JuliaInclude` on the chosen file (JuliaInXL's separate Select and Include steps add nothing).
+- **Show Julia Window.** Brings Julia's console to the front, e.g. after launching minimised.
+- **Close Julia.** Ends the Julia session, like JuliaInXL's "Terminate".
+- **Help.** Opens the GitHub page.
+
+Not JuliaInXL's connection box or Reconnect: they belong to its connection model, not ours (Julia writes its port to the port file).
+
+**Decisions to make.**
+
+- **Launch options.** A button has no arguments. Either launch with defaults, or open a small dialog for `UseLinux`, `MinimiseWindow`, `CommandLineOptions` and `Packages`, remembering the last choices (e.g. in the registry). The dialog is most of the work.
+- **Ribbon versus formula.** A `JuliaLaunch` formula travels with the workbook and records how Julia should start; a ribbon click is per session. Both stay; the README would say when to use which.
+- **Include from the ribbon** loads the file at once, but Excel won't recalculate cells that use the functions it defines. Either recalculate afterwards or say so in the README.
+- **Close Julia** while formulas still depend on it: they will show "Please call JuliaLaunch..." on their next recalculation, which is probably right.
+- **Icons.** The Julia dots are licensed CC BY-NC-SA 4.0 by Stefan Karpinski (https://github.com/JuliaLang/julia-logo-graphics). Using them in a free, open-source add-in fits the licence with attribution, the image kept under that licence separately from the MIT code. But "NonCommercial" doesn't match MIT's allowance of commercial use. Options: ask Stefan Karpinski for permission, accept the low practical risk as many Julia projects do, or design our own icon. Don't copy JuliaInXL's other icons, which are Julia Computing's artwork; Office's built-in `imageMso` icons are free to use and look native.
+
+**Sketch.** Excel-DNA supports ribbons directly: a `CustomUI` block in `CallFromExcel.AddIn.dna`, a class deriving from `ExcelRibbon` with one handler per button, and the icon packed into the `.xll`. Most handlers call existing code (`JuliaLaunch.Launch`, the `JuliaInclude` path, `WindowUtils` for the window). Ribbon callbacks run on Excel's main thread, like our worksheet functions. Expect the design to take time to get right: layout, wording, icons, and the options dialog.
+
+**Test.** Mostly by hand, as ribbon clicks can't easily be automated. The handlers' logic can sit in plain methods that the VBA tests call through the COM server.

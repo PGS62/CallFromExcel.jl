@@ -23,7 +23,7 @@ Option Explicit
 Public Sub RunSoakTest(Optional Batches As Long = 20, Optional IterationsPerBatch As Long = 1000)
     Dim CFE As Object
     Dim Arr() As Double
-    Dim i As Long, b As Long, k As Long
+    Dim i As Long, B As Long, k As Long
     Dim wb As Workbook, wsOut As Worksheet, wsCalc As Worksheet
     Dim Formulas As Range
     Dim ExcelPID As Long, JuliaPID As Long
@@ -65,7 +65,7 @@ Public Sub RunSoakTest(Optional Batches As Long = 20, Optional IterationsPerBatc
     Application.ScreenUpdating = False
 
     ' Batch 0 is the warm-up: JIT, Julia method compilation and the connection pool settle.
-    For b = 0 To Batches
+    For B = 0 To Batches
         t = Timer
         For i = 1 To IterationsPerBatch
             Res = CFE.JuliaCallVBA("+", 1, 2)
@@ -77,15 +77,15 @@ Public Sub RunSoakTest(Optional Batches As Long = 20, Optional IterationsPerBatc
         Next i
         t = Timer - t
 
-        wsOut.Cells(b + 2, 1).Value = b
-        wsOut.Cells(b + 2, 2).Value = CDbl(b) * IterationsPerBatch
-        wsOut.Cells(b + 2, 3).Value = t
-        wsOut.Cells(b + 2, 4).Value = PrivateMB(ExcelPID)
-        wsOut.Cells(b + 2, 5).Value = CFE.JuliaEvalVBA("GC.gc(); Base.gc_live_bytes() / 2^20")
-        wsOut.Cells(b + 2, 6).Value = PrivateMB(JuliaPID)
-        Application.StatusBar = "Soak test: batch " & b & " of " & Batches
+        wsOut.Cells(B + 2, 1).Value = B
+        wsOut.Cells(B + 2, 2).Value = CDbl(B) * IterationsPerBatch
+        wsOut.Cells(B + 2, 3).Value = t
+        wsOut.Cells(B + 2, 4).Value = PrivateMB(ExcelPID)
+        wsOut.Cells(B + 2, 5).Value = CFE.JuliaEvalVBA("GC.gc(); Base.gc_live_bytes() / 2^20")
+        wsOut.Cells(B + 2, 6).Value = PrivateMB(JuliaPID)
+        Application.StatusBar = "Soak test: batch " & B & " of " & Batches
         DoEvents
-    Next b
+    Next B
 
     Application.StatusBar = False
     Application.ScreenUpdating = True

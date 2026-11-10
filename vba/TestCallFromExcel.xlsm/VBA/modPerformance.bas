@@ -44,12 +44,18 @@ Option Private Module
 'Expression = fill("xxx",1000,1000)
 'Average time in JuliaEval   0.224108579999302          Averaged over 20 calls '1st run using C# code of CallFromExcel.
 '--------------------------------------------------
+'10-Nov-2026 11:00:50       MSI
+'CallFromExcel Version = 0.1.0
+'Commit = d438420
+'Expression = fill("xxx",1000,1000)
+'Average time in JuliaEval   0.220096425001975          Averaged over 20 calls
+'--------------------------------------------------
 Private Sub SimpleSpeedTest()
 
-          Const Expression As String = "fill(""xxx"",1000,1000)"
-          Const NumCalls = 20
-          ' Const Expression As String = "1+1"
-          ' Const NumCalls = 1000
+         ' Const Expression As String = "fill(""xxx"",1000,1000)"
+         ' Const NumCalls = 20
+          Const Expression As String = "1+1"
+           Const NumCalls = 1000
           Const UseLinux As Boolean = False
           Dim i As Long
           Dim Res As Variant
@@ -67,47 +73,56 @@ Private Sub SimpleSpeedTest()
 9         t2 = ElapsedTime
 
 10        Debug.Print "'" & Format(Now(), "dd-mmm-yyyy hh:mm:ss"), Environ("ComputerName")
-11        Debug.Print "'Expression = " & Expression
-12        Debug.Print "'Average time in JuliaEval", (t2 - t1) / NumCalls, "Averaged over " & CStr(NumCalls) & " calls"
-13        Debug.Print "'--------------------------------------------------"
-14    End Sub
+11        Debug.Print "'" & Replace(VersionReport(), vbLf, vbLf & "'")
+12        Debug.Print "'Expression = " & Expression
+13        Debug.Print "'Average time in JuliaEval", (t2 - t1) / NumCalls, "Averaged over " & CStr(NumCalls) & " calls"
+14        Debug.Print "'--------------------------------------------------"
+15    End Sub
 
-      '--------------------------------------------------
-      '29-Oct-2025 18:37:22       PHILIP-HPZ1
-      'Expression = 1+1
-      'Average time in JuliaEval   6.16188229999898E-03       Averaged over 1000 calls
-      '--------------------------------------------------
-      '22-Dec-2025 15:58:22       MSI
-      'Expression = 1+1
-      'Average time in JuliaEval   0.015039338300001          Averaged over 1000 calls
-      '--------------------------------------------------
-      '18-Aug-2026 20:09:02       MSI
-      'Expression = 1+1
-      'Average time in JuliaEval   1.32635509999818E-03       Averaged over 1000 calls
-      '--------------------------------------------------
-      '08-Nov-2026 11:03:46       MSI
-      'Expression = 1+1
-      'Average time in JuliaEval   1.60134200006723E-04       Averaged over 1000 calls' '1st run using C# code of CallFromExcel.
-      '--------------------------------------------------
 
-      '========================================================================================================================
-      'Running method PerformanceTest
-      'Time now = 2026-08-03 18:01:11
-      'JuliaExcel Version = 107
-      'Computer = MSI
-      'Latency test
-      'Average time for JuliaEval("1+1") = 7.96316399984062 miliseconds (averaged over 500 calls)
-      'Two-way data transport test
-      'Average time for JuliaCall("identity", vector of length 100,000) = 1.48447485999204 seconds (averaged over 10 calls)
-      'One-way data transport test, Excel to Julia
-      'Average time for JuliaCall("sum", vector of length 100,000) = 1.27661278001033 seconds (averaged over 10 calls)
-      'One-way data transport test, Julia to Excel
-      'Average time for JuliaEval("collect((1:100000).*pi)") = 0.294781249994412 seconds (averaged over 10 calls)
 
-      '========================================================================================================================
-      'Running method PerformanceTest
-      'Time now = 2026-08-04 15:53:30
-      'JuliaExcel Version = 109 <- Version 109 had experimental code to use UTF-8 for Excel-> Julia and Julia->Excel _
+'--------------------------------------------------
+'29-Oct-2025 18:37:22       PHILIP-HPZ1
+'Expression = 1+1
+'Average time in JuliaEval   6.16188229999898E-03       Averaged over 1000 calls
+'--------------------------------------------------
+'22-Dec-2025 15:58:22       MSI
+'Expression = 1+1
+'Average time in JuliaEval   0.015039338300001          Averaged over 1000 calls
+'--------------------------------------------------
+'18-Aug-2026 20:09:02       MSI
+'Expression = 1+1
+'Average time in JuliaEval   1.32635509999818E-03       Averaged over 1000 calls
+'--------------------------------------------------
+'08-Nov-2026 11:03:46       MSI
+'Expression = 1+1
+'Average time in JuliaEval   1.60134200006723E-04       Averaged over 1000 calls' '1st run using C# code of CallFromExcel.
+'--------------------------------------------------
+'CallFromExcel Version = 0.1.0
+'Commit = d438420
+'Expression = 1+1
+'Average time in JuliaEval   1.17278999998234E-04       Averaged over 1000 calls
+'--------------------------------------------------
+
+
+'========================================================================================================================
+'Running method PerformanceTest
+'Time now = 2026-08-03 18:01:11
+'JuliaExcel Version = 107
+'Computer = MSI
+'Latency test
+'Average time for JuliaEval("1+1") = 7.96316399984062 miliseconds (averaged over 500 calls)
+'Two-way data transport test
+'Average time for JuliaCall("identity", vector of length 100,000) = 1.48447485999204 seconds (averaged over 10 calls)
+'One-way data transport test, Excel to Julia
+'Average time for JuliaCall("sum", vector of length 100,000) = 1.27661278001033 seconds (averaged over 10 calls)
+'One-way data transport test, Julia to Excel
+'Average time for JuliaEval("collect((1:100000).*pi)") = 0.294781249994412 seconds (averaged over 10 calls)
+
+'========================================================================================================================
+'Running method PerformanceTest
+'Time now = 2026-08-04 15:53:30
+'JuliaExcel Version = 109 <- Version 109 had experimental code to use UTF-8 for Excel-> Julia and Julia->Excel _
        communication.Julia To Excel gets faster Excel To Julia gets slower.
 'Computer = MSI
 'Latency test
@@ -382,18 +397,39 @@ Private Sub SimpleSpeedTest()
 'Average time for JuliaEval("collect((1:100000).*pi)") = 1.90326599986292E-02 seconds (averaged over 10 calls)
 'One-way data transport (AbstractRange), Julia to Excel
 'Average time for JuliaEval("(1:100000).*pi") = 1.42919200006872E-02 seconds (averaged over 10 calls)
-
-' Two report lines saying which CallFromExcel code is running, as reported by Julia: the
-' package version, and the commit from "git describe --always --dirty", which appends
-' "-dirty" if there are uncommitted changes. That is "not a git checkout" for a package
-' installed with Pkg.add rather than run from the repo via --project=. Julia must be running.
-Private Function VersionReport(Prefix As String) As String
-          Dim Version As Variant, Commit As Variant
-1         Version = CallFromExcel.JuliaEval("string(pkgversion(CallFromExcel))")
-2         Commit = CallFromExcel.JuliaEval("try readchomp(`git -C $(pkgdir(CallFromExcel)) describe --always --dirty`) catch; ""not a git checkout"" end")
-3         VersionReport = Prefix & "CallFromExcel Version = " & Version & vbLf & Prefix & "Commit = " & Commit
-End Function
-
+'========================================================================================================================
+'Running method PerformanceTest
+'Time now = 2026-11-09 17:56:00
+'CallFromExcel Version = 0.1.0
+'Commit = 07eab05
+'Computer = MSI
+'Latency test
+'Average time for JuliaEval("1+1") = 0.131025200011209 miliseconds (averaged over 500 calls)
+'Two-way data transport test
+'Average time for JuliaCall("identity", vector of 100,000 doubles) = 3.21504799998365E-02 seconds (averaged over 10 calls)
+'One-way data transport test, Excel to Julia
+'Average time for JuliaCall("sum", vector of 100,000 doubles) = 2.04506200039759E-02 seconds (averaged over 10 calls)
+'One-way data transport test, Julia to Excel
+'Average time for JuliaEval("collect((1:100000).*pi)") = 1.02706499979831E-02 seconds (averaged over 10 calls)
+'One-way data transport (AbstractRange), Julia to Excel
+'Average time for JuliaEval("(1:100000).*pi") = 1.09344399999827E-02 seconds (averaged over 10 calls)
+'========================================================================================================================
+'Running method PerformanceTest
+'Time now = 2026-11-10 10:49:39
+'CallFromExcel Version = 0.1.0
+'Commit = d438420
+'Computer = MSI
+'Latency test
+'Average time for JuliaEval("1+1") = 0.142581199994311 miliseconds (averaged over 500 calls)
+'Two-way data transport test
+'Average time for JuliaCall("identity", vector of 100,000 doubles) = 2.54280900000595E-02 seconds (averaged over 10 calls)
+'One-way data transport test, Excel to Julia
+'Average time for JuliaCall("sum", vector of 100,000 doubles) = 1.63368800072931E-02 seconds (averaged over 10 calls)
+'One-way data transport test, Julia to Excel
+'Average time for JuliaEval("collect((1:100000).*pi)") = 7.42962000658736E-03 seconds (averaged over 10 calls)
+'One-way data transport (AbstractRange), Julia to Excel
+'Average time for JuliaEval("(1:100000).*pi") = 1.05511100031435E-02 seconds (averaged over 10 calls)
+'========================================================================================================================
 Function PerformanceTest() As String
           Const NumCallsOnePlusOne As Long = 500
           Const NumCallsVectors = 10
@@ -498,6 +534,19 @@ ErrHandler:
 66        PerformanceTest = ReThrow("PerformanceTest", Err, True)
 End Function
 
+' Two report lines saying which CallFromExcel code is running, as reported by Julia: the
+' package version, and the commit from "git describe --always --dirty", which appends
+' "-dirty" if there are uncommitted changes. That is "not a git checkout" for a package
+' installed with Pkg.add rather than run from the repo via --project=. Julia must be running.
+Function VersionReport(Optional Prefix As String) As String
+          Dim Version As Variant, Commit As Variant
+1         Version = CallFromExcel.JuliaEval("string(pkgversion(CallFromExcel))")
+2         Commit = CallFromExcel.JuliaEval("try readchomp(`git -C $(pkgdir(CallFromExcel)) describe --always --dirty`) catch; ""not a git checkout"" end")
+3         VersionReport = Prefix & "CallFromExcel Version = " & Version & vbLf & Prefix & "Commit = " & Commit
+End Function
+
+
+
 '--------------------------------------------------
 'Running method SerialisationPerformanceTest
 '========================================================================================================================
@@ -573,7 +622,6 @@ End Function
 'Time to evaluate 'DataFrame(rand(Float64,(5000,512)),:auto)':  2.15701540000737
 'Time to evaluate 'DataFrame(rand(Float64,(5000,1024)),:auto)':  6.45206529996358
 '========================================================================================================================
-'========================================================================================================================
 'Running method DataframePerformanceTest
 'Time now = 2026-11-08 14:48:53
 'CallFromExcel Version = TODO write code to get this
@@ -589,7 +637,24 @@ End Function
 'Time to evaluate 'DataFrame(rand(Float64,(5000,256)),:auto)':  0.328970999980811
 'Time to evaluate 'DataFrame(rand(Float64,(5000,512)),:auto)':  0.658971500000916
 'Time to evaluate 'DataFrame(rand(Float64,(5000,1024)),:auto)':  1.33720409998205
-
+'========================================================================================================================
+'Running method DataframePerformanceTest
+'Time now = 2026-11-10 10:52:38
+'Computer = MSI
+'CallFromExcel Version = 0.1.0
+'Commit = d438420
+'Time to evaluate 'DataFrame(rand(Float64,(5000,1)),:auto)':  1.36979995295405E-03
+'Time to evaluate 'DataFrame(rand(Float64,(5000,2)),:auto)':  1.86570000369102E-03
+'Time to evaluate 'DataFrame(rand(Float64,(5000,4)),:auto)':  3.50480002816767E-03
+'Time to evaluate 'DataFrame(rand(Float64,(5000,8)),:auto)':  6.71019998844713E-03
+'Time to evaluate 'DataFrame(rand(Float64,(5000,16)),:auto)':  1.70015000039712E-02
+'Time to evaluate 'DataFrame(rand(Float64,(5000,32)),:auto)':  3.37697999784723E-02
+'Time to evaluate 'DataFrame(rand(Float64,(5000,64)),:auto)':  0.095545900054276
+'Time to evaluate 'DataFrame(rand(Float64,(5000,128)),:auto)':  0.116476599941961
+'Time to evaluate 'DataFrame(rand(Float64,(5000,256)),:auto)':  0.28722280007787
+'Time to evaluate 'DataFrame(rand(Float64,(5000,512)),:auto)':  0.578835899941623
+'Time to evaluate 'DataFrame(rand(Float64,(5000,1024)),:auto)':  1.20030040002894
+'========================================================================================================================
 Sub DataframePerformanceTest()
           Dim Report As String
 

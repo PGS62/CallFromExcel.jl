@@ -38,7 +38,7 @@ function round_trip(x)
 end
 
 @testset "CallFromExcel.jl" begin
-    #For compatibility with VBA function Unserialise (which should be exact equivalent of decode_from_excel)
+    # The exact wire forms the add-in's WireFormatDecode.Decode expects
     @test CallFromExcel.encode_for_xl(1) == "^1"
     @test CallFromExcel.encode_for_xl(1.0) == "#3FF0000000000000"
     @test CallFromExcel.encode_for_xl(Int8(1)) == "%1"
@@ -166,8 +166,8 @@ end
     @test startswith(CallFromExcel.encode_for_xl(Any[1.0, 2.0, 3.0]), "V")
 
     # ...but the dynamic check must still correctly decline "V" (falling back to the general
-    # format) for a Vector{Any} containing a NaN, a non-Float64 element, or with rank > 9 (matching
-    # VBA's own ReDimVariantArray MAX_RANK, modUnserialise.bas).
+    # format) for a Vector{Any} containing a NaN, a non-Float64 element, or with rank > 9 (the
+    # add-in's WireFormatDecode.DecodeV reads the rank as a single digit).
     @test CallFromExcel.encode_for_xl(Any[1.0, 2.0, NaN]) == CallFromExcel.encode_for_xl([1.0, 2.0, NaN])
     @test !startswith(CallFromExcel.encode_for_xl(Any[1.0, 2.0, NaN]), "V")
     @test CallFromExcel.encode_for_xl(Any[1.0, 2, 3.0]) == CallFromExcel.encode_array_general(Any[1.0, 2, 3.0])
@@ -177,9 +177,8 @@ end
     # Rank 3-9: one method (encode_for_xl(x::Array{Float64,N})) handles every rank, since
     # Vector{Float64}/Matrix{Float64} are just Array{Float64,1}/Array{Float64,2} and the bulk
     # byte-reinterpret doesn't care how many dimensions the buffer is viewed as. Decoded by the
-    # Case 86 'V' branch's Case Else (rank 3-9) in Unserialise (modUnserialise.bas), which reuses
-    # ParseDims/ReDimVariantArray/AssignByRank - the same helpers the general "*" format's own
-    # >=3-D handling already used.
+    # add-in's WireFormatDecode.DecodeV, whose rank 3-9 branch builds the array with ParseDims and
+    # AdvanceIndex.
     let a3d = reshape(collect(1.0:24.0), 2, 3, 4)
         @test startswith(CallFromExcel.encode_for_xl(a3d), "V3,2,3,4;")
         @test round_trip(a3d)
@@ -188,8 +187,7 @@ end
         @test CallFromExcel.encode_for_xl(Array{Any}(a3d)) == CallFromExcel.encode_for_xl(a3d)
     end
 
-    # Rank > 9 must fall back to the general "*" format - matches VBA's own ReDimVariantArray
-    # MAX_RANK, which Case 86's Case Else would otherwise be asked to exceed.
+    # Rank > 9 must fall back to the general "*" format - the add-in's DecodeV handles only ranks 1-9.
     let a10d = reshape(collect(1.0:2.0^10), fill(2, 10)...)
         @test !startswith(CallFromExcel.encode_for_xl(a10d), "V")
         @test round_trip(a10d)
@@ -200,27 +198,36 @@ end
         @test CallFromExcel.encode_for_xl(x3d) == CallFromExcel.encode_for_xl(fill(1.0, 2, 2, 2))
     end
 
-    # decode_xl_array_v (src/decode.jl) - the VBA -> Julia direction, added alongside
-    # TrySerialiseArrayAsV (modSerialise.bas). Real round trips are possible now that
+    # decode_xl_array_v (src/decode.jl) - the Excel -> Julia direction, whose input the add-in's
+    # WireFormatEncode.TryEncodeArrayAsV produces. Real round trips are possible since
     # decode_from_xl understands "V", unlike the encode-only assertions above.
     @test round_trip([1.0, 2.0, 3.0])
     @test round_trip([1.0 2.0 3.0; 4.0 5.0 6.0])  # non-square, to catch a row/column transposition bug
     @test CallFromExcel.decode_from_xl(CallFromExcel.encode_for_xl([1.0, 2.0, 3.0])) isa Vector{Float64}
     @test CallFromExcel.decode_from_xl(CallFromExcel.encode_for_xl([1.0 2.0; 3.0 4.0])) isa Matrix{Float64}
 
-    # Hand-built, VBA-style big-endian hex (plain MSB-first hex per element, matching what
-    # DoubleToHex in modSerialise.bas actually produces) - confirms decode_xl_array_v works against
-    # genuinely VBA-encoded-style input, not only against Julia's own encoder output.
+    # Hand-built big-endian hex in upper case (MSB-first per element, as the add-in's
+    # Hex.WriteBulkHex produces) - confirms decode_xl_array_v works against the add-in's style of
+    # input, not only against Julia's own (lower-case) encoder output.
     let be_hex(v) = uppercase(string(reinterpret(UInt64, v), base=16, pad=16))
         manual = "V1,3;" * be_hex(1.0) * be_hex(-2.5) * be_hex(3.14159265358979)
         @test CallFromExcel.decode_from_xl(manual) == [1.0, -2.5, 3.14159265358979]
 
-        # Rank 3, exercising decode_xl_array_v's general reshape path against hand-built VBA-style
-        # hex - this is what TrySerialiseArrayAsV's new Case Else (modSerialise.bas) now produces
-        # for the Excel -> Julia direction of a 3D+ array.
+        # Rank 3, exercising decode_xl_array_v's reshape path - what TryEncodeArrayAsV produces
+        # for a 3D+ array passed from VBA.
         vals3d = collect(1.0:24.0)
         manual3d = "V3,2,3,4;" * join(be_hex.(vals3d))
         @test CallFromExcel.decode_from_xl(manual3d) == reshape(vals3d, 2, 3, 4)
+
+        # Special values survive bit-for-bit, and malformed input is rejected rather than misread.
+        specials = [-0.0, floatmin(Float64), nextfloat(0.0), floatmax(Float64), -1.0e300]
+        decoded = CallFromExcel.decode_from_xl("V1,5;" * join(be_hex.(specials)))
+        @test reinterpret(UInt64, decoded) == reinterpret(UInt64, specials)
+        @test_throws ArgumentError CallFromExcel.decode_from_xl("V1,2;" * be_hex(1.0))            # too short
+        @test_throws ArgumentError CallFromExcel.decode_from_xl("V1,1;" * be_hex(1.0) * "0")      # too long
+        @test_throws ArgumentError CallFromExcel.decode_from_xl("V1,1;3FF000000000000G")          # not hex
+        @test_throws ArgumentError CallFromExcel.decode_from_xl("V2,3;" * be_hex(1.0))            # rank/dims mismatch
+        @test_throws ArgumentError CallFromExcel.decode_from_xl("L1,1;000000000000000-")          # not hex, "L" too
     end
 
     # "L" format - Int64 arrays, the Int64 counterpart of "V".

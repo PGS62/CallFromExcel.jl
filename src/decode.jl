@@ -1,8 +1,8 @@
 #=
 decode_from_xl is the inverse of encode_for_xl (in encode.jl). It decodes a string in the
-CallFromExcel wire format back to a Julia value. The same format is used by VBA's
-SerialiseElement function (in modSerialise.bas) to encode arguments before POSTing them to
-the /call HTTP endpoint, handled by srv_call_inner (in comms.jl).
+CallFromExcel wire format back to a Julia value. The add-in's WireFormatEncode.Encode
+(dotnet-addin, WireFormatEncode.cs) uses the same format to encode arguments before POSTing them
+to the /call HTTP endpoint, handled by srv_call_inner (in comms.jl).
 
 Type indicators:
  #   Float64  (followed by 16 hex chars, IEEE-754 bit pattern)
@@ -21,10 +21,11 @@ Type indicators:
  !   Error    (followed by Excel error number, e.g. 2042 for #N/A; decodes to ExcelError)
  *   Array    (*<rank>,<d1>[,<d2>];<len1>,<len2>,...,;<elements> column-major)
  H   Dict     (H<count>;<key1_len>,<val1_len>,...,;<key1><val1>... pairs column-order)
- V   Array of Float64 only (VBA -> Julia direction; see decode_xl_array_v below and
-     TrySerialiseArrayAsV in modSerialise.bas, which produces this format)
+ V   Array of Float64 only (V<rank>,<d1>,...;<16 hex chars per element>; see decode_xl_array_v
+     below, and WireFormatEncode.TryEncodeArrayAsV in the add-in, which produces this format)
+ L   Array of Int64 only - the Int64 counterpart of V, produced only by Julia's encode_for_xl
 
-See also VBA function SerialiseElement (modSerialise.bas) which serialises i.e. inverts this.
+See also the add-in's WireFormatEncode.Encode, which serialises i.e. inverts this.
 =#
 
 """
@@ -83,8 +84,8 @@ end
 
 Starting at byte position `start` in `s`, advance `xl_len` xl-length units and return the
 byte index of the first character past the advanced region. An xl-length unit is one per
-BMP character (< U+10000) and two per supplementary character (≥ U+10000), matching VBA's
-`Len()` and Julia's `xl_length()`.
+BMP character (< U+10000) and two per supplementary character (≥ U+10000), matching the
+add-in's `string.Length` (UTF-16 code units, as VBA's `Len()`) and Julia's `xl_length()`.
 
 UTF-8 character-boundary finding itself is left entirely to `nextind` - the only thing
 genuinely specific to this function is converting "how many bytes did that character take"
@@ -99,6 +100,11 @@ function xl_advance(s::String, start::Int, xl_len::Int)::Int
     end
     pos
 end
+
+# Whether an array element starting with this byte can contain non-ASCII characters: a string
+# ('£', whose UTF-8 lead byte is 0xc2), or a nested array or dictionary. Every other element type
+# is pure ASCII, so its length in bytes equals its xl_length and xl_advance isn't needed.
+may_be_non_ascii(b::UInt8) = b == 0xc2 || b == UInt8('*') || b == UInt8('H')
 
 """
     decode_xl_array(s::String)
@@ -134,7 +140,10 @@ function decode_xl_array(s::String)
     elements = Vector{Any}(undef, n)
     pos = p2 + 1
     for i in 1:n
-        next_pos = xl_advance(s, pos, lengths[i])
+        # Skipping xl_advance where possible matters for a "V" element of 1,000,000 Doubles
+        # (16,000,000 characters), which xl_advance would otherwise step through one by one.
+        len = lengths[i]
+        next_pos = len > 0 && may_be_non_ascii(codeunit(s, pos)) ? xl_advance(s, pos, len) : pos + len
         # next_pos is the byte index of the start of the *next* character (or one past the end
         # of s) - a valid character-boundary index, but next_pos-1 is not necessarily one: if
         # this element's last character is multi-byte, next_pos-1 lands on a continuation byte,
@@ -153,32 +162,18 @@ end
 """
     decode_xl_array_v(s::String)
 
-Decode a "V"-format array-of-Float64 string (starting with `V`) - the compact encoding VBA's
-`TrySerialiseArrayAsV` (modSerialise.bas) produces for a 1- to 9-dimensional array whose elements
-are all finite Doubles: no per-element type indicator or length, since every element is always
-exactly 16 hex characters. This function itself places no limit on rank - `reshape` works for any
-N - the 1-9 cap is on the VBA-encode side, matching VBA's own GetAt/ReDimVariantArray cap
-elsewhere in the codebase. Unlike `decode_xl_array`, this never needs `_maybe_typed` -
-`reinterpret`/`reshape` already produce a genuinely typed `Array{Float64,N}` directly.
+Decode a "V"-format array-of-Float64 string (starting with `V`) - the compact encoding the add-in's
+`WireFormatEncode.TryEncodeArrayAsV` (dotnet-addin, WireFormatEncode.cs) produces for a 1- to
+9-dimensional array whose elements are all Doubles: no per-element type indicator or length, since
+every element is always exactly 16 hex characters. This is the format of almost any range of
+numbers passed to `JuliaCall`. Unlike `decode_xl_array`, this never needs `_maybe_typed` - the
+result is a genuinely typed `Array{Float64,N}` directly.
 
-The hex is big-endian (matching `hex_to_float64`'s scalar convention), produced on the VBA side by
-plain `DoubleToHex` (no byte reordering needed there, since VBA already reads/writes hex MSB-first)
-- decoded here by `hex2bytes` (giving the bytes in wire/big-endian order) followed by `bswap` to
-get the native (little-endian) `UInt64` bit pattern before reinterpreting as `Float64`. This is the
-same convention `encode_for_xl(x::Array{Float64,N})` (encode.jl) uses for the Julia -> Excel
-direction, just decoded instead of encoded.
+The hex is big-endian (matching `hex_to_float64`'s scalar convention), as produced by the add-in's
+`Hex.WriteBulkHex`. The same convention `encode_for_xl(x::Array{Float64,N})` (encode.jl) uses for
+the Julia -> Excel direction.
 """
-function decode_xl_array_v(s::String)
-    # Format: V<rank>,<d1>[,<d2>];<hex, no delimiters, 16 hex chars per Float64>
-    p1 = findfirst(isequal(';'), s)::Int
-    parts = split(s[2:p1-1], ',')
-    rank = parse(Int, parts[1])
-    dims = tuple(parse.(Int, parts[2:end])...)
-
-    raw = hex2bytes(s[p1+1:end])
-    vals = reinterpret(Float64, bswap.(reinterpret(UInt64, raw)))
-    rank == 1 ? collect(vals) : reshape(collect(vals), dims)
-end
+decode_xl_array_v(s::String) = decode_hex_array(Float64, s)
 
 """
     decode_xl_array_l(s::String)
@@ -187,15 +182,55 @@ Decode an "L"-format array-of-Int64 string - the Int64 counterpart of "V", produ
 `encode_for_xl(x::Array{Int64,N})`. Only Julia ever produces this format, so this exists so
 that `decode_from_xl` remains the inverse of `encode_for_xl`.
 """
-function decode_xl_array_l(s::String)
-    # Format: L<rank>,<d1>[,<d2>];<hex, no delimiters, 16 hex chars per Int64>
-    p1 = findfirst(isequal(';'), s)::Int
-    parts = split(s[2:p1-1], ',')
-    rank = parse(Int, parts[1])
-    dims = tuple(parse.(Int, parts[2:end])...)
+decode_xl_array_l(s::String) = decode_hex_array(Int64, s)
 
-    vals = bswap.(reinterpret(Int64, hex2bytes(s[p1+1:end])))
-    rank == 1 ? vals : reshape(vals, dims)
+# Value of each hex digit (either case), indexed by byte + 1; 0xff for any other byte.
+const HEX_NIBBLE = let t = fill(0xff, 256)
+    for (i, c) in enumerate(b"0123456789abcdef")
+        t[c+1] = i - 1
+    end
+    for (i, c) in enumerate(b"ABCDEF")
+        t[c+1] = i + 9
+    end
+    t
+end
+
+"""
+    decode_hex_array(T, s::String)
+
+Shared decoder for the "V" (`T = Float64`) and "L" (`T = Int64`) formats:
+`<tag><rank>,<d1>,...;<16 big-endian hex chars per element, column-major, no delimiters>`.
+
+Reads the hex straight from the string's bytes into the result, in one pass. This replaced
+`hex2bytes` + `bswap.` + `collect`, which copied the payload three times and took ~60-100 ms
+for 1,000,000 elements, against ~4 ms for this loop.
+"""
+function decode_hex_array(::Type{T}, s::String) where {T<:Union{Float64,Int64}}
+    cu = codeunits(s)
+    p1 = findfirst(==(UInt8(';')), cu)
+    p1 === nothing && throw(ArgumentError("'$(s[1])'-format array has no ';' after its dimensions"))
+    parts = split(SubString(s, 2, p1 - 1), ',')
+    rank = parse(Int, parts[1])
+    length(parts) == rank + 1 || throw(ArgumentError("'$(s[1])'-format array has rank $rank but $(length(parts) - 1) dimension(s)"))
+    dims = ntuple(i -> parse(Int, parts[i+1]), rank)
+    n = prod(dims; init=1)
+    length(cu) - p1 == 16n || throw(ArgumentError(
+        "'$(s[1])'-format array of $n element(s) should have $(16n) hex characters, but has $(length(cu) - p1)"))
+
+    out = Vector{T}(undef, n)
+    bad = 0x00   # ORs together every nibble value, so it is 0xff if and only if any byte wasn't a hex digit
+    @inbounds for i in 1:n
+        base = p1 + 16(i - 1)
+        u = zero(UInt64)
+        for j in 1:16
+            nibble = HEX_NIBBLE[cu[base+j]+1]
+            bad |= nibble
+            u = (u << 4) | nibble
+        end
+        out[i] = reinterpret(T, u)
+    end
+    bad == 0xff && throw(ArgumentError("'$(s[1])'-format array contains a character that is not a hex digit"))
+    rank == 1 ? out : reshape(out, dims)
 end
 
 """

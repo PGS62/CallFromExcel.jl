@@ -2,7 +2,7 @@
 encode_for_xl implements a data serialisation format that's easier and faster to
 unserialise than csv.
 - Singleton types are prefixed with a type indicator character.
-- Dates are converted to their Excel representation - faster to unserialise in VBA.
+- Dates are converted to their Excel representation - faster to decode in the add-in.
 - Arrays are written with type indicator *, then three sections separated by semi-colons:
   First section gives the number of dimensions and the dimensions themselves, comma
   delimited e.g. a 3 x 4 array would have a dimensions section "2,3,4".
@@ -16,8 +16,8 @@ unserialise than csv.
   (key1_len, val1_len, key2_len, val2_len, ...), comma delimited with a terminating comma.
   Third section gives the encodings of each key and value concatenated with no delimiter.
 
-When decoded (by VBA function modSerialise.Unserialise), the type indicator characters are 
-interpreted as follows:
+When decoded (by the add-in's WireFormatDecode.Decode, WireFormatDecode.cs), the type indicator
+characters are interpreted as follows:
  #   Double (followed by hex represention of the value, see float64_to_hex)
  £   String (followed by the string)
  T   Boolean True
@@ -37,9 +37,9 @@ interpreted as follows:
  *   Array
  H   Dictionary
  V   Array of Float64 only, rank 1-9, no per-element type indicator or length - see
-     encode_for_xl(x::Array{Float64,N}) below. Decoded by the Case 86 'V' branch of the
-     production VBA decoder (modUnserialise.bas). Also used in the opposite direction (VBA's
-     TrySerialiseArrayAsV, modSerialise.bas), decoded by decode_xl_array_v (src/decode.jl).
+     encode_for_xl(x::Array{Float64,N}) below. Decoded by the add-in's WireFormatDecode.DecodeV.
+     Also used in the opposite direction (the add-in's WireFormatEncode.TryEncodeArrayAsV),
+     decoded by decode_xl_array_v (src/decode.jl).
  L   Array of Int64 only, rank 1-9 - the Int64 counterpart of V. See
      encode_for_xl(x::Array{Int64,N}) below. Julia -> Excel only.
  R   Integer range (UnitRange/StepRange etc.) - encodes only first/step/length, not every
@@ -51,7 +51,7 @@ interpreted as follows:
 "#3FF0000000000000"
 
 julia> CallFromExcel.encode_for_xl(1)
-"&1"
+"^1"
 
 julia> CallFromExcel.encode_for_xl("Hello")
 "£Hello"
@@ -66,9 +66,9 @@ julia> CallFromExcel.encode_for_xl(Date(2021,3,11))
 "D44266"
 
 julia> CallFromExcel.encode_for_xl([1 2;true π;"Hello" "World"])
-"*2,3,2;2,1,6,2,18,6,;&1T£Hello&2#3.141592653589793£World" =#
+"*2,3,2;2,1,6,2,17,6,;^1T£Hello^2#400921FB54442D18£World" =#
 
-# See also VBA method Unserialise which unserialises i.e. inverts this function
+# See also the add-in's WireFormatDecode.Decode, which decodes i.e. inverts this function
 encode_for_xl(x::AbstractString) = "£" * xl_valid(x)  # String in VBA/Excel
 encode_for_xl(x::AbstractChar) = "£" * (isvalid(x) ? x : '�')
 
@@ -145,7 +145,7 @@ function encode_for_xl(z::Complex)
     encode_for_xl(re == 0 ? imstr : fmt(re) * (im_ > 0 ? "+" : "") * imstr)
 end
 
-# An ExcelError decoded from VBA (see decode_from_xl's '!' branch, decode.jl) re-emits the same
+# An ExcelError decoded from the add-in's wire format (see decode_from_xl's '!' branch, decode.jl) re-emits the same
 # wire form it was decoded from, so an Excel error genuinely round-trips through Julia - e.g.
 # JuliaCall("identity", SomeErrorCell) returns the same error, unlike the Inf/Float64 case above,
 # which only ever produces #NUM!/#N/A from Julia's own numeric NaN/Inf, not a full 14-error set.
@@ -234,8 +234,8 @@ trivially passing the check) and recurse without ever reaching a concrete-type b
 explicit constructor always produces a genuine dense Array, so the recursive call below is
 guaranteed to land on the fast method and never re-enter this one.
 
-Rank is restricted to 1-9, matching what the VBA decoder's Case 86 'V' branch
-(modUnserialise.bas) supports; anything else falls through to encode_array_general unchanged.
+Rank is restricted to 1-9, matching what the add-in's WireFormatDecode.DecodeV supports (it
+reads the rank as a single digit); anything else falls through to encode_array_general unchanged.
 Ranks 3-9 can only be returned to a VBA variable (JuliaEvalVBA/JuliaCallVBA), not a worksheet -
 same restriction the general "*" format already has for those ranks.
 """
@@ -255,27 +255,22 @@ the concrete type means Julia has already done the work of confirming every elem
 Float64, so (unlike encode_array_general) neither a per-element type indicator nor a
 per-element length is needed: every element is always exactly 16 hex characters. Format:
 "V<rank>,<dims>;<raw hex, no delimiters>", e.g. "V1,5;..." for a 5-element vector,
-"V2,3,4;..." for a 3x4 matrix, or "V3,2,3,4;..." for a 2x3x4 array - decoded by the Case 86 'V'
-branch of the VBA function Unserialise (modUnserialise.bas), which relies on HexToDouble there
-(the same function used for scalar "#" values). One method handles every rank since
+"V2,3,4;..." for a 3x4 matrix, or "V3,2,3,4;..." for a 2x3x4 array - decoded by the add-in's
+WireFormatDecode.DecodeV, which relies on Hex.ReadBulkHex (Hex.cs) - the same per-element
+decode used for scalar "#" values. One method handles every rank since
 Vector{Float64}/Matrix{Float64} are just Array{Float64,1}/Array{Float64,2}, and the encoding
 itself (a single bulk byte-reinterpret over the whole linear buffer) doesn't care how many
 dimensions the buffer is being viewed as.
 
-Falls back to encode_array_general for rank > 9 (matching VBA's own ReDimVariantArray MAX_RANK),
-an empty array, or one containing any NaN/Inf - the fast path assumes every element decodes as an
+Falls back to encode_array_general for rank > 9 (the add-in's limit, see above), an empty array, or one containing any NaN/Inf - the fast path assumes every element decodes as an
 ordinary hex-encoded Double, which isn't true for those (see the NaN/Inf special-casing in the
 scalar encode_for_xl(::Float64) above).
 
 The hex uses the same big-endian-style convention as `float64_to_hex` (scalars), achieved by
 `bswap`-ing every element (a cheap, fully vectorized bulk operation) before reinterpreting as
-bytes and calling `bytes2hex`. An earlier version of this format hex-encoded the raw
-little-endian memory bytes directly (skipping the bswap here, in favour of a dedicated
-little-endian decode function in VBA) - but a direct measurement (VFormatDecodeSpeedTest,
-modPerformance.bas) showed that VBA-side little-endian decode was enough slower, per element,
-than the existing big-endian HexToDouble that the whole "V" format decoded slower than the
-general "*" format it was meant to replace. Doing the bswap here instead keeps the decode side
-simple and fast.
+bytes and calling `bytes2hex`. (Big-endian was chosen when the decoder was still written in VBA,
+where little-endian decoding measured too slow; the add-in's decoder now inherits the
+convention.)
 """
 function encode_for_xl(x::Array{Float64,N}) where {N}
     N > 9 && return encode_array_general(x)
@@ -377,9 +372,9 @@ end
 
 """
     xl_length(x)
-If `x` is a `Char` or `String` then `xl_length` emulates the VBA function `Len` which
-returns the number of characters in a string except that characters with code point 65536
-or above count as 2 instead of 1. Otherwise `xl_length` returns the (Julia) `length` of `x`.
+If `x` is a `Char` or `String` then `xl_length` emulates the add-in's `string.Length` (UTF-16
+code units, the same as VBA's `Len`), which is the number of characters in a string except that
+characters with code point 65536 or above count as 2 instead of 1. Otherwise `xl_length` returns the (Julia) `length` of `x`.
 """
 function xl_length(x::Char)
     return (codepoint(x) >= 65536 ? 2 : 1)

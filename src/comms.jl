@@ -227,10 +227,10 @@ end
     srv_eval_inner(expression::String)::String
 Evaluate a Julia expression and return the encoded result as a string.
 Called by the HTTP request handler in `start_server` for requests to `/eval`, originating
-from VBA calls to JuliaEval and JuliaEvalVBA.
+from the add-in's JuliaEval and JuliaEvalVBA.
 
-`expression` may contain several newline-separated top-level statements - VBA's
-`ConcatenateExpressions` reassembles a one-column range of cells by joining them with `\\n`,
+`expression` may contain several newline-separated top-level statements - the add-in's
+`ConcatenateExpressions` (JuliaFunctions.cs) reassembles a one-column range of cells by joining them with `\\n`,
 one cell per line, exactly as the user typed them. `Meta.parseall` (rather than `Meta.parse`,
 which only ever returns a single top-level form) is what `include_string` itself uses to turn
 such a multi-statement string into one `:toplevel` expression, so it already handles `#`
@@ -354,7 +354,7 @@ end
 Decode `payload` (in the CallFromExcel wire format - a 1D array whose first element is a
 function name and remaining elements are its arguments), call the named function, and
 return the encoded result as a string. Called by the HTTP request handler in `start_server`
-for requests to `/call`, originating from VBA calls to functions JuliaCall and JuliaCallVBA,
+for requests to `/call`, originating from the add-in's JuliaCall and JuliaCallVBA,
 and with `named_args=true` for requests to `/callkw`, originating from JuliaCallNamedArgs and
 JuliaCallNamedArgsVBA. In that case the arguments are split into positional and named
 arguments by `split_named_args`, the named ones being saved in `kwargs_from_xl`.
@@ -443,7 +443,7 @@ the port - or, since HTTP.jl's server binds with `reuseaddr=true`, could appear 
 even though something else is already listening there. Retrying on the real bind failure
 avoids relying on that separate check being reliable.
 
-Writes the chosen port to the port file so VBA can discover it during JuliaLaunch.
+Writes the chosen port to the port file so the add-in can discover it during JuliaLaunch.
 
 Closes any server already started by a previous call in this session first - otherwise, calling
 this (or `serve_xl`) more than once would leave each earlier listener still running, each holding
@@ -570,7 +570,7 @@ end
 
 """
     setvar(name::String, arg)
-Set a variable in global scope. Called by VBA function JuliaSetVar.
+Set a variable in global scope. Called by the add-in's JuliaSetVar (via the /call endpoint).
 """
 function setvar(name::String, arg)
 

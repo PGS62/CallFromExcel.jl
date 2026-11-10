@@ -4,6 +4,10 @@ CallFromExcel is the successor to [JuliaExcel](https://github.com/PGS62/JuliaExc
 
 ## [Unreleased]
 
+### Changes
+
+- "Help on this function" in Excel's Insert Function dialog now opens the function's documentation on GitHub, as does clicking the function's name in its IntelliSense pop-up.
+
 ### Performance
 
 - Julia decodes large ranges of numbers passed to `JuliaCall` about seven times faster: for 1,000,000 Doubles, from about 77 ms to about 11 ms. This takes about 70 ms off `=JuliaCall("sort", A1:A1000000)`.

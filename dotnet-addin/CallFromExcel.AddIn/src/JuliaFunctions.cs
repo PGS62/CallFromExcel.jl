@@ -18,6 +18,11 @@ namespace CallFromExcel.AddIn
         // capped strings in an array at 255 characters.)
         private const int StringLengthLimit = 32768;
 
+        // Each function's HelpTopic is its section of the README. Excel opens it from "Help on
+        // this function" in the Insert Function dialog, and IntelliSense makes the function's
+        // name in its pop-up a link to it.
+        private const string HelpRoot = "https://github.com/PGS62/CallFromExcel.jl#";
+
         // Parameter order (UseLinux, MinimiseWindow, CommandLineOptions, Packages,
         // BashStatements, TimeOut) deliberately matches the old VBA worksheet function
         // (modMain.bas) exactly - dropping any of them from the signature (as an earlier
@@ -25,7 +30,7 @@ namespace CallFromExcel.AddIn
         // formula that set a later positional argument (e.g.
         // "=JuliaLaunch(,,""--project=...."")" to set CommandLineOptions) by silently
         // shifting it onto the wrong parameter.
-        [ExcelFunction(Description = "Launches a local Julia session which listens to the current Excel session and responds to calls to JuliaEval etc..", IsThreadSafe = false)]
+        [ExcelFunction(Description = "Launches a local Julia session which listens to the current Excel session and responds to calls to JuliaEval etc..", HelpTopic = HelpRoot + "julialaunch", IsThreadSafe = false)]
         public static object JuliaLaunch(
             [ExcelArgument(Name = "UseLinux", Description = "Launch Julia under WSL instead of natively on Windows.")] object useLinux,
             [ExcelArgument(Name = "MinimiseWindow", Description = "Launch Julia's console window minimised.")] object minimiseWindow,
@@ -57,7 +62,7 @@ namespace CallFromExcel.AddIn
             }
         }
 
-        [ExcelFunction(Description = "Call a named Julia function, passing in data from the worksheet. Returns an error string for results that cannot be displayed on a worksheet (nested arrays, dictionaries etc).", IsThreadSafe = false)]
+        [ExcelFunction(Description = "Call a named Julia function, passing in data from the worksheet. Returns an error string for results that cannot be displayed on a worksheet (nested arrays, dictionaries etc).", HelpTopic = HelpRoot + "juliacall", IsThreadSafe = false)]
         public static object JuliaCall(
             [ExcelArgument(Name = "JuliaFunction", Description = "The name of a Julia function visible from the Julia REPL.")] string juliaFunction,
             [ExcelArgument(Name = "Args", Description = "Zero or more arguments: a number, string, Boolean, empty cell, or array/range.")] params object[] args)
@@ -65,7 +70,7 @@ namespace CallFromExcel.AddIn
             return CallCore(juliaFunction, args, "/call");
         }
 
-        [ExcelFunction(Description = "Call a named Julia function, passing positional and named arguments from the worksheet. The argument \";\" marks where the named arguments start, given as name-value pairs. A named argument whose value is \";\" must be the last pair.", IsThreadSafe = false)]
+        [ExcelFunction(Description = "Call a named Julia function, passing positional and named arguments from the worksheet. The argument \";\" marks where the named arguments start, given as name-value pairs. A named argument whose value is \";\" must be the last pair.", HelpTopic = HelpRoot + "juliacallnamedargs", IsThreadSafe = false)]
         public static object JuliaCallNamedArgs(
             [ExcelArgument(Name = "JuliaFunction", Description = "The name of a Julia function visible from the Julia REPL.")] string juliaFunction,
             [ExcelArgument(Name = "Args", Description = "Positional arguments, then \";\", then name/value pairs for keyword arguments.")] params object[] args)
@@ -76,7 +81,7 @@ namespace CallFromExcel.AddIn
         // Volatile, as is JuliaExcelPID below: neither has arguments, so otherwise Excel would
         // never recalculate them - JuliaIsRunning would keep its value from before JuliaLaunch,
         // and a saved JuliaExcelPID would show a previous Excel session's process id.
-        [ExcelFunction(Description = "Returns TRUE if a Julia session is running and listening to this Excel session.", IsThreadSafe = false, IsVolatile = true)]
+        [ExcelFunction(Description = "Returns TRUE if a Julia session is running and listening to this Excel session.", HelpTopic = HelpRoot + "juliaisrunning", IsThreadSafe = false, IsVolatile = true)]
         public static bool JuliaIsRunning()
         {
             // Improves on the VBA original's approach (matching a console window titled
@@ -89,13 +94,13 @@ namespace CallFromExcel.AddIn
             return port != 0 && JuliaHttpClient.IsListening(port);
         }
 
-        [ExcelFunction(Description = "Returns the process id of the current Excel session. Only needed if more than one Excel instance is running - pass it to serve_xl(pid) to say which one to attach to.", IsThreadSafe = false, IsVolatile = true)]
+        [ExcelFunction(Description = "Returns the process id of the current Excel session. Only needed if more than one Excel instance is running - pass it to serve_xl(pid) to say which one to attach to.", HelpTopic = HelpRoot + "juliaexcelpid", IsThreadSafe = false, IsVolatile = true)]
         public static int JuliaExcelPID()
         {
             return System.Diagnostics.Process.GetCurrentProcess().Id;
         }
 
-        [ExcelFunction(Description = "Set a global variable in the Julia process.", IsThreadSafe = false)]
+        [ExcelFunction(Description = "Set a global variable in the Julia process.", HelpTopic = HelpRoot + "juliasetvar", IsThreadSafe = false)]
         public static object JuliaSetVar(
             [ExcelArgument(Name = "VariableName", Description = "The name of the variable to be set. Must follow Julia's rules for allowed variable names.")] string variableName,
             [ExcelArgument(Name = "RefersTo", Description = "An Excel range, or a number, string, Boolean, empty cell or array of such types.")] object refersTo)
@@ -103,7 +108,7 @@ namespace CallFromExcel.AddIn
             return CallCore("CallFromExcel.setvar", new[] { (object)variableName, refersTo }, "/call");
         }
 
-        [ExcelFunction(Description = "Load a Julia source file into the Julia process, to make additional functions available via JuliaEval and JuliaCall.", IsThreadSafe = false)]
+        [ExcelFunction(Description = "Load a Julia source file into the Julia process, to make additional functions available via JuliaEval and JuliaCall.", HelpTopic = HelpRoot + "juliainclude", IsThreadSafe = false)]
         public static object JuliaInclude(
             [ExcelArgument(Name = "FileName", Description = "The full name of the file to be included.")] string fileName)
         {
@@ -148,7 +153,7 @@ namespace CallFromExcel.AddIn
             return WireFormatDecode.MapLeaves(result, v => v is ExcelErrorValue ev ? MapToExcelDnaError(ev.Code) : v ?? ExcelEmpty.Value);
         }
 
-        [ExcelFunction(Description = "Evaluate a Julia expression and return the result to an Excel worksheet.", IsThreadSafe = false)]
+        [ExcelFunction(Description = "Evaluate a Julia expression and return the result to an Excel worksheet.", HelpTopic = HelpRoot + "juliaeval", IsThreadSafe = false)]
         public static object JuliaEval(
             [ExcelArgument(Name = "JuliaExpression", Description = "Any valid Julia code, as a string. Can also be a one-column range to evaluate multiple Julia statements.")] object juliaExpression)
         {

@@ -86,8 +86,8 @@ namespace CallFromExcel.AddIn
         {
             // Improves on the VBA original's approach (matching a console window titled
             // "serving Excel PID <n>"): this project's own investigation found that
-            // window-title matching never works when Windows Terminal is the default
-            // terminal host (see JuliaLaunch.cs's own notes), so this checks the thing
+            // window-title matching failed when Julia ran in Windows Terminal, and can still
+            // fail for a session attached with serve_xl, so this checks the thing
             // that actually matters -- is something listening on the cached port -- same
             // signal JuliaLaunch itself already relies on.
             int port = JuliaPort.GetJuliaPortOrZero();

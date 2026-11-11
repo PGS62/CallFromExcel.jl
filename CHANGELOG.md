@@ -6,6 +6,7 @@ CallFromExcel is the successor to [JuliaExcel](https://github.com/PGS62/JuliaExc
 
 ### Changes
 
+- `JuliaLaunch` opens Julia in a classic console window showing the Julia logo, in its title bar and taskbar button, rather than in Windows Terminal (where the default terminal is Windows Terminal, as on Windows 11).
 - "Help on this function" in Excel's Insert Function dialog now opens the function's documentation on GitHub, as does clicking the function's name in its IntelliSense pop-up.
 
 ### Performance

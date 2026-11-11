@@ -21,10 +21,17 @@ namespace CallFromExcel.AddIn
     <tabs>
       <tab id='CallFromExcelTab' label='Julia'>
         <group id='CallFromExcelGroup' label='Julia'>
-          <button id='LaunchJulia' label='Launch Julia' size='large' imageMso='MacroPlay'
-                  onAction='OnLaunchJulia'
-                  screentip='Launch Julia'
-                  supertip='Launch a local Julia session for this Excel session, as JuliaLaunch() does with its default arguments.' />
+          <splitButton id='LaunchSplit' size='large'>
+            <button id='LaunchJulia' label='Launch Julia' imageMso='MacroPlay'
+                    onAction='OnLaunchJulia'
+                    screentip='Launch Julia'
+                    supertip='Launch a local Julia session for this Excel session, using the Launch Settings.' />
+            <menu id='LaunchMenu'>
+              <button id='LaunchSettings' label='Launch Settings...' imageMso='PropertySheet'
+                      onAction='OnLaunchSettings'
+                      supertip='Choose the project folder, packages and other options the Launch Julia button uses. JuliaLaunch() formulas use their own arguments instead.' />
+            </menu>
+          </splitButton>
         </group>
       </tab>
     </tabs>
@@ -34,16 +41,43 @@ namespace CallFromExcel.AddIn
 
         public void OnLaunchJulia(IRibbonControl control)
         {
+            Launch(LaunchSettings.Load());
+        }
+
+        public void OnLaunchSettings(IRibbonControl control)
+        {
+            try
+            {
+                using (var form = new LaunchSettingsForm(LaunchSettings.Load()))
+                {
+                    if (form.ShowDialog(new ExcelWindow()) == DialogResult.Yes) Launch(form.Settings);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(new ExcelWindow(), ex.Message, "CallFromExcel", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private static void Launch(LaunchSettings s)
+        {
             try
             {
                 SetStatusBar("Launching Julia...");
-                ShowBriefly(JuliaLaunch.Launch());
+                ShowBriefly(JuliaLaunch.Launch(s.UseLinux, s.MinimiseWindow, s.CommandLineOptions,
+                                               s.Packages, s.BashStatements, s.TimeOut));
             }
             catch (Exception ex)
             {
                 SetStatusBar(null);
-                MessageBox.Show(ex.Message, "CallFromExcel", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show(new ExcelWindow(), ex.Message, "CallFromExcel", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
+        }
+
+        // Excel's main window, as the owner of our dialogs, so they stay in front of Excel.
+        private sealed class ExcelWindow : IWin32Window
+        {
+            public IntPtr Handle => ExcelDnaUtil.WindowHandle;
         }
 
         private const int StatusBarSeconds = 5;

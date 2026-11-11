@@ -546,6 +546,30 @@ if Sys.iswindows()
         @test results == last.(cases)
     end
 
+    # The ribbon's Launch Settings turn a project folder into a --project option: quoted, with
+    # forward slashes, on Windows; a single-quoted Linux path under WSL.
+    @testset "The ribbon's project folder becomes a --project option" begin
+        dll = joinpath(@__DIR__, "..", "dotnet-addin", "dist", "CallFromExcel.AddIn.dll")
+        cases = [
+            ("", false) => "",
+            ("  ", true) => "",
+            ("C:\\Projects\\My Project\\", false) => "\"--project=C:/Projects/My Project/\"",
+            (raw"C:\Projects\Foo", true) => "--project='/mnt/c/Projects/Foo'",
+            (raw"\\wsl.localhost\Ubuntu\home\me\proj", true) => "--project='/home/me/proj'",
+            (raw"\\wsl$\Ubuntu\home\me", true) => "--project='/home/me'",
+            ("/home/me/it's", true) => "--project='/home/me/it'\\''s'",
+            ("@myenv", true) => "--project='@myenv'",
+        ]
+        ps1 = tempname() * ".ps1"
+        quoteps(s) = "'" * replace(s, "'" => "''") * "'"
+        write(ps1, "[void][Reflection.Assembly]::LoadFrom('$dll')\n" * join(
+            ["'[' + [CallFromExcel.AddIn.JuliaLaunch]::ProjectOption($(quoteps(c.first[1])), \$$(c.first[2])) + ']'"
+             for c in cases], "\n"))
+        results = readlines(`powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $ps1`)
+        rm(ps1)
+        @test results == ["[" * c.second * "]" for c in cases]
+    end
+
     # JuliaLaunch writes the comms folder and flag/error file paths into a Julia startup script.
     # They're under the temp folder, so a '$' in it (e.g. from the user name) used to be read as
     # string interpolation, breaking the script. Generates the script with such paths and checks

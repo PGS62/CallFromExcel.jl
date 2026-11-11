@@ -83,6 +83,35 @@ namespace CallFromExcel.AddIn
             return result;
         }
 
+        // The --project option for a project folder, ready to put in CommandLineOptions; "" for
+        // no folder. On Windows, forward slashes and double quotes, so spaces work and a trailing
+        // backslash can't escape the closing quote. Under WSL, the folder as a Linux path in
+        // bash single quotes (WslArguments' outer double quotes rule out double quotes here): a
+        // Windows drive path becomes /mnt/<drive>/..., a \\wsl$\<distro>\ or
+        // \\wsl.localhost\<distro>\ path becomes the path inside the distribution, and anything
+        // else, e.g. /home/me/proj or @myenv, is used as it is. Public so the tests can call it.
+        public static string ProjectOption(string folder, bool useLinux)
+        {
+            folder = (folder ?? "").Trim();
+            if (folder == "") return "";
+            if (!useLinux) return "\"--project=" + folder.Replace('\\', '/') + "\"";
+
+            string linuxPath = folder;
+            foreach (string prefix in new[] { @"\\wsl$\", @"\\wsl.localhost\" })
+            {
+                if (folder.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    int afterDistro = folder.IndexOf('\\', prefix.Length);
+                    linuxPath = afterDistro < 0 ? "/" : folder.Substring(afterDistro).Replace('\\', '/');
+                }
+            }
+            if (folder.Length >= 3 && folder[1] == ':' && (folder[2] == '\\' || folder[2] == '/'))
+            {
+                linuxPath = WSLAddress(folder);
+            }
+            return "--project=" + BashQuote(linuxPath);
+        }
+
         // Splits a command line into arguments at spaces outside double quotes; quotes are
         // removed, as Windows' own argument parsing does.
         private static List<string> SplitArguments(string commandLine)

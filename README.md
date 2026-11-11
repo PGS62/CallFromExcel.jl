@@ -45,11 +45,12 @@ Installation does not require admin rights on the PC.
    ```
    using Pkg
    Pkg.add(url="https://github.com/PGS62/CallFromExcel.jl")
-   Pkg.build("CallFromExcel")
+   using CallFromExcel
+   CallFromExcel.installme()
    ```
-   `Pkg.build` is what installs the Excel add-in. `Pkg.add` usually does that too, but only the first time a given version of CallFromExcel is added to your PC - so if you've since removed the add-in from Excel, `Pkg.add` alone won't put it back.
+   `Pkg.add` installs the Julia package, and `installme()` installs the Excel add-in.
  * Launch Excel. Check that it shows a Julia tab on the ribbon, and that typing `=Julia` into a worksheet cell makes the auto-complete offer `JuliaCall`, `JuliaEval`, `JuliaInclude` etc.
- * Functions missing in Excel, or need to reinstall? Close Excel and run `Pkg.build("CallFromExcel")` again.
+ * After updating CallFromExcel (e.g. with `Pkg.update()`), close Excel and run `using CallFromExcel; CallFromExcel.installme()` again: the add-in and the Julia package must be the same version, and if they aren't, Excel says so. Do the same if the functions go missing from Excel.
 <!--
 The process is illustrated in the GIF below. F5 to replay.
 

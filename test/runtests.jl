@@ -462,8 +462,10 @@ end
         token = CallFromExcel.session_token[],
         post(path, body; headers=["X-CallFromExcel-Token" => token]) =
             CallFromExcel.HTTP.post(url(path), headers, body; status_exception=false)
-        # The port file holds the port, then the session token, for Excel to read.
-        @test readlines(CallFromExcel.portfile()) == [string(CallFromExcel.xlport[]), token]
+        # The port file holds the port, the session token, and the package version (which the
+        # add-in checks against its own), for Excel to read.
+        @test readlines(CallFromExcel.portfile()) ==
+              [string(CallFromExcel.xlport[]), token, string(pkgversion(CallFromExcel))]
         @test length(token) == 32
         @test CallFromExcel.decode_from_xl(String(post("/eval", "1+1").body)) == 2
         @test CallFromExcel.decode_from_xl(String(post("/call", CallFromExcel.encode_for_xl(Any["+", 1, 2])).body)) == 3

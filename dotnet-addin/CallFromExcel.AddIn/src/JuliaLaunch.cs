@@ -141,6 +141,10 @@ namespace CallFromExcel.AddIn
             return "serving Excel PID " + pid;
         }
 
+        // Launches Julia (or finds it already running), then checks it's the same version of
+        // CallFromExcel as this add-in, so a mismatch shows straight away in the launching cell
+        // or dialog rather than at the first JuliaCall. No check while Julia is still starting
+        // (no port yet): the first call after that checks instead.
         public static string Launch(
             bool useLinux = false,
             bool minimiseWindow = false,
@@ -148,6 +152,20 @@ namespace CallFromExcel.AddIn
             string packages = "",
             string bashStatements = "",
             int timeoutSeconds = 30)
+        {
+            string message = LaunchCore(useLinux, minimiseWindow, commandLineOptions, packages, bashStatements, timeoutSeconds);
+            int port = JuliaPort.GetJuliaPortOrZero();
+            if (port > 0) JuliaPort.CheckVersion(port);
+            return message;
+        }
+
+        private static string LaunchCore(
+            bool useLinux,
+            bool minimiseWindow,
+            string commandLineOptions,
+            string packages,
+            string bashStatements,
+            int timeoutSeconds)
         {
             string juliaExe = JuliaExeLocation.Find(useLinux);
 

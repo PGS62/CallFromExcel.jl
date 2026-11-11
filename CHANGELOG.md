@@ -6,6 +6,8 @@ CallFromExcel is the successor to [JuliaExcel](https://github.com/PGS62/JuliaExc
 
 ### Changes
 
+- A Julia tab on Excel's ribbon launches Julia (with saved settings, including a project folder), shows or closes its window, switches `display_results` on and off, and includes Julia files chosen in a file box with a list of recent files. See [The Julia ribbon tab](README.md#the-julia-ribbon-tab).
+- Installing the package no longer installs the Excel add-in as a side effect (there is no longer a `deps/build.jl`). Install it with `using CallFromExcel; CallFromExcel.installme()`, after installing and after each update. The add-in checks that it's the same version as the Julia package it talks to, and if not, says so and how to fix it.
 - `JuliaLaunch` opens Julia in a classic console window showing the Julia logo, in its title bar and taskbar button, rather than in Windows Terminal (where the default terminal is Windows Terminal, as on Windows 11).
 - "Help on this function" in Excel's Insert Function dialog now opens the function's documentation on GitHub, as does clicking the function's name in its IntelliSense pop-up.
 

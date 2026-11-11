@@ -2,7 +2,7 @@
 # installer for its VBA add-in JuliaExcel.xlam, which it uninstalls if present.
 #
 # Non-interactive by design: no MsgBox dialogs (unlike the old installer) - this is meant to
-# be callable unattended from a build script or Julia's own installme(), as well as directly
+# be callable unattended from Julia's installme(), as well as directly
 # by a user. All status is written to the output stream; failures throw a terminating error
 # and this exits non-zero.
 #

@@ -181,6 +181,16 @@ function _default_commsfolder()
     end
 end
 
+"""
+    installme()
+
+Install CallFromExcel's Excel add-in for the current user, from this version of the package,
+and uninstall JuliaExcel's add-in if present. Needs no admin rights. Close Excel first: the
+installer stops with an error if Excel is running.
+
+Run it after installing CallFromExcel, and again after each update: the add-in and the Julia
+package must be the same version. If they aren't, Excel says so on launching Julia.
+"""
 function installme()
     Sys.iswindows() || throw("CallFromExcel.installme (which installs a Microsoft Excel \
         addin) can only be run from Julia on Windows")
@@ -481,8 +491,11 @@ function start_server(start::Int=2700)
         end
     end
     mkpath(comms_folder())
+    # Port, session token, and this package's version, which the Excel add-in checks against
+    # its own (JuliaPort.CheckVersion) - the two must match, and since installing the package
+    # doesn't install the add-in, they can drift apart.
     open(portfile(), "w") do f
-        write(f, string(port, "\n", session_token[]))
+        write(f, string(port, "\n", session_token[], "\n", pkgversion(@__MODULE__)))
     end
     xlport[] = port
     settitle()
@@ -630,11 +643,8 @@ end
 
 # https://docs.microsoft.com/en-us/windows/terminal/tutorials/tab-title
 function settitle()
-    if Sys.islinux()
-        os = "Linux"
-    elseif Sys.iswindows()
-        os = "Windows"
-    end
+    # Any other OS by its kernel name (e.g. "Darwin" on macOS), so the tests run there too.
+    os = Sys.islinux() ? "Linux" : Sys.iswindows() ? "Windows" : string(Sys.KERNEL)
 
     portpart = xlport[] == 0 ? "" : ", port $(xlport[])"
     print("\033]0;Julia $VERSION on $os serving Excel PID $(getxlpid())$portpart\a")

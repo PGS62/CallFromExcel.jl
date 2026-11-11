@@ -39,6 +39,7 @@ namespace CallFromExcel.AddIn
         public static string Post(string payload, string path)
         {
             int port = JuliaPort.GetJuliaPort();
+            JuliaPort.CheckVersion(port);
             if (TryPost(port, path, payload, out string result))
             {
                 return result;
@@ -57,6 +58,7 @@ namespace CallFromExcel.AddIn
             {
                 throw new InvalidOperationException(JuliaPort.NoConnectionErrorMessage);
             }
+            JuliaPort.CheckVersion(refreshedPort);
             if (TryPost(refreshedPort, path, payload, out result))
             {
                 return result;

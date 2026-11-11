@@ -9,7 +9,7 @@ The C# source of CallFromExcel's Excel add-in, built with [Excel-DNA](https://ex
 | `CallFromExcel.AddIn\` | The add-in. `src\JuliaFunctions.cs` holds the worksheet (XLL) functions, `src\ComServer.cs` the VBA-facing COM object (`CreateObject("CallFromExcel.ComServer")`), `src\WireFormatEncode.cs`/`WireFormatDecode.cs` the wire format shared with Julia's `src\encode.jl`/`decode.jl`, and `src\JuliaLaunch.cs` the launching of Julia, natively or under WSL. |
 | `CallFromExcel.AddIn.TestHarness\` | Wire-format tests that need no Excel, plus cross-validation against a real Julia process. |
 | `dist\` | The built add-in that users get, committed to git, with a hash of the source it was built from. |
-| `installer\` | `Install.ps1`, run by `Pkg.build("CallFromExcel")` via `deps\build.jl`. Installs per-user to `%APPDATA%\Microsoft\AddIns\CallFromExcel`, registers the COM server under `HKCU`, and needs no admin rights. |
+| `installer\` | `Install.ps1`, run by `CallFromExcel.installme()`. Installs per-user to `%APPDATA%\Microsoft\AddIns\CallFromExcel`, registers the COM server under `HKCU`, and needs no admin rights. |
 | `vba\` | `Run-VbaTests.ps1`, which runs the VBA test suite in `workbooks\TestCallFromExcel.xlsm`. |
 
 ## Building

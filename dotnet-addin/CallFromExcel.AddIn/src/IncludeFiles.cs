@@ -5,7 +5,7 @@ using Microsoft.Win32;
 
 namespace CallFromExcel.AddIn
 {
-    // The ribbon's Julia File box: the file to include, and the files most recently included,
+    // The ribbon's Julia File box: the file to include, and the files most recently chosen or included,
     // newest first. Kept per user in the registry, beside the launch settings, so they survive
     // Excel restarts.
     internal static class IncludeFiles
@@ -42,7 +42,7 @@ namespace CallFromExcel.AddIn
             }
         }
 
-        // Puts a file that has just been included at the top of the recent list.
+        // Puts a file at the top of the recent list: one just chosen (Choose) or included.
         public static void AddRecent(string fileName)
         {
             List<string> recent = Recent;
@@ -52,6 +52,16 @@ namespace CallFromExcel.AddIn
             {
                 key.SetValue("Recent", recent.Take(MaxRecent).ToArray(), RegistryValueKind.MultiString);
             }
+        }
+
+        // Makes path the current file, typed, pasted, picked from the list or browsed to; and puts
+        // it on the recent list if the file exists, so a mistyped path doesn't get there. (Office
+        // reports a typed path only on Enter or leaving the box, not keystroke by keystroke.)
+        public static void Choose(string path)
+        {
+            Current = path;
+            string chosen = Current;   // as cleaned by the setter
+            if (chosen != "" && System.IO.File.Exists(chosen)) AddRecent(chosen);
         }
 
         public static void ClearRecent()

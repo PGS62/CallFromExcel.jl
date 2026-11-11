@@ -99,7 +99,7 @@ namespace CallFromExcel.AddIn
         {
             Settings = settings;
 
-            Text = "CallFromExcel - Launch Settings";
+            Text = Ribbon.DialogTitle + " - Launch Settings";
             Icon windowIcon = JuliaIcon.WindowIcon(SystemInformation.SmallIconSize.Width);   // null: keep the default icon
             if (windowIcon != null) Icon = windowIcon;
             Font = SystemFonts.MessageBoxFont;

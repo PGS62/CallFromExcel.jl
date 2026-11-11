@@ -24,6 +24,11 @@ end
     # On failure: run `dotnet build -c Release` in dotnet-addin/CallFromExcel.AddIn, then commit dist/.
     @test source_hash(joinpath(addin, "CallFromExcel.AddIn")) ==
           strip(read(joinpath(addin, "dist", "source-hash.txt"), String))
+    # The add-in reports its version in the ribbon's Help tooltip. On failure: set
+    # AssemblyInformationalVersion in AssemblyInfo.cs to Project.toml's version, and rebuild.
+    assemblyinfo = read(joinpath(addin, "CallFromExcel.AddIn", "src", "AssemblyInfo.cs"), String)
+    m = match(r"AssemblyInformationalVersion\(\"([^\"]+)\"\)", assemblyinfo)
+    @test m !== nothing && m[1] == string(pkgversion(CallFromExcel))
 end
 
 # isequal alone is type-blind (isequal(2, 2.0) is true), so it would miss a type morph introduced

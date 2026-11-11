@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
@@ -15,6 +16,9 @@ namespace CallFromExcel.AddIn
     [ComVisible(true)]
     public class Ribbon : ExcelRibbon
     {
+        // The title of our message boxes and dialogs - the package name, as on the ribbon.
+        internal const string DialogTitle = "CallFromExcel.jl";
+
         public override string GetCustomUI(string RibbonID)
         {
             return @"<customUI xmlns='http://schemas.microsoft.com/office/2009/07/customui' onLoad='OnRibbonLoad' loadImage='LoadImage'>
@@ -33,12 +37,15 @@ namespace CallFromExcel.AddIn
                       supertip='Choose the project folder, packages and other options the Launch Julia button uses. JuliaLaunch() formulas use their own arguments instead.' />
             </menu>
           </splitButton>
-          <button id='ShowJuliaWindow' label='Show Julia Window' imageMso='WindowUnhide'
+          <button id='ShowJuliaWindow' label='Show Julia' imageMso='WindowUnhide'
                   onAction='OnShowJuliaWindow'
                   supertip='Bring the Julia window serving this Excel session to the front, restoring it if it is minimised.' />
           <button id='CloseJulia' label='Close Julia' imageMso='PrintPreviewClose'
                   onAction='OnCloseJulia'
                   supertip='Close the Julia session serving this Excel session, after asking for confirmation. Variables and functions defined in it are lost.' />
+          <checkBox id='DisplayResults' label='Display Results'
+                    getPressed='GetDisplayResultsPressed' onAction='OnDisplayResults'
+                        supertip='Show each call from Excel, and the result returned, in the Julia window - as display_results(true) does in Julia. Ticked when it is on in the running Julia session.' />
         </group>
         <group id='CallFromExcelFileGroup' label='Julia File'>
           <box id='IncludeFileRow' boxStyle='horizontal'>
@@ -52,14 +59,14 @@ namespace CallFromExcel.AddIn
                     screentip='Browse'
                     supertip='Choose a Julia file to put in the box. It is not included until you click Include.' />
           </box>
-          <button id='IncludeFile' label='Include' imageMso='ImportTextFile'
+          <button id='IncludeFile' label='Include' imageMso='CodeEdit' getEnabled='GetIncludeEnabled'
                   onAction='OnIncludeFile'
-                  supertip='Load the file in the box into Julia, as JuliaInclude does, making the functions it defines available to JuliaCall and JuliaEval. Cells already using them are not recalculated.' />
+                  supertip='Load the file in the box into Julia, as JuliaInclude does, making the functions it defines available to JuliaCall and JuliaEval. Does not trigger recalculation.' />
         </group>
-        <group id='CallFromExcelHelpGroup' label='Help'>
+        <group id='CallFromExcelHelpGroup' label='&#160;CallFromExcel.jl&#160;'>
           <button id='CallFromExcelHelp' label='Help' size='large' imageMso='Help'
                   onAction='OnHelp'
-                  supertip='Open the CallFromExcel documentation on GitHub.' />
+                  getSupertip='GetHelpSupertip' />
         </group>
       </tab>
     </tabs>
@@ -92,7 +99,7 @@ namespace CallFromExcel.AddIn
             }
             catch (Exception ex)
             {
-                MessageBox.Show(new ExcelWindow(), ex.Message, "CallFromExcel", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show(new ExcelWindow(), ex.Message, DialogTitle, MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -109,11 +116,12 @@ namespace CallFromExcel.AddIn
             string message = JuliaFunctions.JuliaIsRunning()
                 ? "Julia is running, but its window couldn't be found. If you attached your own Julia session with serve_xl, switch to it directly."
                 : "Julia isn't running. Use Launch Julia to start it.";
-            MessageBox.Show(new ExcelWindow(), message, "CallFromExcel", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show(new ExcelWindow(), message, DialogTitle, MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
         // Kept so the Julia File box can be refreshed (InvalidateControl) after Browse or Include.
-        private IRibbonUI _ribbon;
+        // Static so the static Launch can refresh the Display Results toggle after a launch.
+        private static IRibbonUI _ribbon;
 
         public void OnRibbonLoad(IRibbonUI ribbon)
         {
@@ -123,28 +131,49 @@ namespace CallFromExcel.AddIn
         // The Julia File box: its text is the file to include, its drop-down the recent files.
         public string GetIncludeText(IRibbonControl control) => IncludeFiles.Current;
 
-        // The last item in the drop-down, when there is history to clear. A ribbon combo box's
-        // items can only be text - no separator line, no action of their own - so choosing it
-        // arrives here as the box's text changing to this label, which no file path can equal.
+        // Two drop-down items that act rather than name a file: "(No file)" first, when the box
+        // has a file, to empty it - deleting all the text doesn't, since Office then puts the old
+        // text back without telling the add-in - and "Clear history" last, when there is history
+        // to clear. A ribbon combo box's items can only be text (no separator line, no action of
+        // their own), so choosing one arrives here as the box's text changing to its label,
+        // which no file path can equal.
+        private const string NoFileLabel = "(No file)";
         private const string ClearHistoryLabel = "Clear history";
 
         public void OnIncludeTextChanged(IRibbonControl control, string text)
         {
             if (text == ClearHistoryLabel) IncludeFiles.ClearRecent();   // and keep the current file
-            else IncludeFiles.Current = text;
-            _ribbon?.InvalidateControl("IncludeFileBox");   // shows the cleaned path, e.g. without quotes
+            else if (text == NoFileLabel) IncludeFiles.Current = "";
+            else IncludeFiles.Choose(text);
+            RefreshFileControls();
         }
 
-        public int GetRecentCount(IRibbonControl control)
+        // The box (to show the cleaned path, e.g. without quotes) and Include (enabled or not).
+        private static void RefreshFileControls()
         {
-            int n = IncludeFiles.Recent.Count;
-            return n == 0 ? 0 : n + 1;
+            _ribbon?.InvalidateControl("IncludeFileBox");
+            _ribbon?.InvalidateControl("IncludeFile");
         }
+
+        // Include is greyed out while the box is empty.
+        public bool GetIncludeEnabled(IRibbonControl control) => IncludeFiles.Current != "";
+
+        private static List<string> DropDownItems()
+        {
+            var items = new List<string>();
+            if (IncludeFiles.Current != "") items.Add(NoFileLabel);
+            List<string> recent = IncludeFiles.Recent;
+            items.AddRange(recent);
+            if (recent.Count > 0) items.Add(ClearHistoryLabel);
+            return items;
+        }
+
+        public int GetRecentCount(IRibbonControl control) => DropDownItems().Count;
 
         public string GetRecentLabel(IRibbonControl control, int index)
         {
-            var recent = IncludeFiles.Recent;
-            return index < recent.Count ? recent[index] : ClearHistoryLabel;
+            List<string> items = DropDownItems();
+            return index < items.Count ? items[index] : "";
         }
 
         // The full path on hovering, since a long one doesn't fit in the box.
@@ -170,9 +199,9 @@ namespace CallFromExcel.AddIn
                     dialog.FileName = Path.GetFileName(current);
                 }
                 if (dialog.ShowDialog(new ExcelWindow()) != DialogResult.OK) return;
-                IncludeFiles.Current = dialog.FileName;
+                IncludeFiles.Choose(dialog.FileName);
             }
-            _ribbon?.InvalidateControl("IncludeFileBox");
+            RefreshFileControls();
         }
 
         public void OnIncludeFile(IRibbonControl control)
@@ -199,11 +228,11 @@ namespace CallFromExcel.AddIn
             if (result is string text && text.StartsWith("#", StringComparison.Ordinal))
             {
                 SetStatusBar(null);
-                MessageBox.Show(new ExcelWindow(), text.Substring(1), "CallFromExcel", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show(new ExcelWindow(), text.Substring(1), DialogTitle, MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
             IncludeFiles.AddRecent(fileName);
-            _ribbon?.InvalidateControl("IncludeFileBox");
+            RefreshFileControls();
             ShowBriefly("Included " + Path.GetFileName(fileName));
         }
 
@@ -217,7 +246,7 @@ namespace CallFromExcel.AddIn
             }
             DialogResult answer = MessageBox.Show(new ExcelWindow(),
                 "Close the Julia session serving this Excel session? Variables and functions defined in it will be lost.",
-                "CallFromExcel", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2);
+                DialogTitle, MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2);
             if (answer != DialogResult.Yes) return;
 
             // Julia exits while handling the request, so no reply is expected: the error that
@@ -233,12 +262,60 @@ namespace CallFromExcel.AddIn
                 Inform("Julia didn't close. It may be busy - try again, or close its window.");
                 return;
             }
+            _ribbon?.InvalidateControl("DisplayResults");
             ShowBriefly("Julia closed");
         }
 
         private static void Inform(string message)
         {
-            MessageBox.Show(new ExcelWindow(), message, "CallFromExcel", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show(new ExcelWindow(), message, DialogTitle, MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
+        // Display Results shows Julia's real setting, asked for each time the ribbon redraws the
+        // toggle (when the tab first shows, after Launch, Close Julia or a click), so it's right
+        // even for a session started by a JuliaLaunch formula or serve_xl. It can go stale if the
+        // setting is changed in the REPL meanwhile; a click then sets it explicitly anyway.
+        public bool GetDisplayResultsPressed(IRibbonControl control)
+        {
+            try
+            {
+                if (!JuliaFunctions.JuliaIsRunning()) return false;
+                string wire = JuliaHttpClient.Post("CallFromExcel.display_results()", "/eval");
+                return WireFormatDecode.Decode(wire) is bool on && on;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
+        public void OnDisplayResults(IRibbonControl control, bool pressed)
+        {
+            try
+            {
+                if (!JuliaFunctions.JuliaIsRunning())
+                {
+                    Inform("Julia isn't running. Use Launch Julia to start it first.");
+                    return;
+                }
+                JuliaHttpClient.Post("CallFromExcel.display_results(" + (pressed ? "true" : "false") + ")", "/eval");
+                ShowBriefly("Display results " + (pressed ? "on" : "off"));
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(new ExcelWindow(), ex.Message, DialogTitle, MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                _ribbon?.InvalidateControl("DisplayResults");   // shows Julia's actual setting
+            }
+        }
+
+        public string GetHelpSupertip(IRibbonControl control)
+        {
+            string version = typeof(Ribbon).Assembly
+                .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "";
+            return "CallFromExcel " + version + "\n\nOpen the CallFromExcel documentation on GitHub.";
         }
 
         public void OnHelp(IRibbonControl control)
@@ -250,7 +327,7 @@ namespace CallFromExcel.AddIn
             }
             catch (Exception ex)
             {
-                MessageBox.Show(new ExcelWindow(), ex.Message, "CallFromExcel", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show(new ExcelWindow(), ex.Message, DialogTitle, MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -261,11 +338,12 @@ namespace CallFromExcel.AddIn
                 SetStatusBar("Launching Julia...");
                 ShowBriefly(JuliaLaunch.Launch(s.UseLinux, s.MinimiseWindow, s.CommandLineOptions,
                                                s.Packages, s.BashStatements, s.TimeOut));
+                _ribbon?.InvalidateControl("DisplayResults");
             }
             catch (Exception ex)
             {
                 SetStatusBar(null);
-                MessageBox.Show(new ExcelWindow(), ex.Message, "CallFromExcel", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show(new ExcelWindow(), ex.Message, DialogTitle, MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 

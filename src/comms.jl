@@ -602,6 +602,32 @@ function setvar(name::String, arg)
     end
 end
 
+"""
+    set_console_icon()
+
+Give this Julia session's console window the icon embedded in `julia.exe`, in its title bar
+and taskbar button. Called by the start-up script `JuliaLaunch` writes, which runs Julia in the
+classic console window (conhost); that shows its own generic icon otherwise. Does nothing
+except on Windows. Under Windows Terminal, `GetConsoleWindow` returns a hidden stand-in
+window, so this has no visible effect there.
+"""
+function set_console_icon()
+    Sys.iswindows() || return nothing
+    hwnd = ccall((:GetConsoleWindow, "kernel32"), stdcall, Ptr{Cvoid}, ())
+    hwnd == C_NULL && return nothing
+    large, small = Ref{Ptr{Cvoid}}(C_NULL), Ref{Ptr{Cvoid}}(C_NULL)
+    n = ccall((:ExtractIconExW, "shell32"), stdcall, UInt32,
+              (Cwstring, Cint, Ref{Ptr{Cvoid}}, Ref{Ptr{Cvoid}}, UInt32),
+              joinpath(Sys.BINDIR, "julia.exe"), 0, large, small, 1)
+    n == 0 && return nothing
+    WM_SETICON, ICON_SMALL, ICON_BIG = 0x0080, 0, 1
+    for (kind, icon) in ((ICON_SMALL, small[]), (ICON_BIG, large[]))
+        icon == C_NULL || ccall((:SendMessageW, "user32"), stdcall, Int,
+                                (Ptr{Cvoid}, UInt32, UInt, Ptr{Cvoid}), hwnd, WM_SETICON, kind, icon)
+    end
+    nothing
+end
+
 # https://docs.microsoft.com/en-us/windows/terminal/tutorials/tab-title
 function settitle()
     if Sys.islinux()

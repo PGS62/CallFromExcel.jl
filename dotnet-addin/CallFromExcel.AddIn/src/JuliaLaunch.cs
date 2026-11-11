@@ -17,6 +17,7 @@ namespace CallFromExcel.AddIn
     {
         private const string PackageName = "CallFromExcel";
         private const string WSLExecutable = @"C:\Windows\System32\wsl.exe";
+        private const string ConhostExecutable = @"C:\Windows\System32\conhost.exe";
 
         // Julia's short options that take a value, either attached (-Lfile) or as the next
         // argument (-L file), per julia --help. Any other letter in a short-option group is a flag
@@ -241,6 +242,16 @@ namespace CallFromExcel.AddIn
                 command = "\"" + juliaExe + "\" " + processArguments;
             }
 
+            // Run in the classic console window (conhost) rather than the user's default terminal.
+            // Where that's Windows Terminal (the default on Windows 11), the taskbar would show
+            // Terminal's icon, and Julia's window couldn't be found by its title. In conhost the
+            // taskbar shows Julia's icon (for a Microsoft Store Julia), Julia sets its title-bar
+            // icon itself (set_console_icon, in the start-up script), and MinimiseWindow is
+            // respected. Still started via ShellExecute (see below), so networking for a Store
+            // Julia is unaffected - checked with a loopback connection to Julia under conhost.
+            processArguments = "\"" + processFileName + "\" " + processArguments;
+            processFileName = ConhostExecutable;
+
             // MakeJuliaLiteral wraps its result in quotes (so it can stand alone as a
             // Julia string literal); strip them here since the escaped content is about
             // to be embedded inside another double-quoted println string below, which
@@ -293,8 +304,9 @@ namespace CallFromExcel.AddIn
                 Thread.Sleep(50);
                 if (juliaProcess.HasExited)
                 {
-                    string errDescription = "Julia's process exited (exit code " + juliaProcess.ExitCode +
-                                             ") before start-up finished.";
+                    // No exit code in the message: juliaProcess is conhost (see above), which
+                    // exits with 0 whatever Julia's own exit code was.
+                    string errDescription = "Julia's process exited before start-up finished.";
                     if (userSuppliedCommandLineOptions != "")
                     {
                         errDescription += " Check the CommandLineOptions are valid " +
@@ -337,10 +349,9 @@ namespace CallFromExcel.AddIn
                     "See https://github.com/PGS62/CallFromExcel.jl#installation");
             }
 
-            // Best-effort only: on this exact machine (and plausibly for anyone using
-            // Windows Terminal as their default terminal host) no matching top-level
-            // window is ever found - see this method's own notes above. That's cosmetic
-            // only; it doesn't affect whether the launch itself succeeded.
+            // Best-effort only: the window is found now that Julia runs in conhost (see above),
+            // but wasn't when it ran in Windows Terminal, and might not be in some other
+            // setup. That's cosmetic; it doesn't affect whether the launch itself succeeded.
             if (WindowUtils.TryGetHandleFromPartialCaption(windowPartialTitle, out IntPtr hwndFinal))
             {
                 return "Julia launched in window \"" + WindowUtils.WindowTitleFromHandle(hwndFinal) + "\"";
@@ -420,6 +431,7 @@ namespace CallFromExcel.AddIn
                    "    CallFromExcel.comms_folder(" + JuliaLiteral.MakeJuliaLiteral(commsFolderX) + ")\n" +
                    "    println(\"Julia $VERSION, using " + PackageName + " to serve Excel running as process ID " + pid + ".\")\n" +
                    "    println(\"Julia launched with command: " + literalCommand + " \")\n" +
+                   "    CallFromExcel.set_console_icon()\n" +
                    "    CallFromExcel.start_server()\n" +
                    "    rm(" + JuliaLiteral.MakeJuliaLiteral(flagFileX) + ")\n" +
                    "catch e\n" +

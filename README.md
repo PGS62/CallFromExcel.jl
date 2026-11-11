@@ -246,7 +246,7 @@ JuliaExcelPID()
 Calls are fast: a simple call takes under a millisecond, and `=JuliaCall("sort", A1:A1000000)` sorts a million numbers in about 0.4 seconds, including sending them to Julia and back. That's faster than Excel's own `=SORT(A1:A1000000)`, which takes about 0.6 seconds, and about a third of the time taken by CallFromExcel's predecessor, JuliaExcel. See the [changelog](CHANGELOG.md) for more timings.
 
 ## Alternatives
-Apart from CallFromExcel's own predecessor, [JuliaExcel](https://github.com/PGS62/JuliaExcel.jl), which CallFromExcel replaces, there is one other method of calling Julia from Excel of which I am aware:  
+Apart from CallFromExcel's own predecessor, [JuliaExcel](https://github.com/PGS62/JuliaExcel.jl), there is one other method of calling Julia from Excel of which I am aware:  
 
 https://github.com/JuliaComputing/JuliaInXL.jl  
 

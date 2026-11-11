@@ -73,11 +73,11 @@ namespace CallFromExcel.AddIn
             }
             if (!hasThreads)
             {
-                // Without a dedicated interactive thread, HTTP.jl's server tasks share
-                // Julia's single default thread with whatever expression is currently
-                // being evaluated - a long-running or blocking evaluation (even exit())
-                // can then leave the server unable to respond, or even to shut down
-                // cleanly. See the "Server" docstring in HTTP.jl's http_server.jl.
+                // One interactive thread, as HTTP.jl recommends for servers (see the "Server"
+                // docstring in HTTP.jl's http_server.jl), alongside Julia's usual threads.
+                // Added in August 2026, when exit() sent from Excel could fail to shut Julia
+                // down with a single thread; checked in November 2026, that no longer
+                // happens either way, so this is now just following HTTP.jl's advice.
                 result = (result + " --threads=auto,1").Trim();
             }
             return result;

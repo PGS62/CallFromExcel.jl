@@ -34,7 +34,7 @@ namespace CallFromExcel.AddIn
         public static object JuliaLaunch(
             [ExcelArgument(Name = "UseLinux", Description = "Launch Julia under WSL instead of natively on Windows.")] object useLinux,
             [ExcelArgument(Name = "MinimiseWindow", Description = "Launch Julia's console window minimised.")] object minimiseWindow,
-            [ExcelArgument(Name = "CommandLineOptions", Description = "Command line options set when launching Julia.")] object commandLineOptions,
+            [ExcelArgument(Name = "CommandLineOptions", Description = "Command line options for Julia, e.g. --project=C:\\MyProject or --banner=no.")] object commandLineOptions,
             [ExcelArgument(Name = "Packages", Description = "Packages to load, comma-delimited, which must be available in the default Julia environment.")] object packages,
             [ExcelArgument(Name = "BashStatements", Description = "Relevant only when UseLinux is TRUE. Bash statements to run before launching Julia under WSL, e.g. to set environment variables. Delimit multiple statements with the line feed character.")] object bashStatements,
             [ExcelArgument(Name = "TimeOut", Description = "Seconds to wait for Julia to fully start before giving up waiting. Defaults to 30.")] object timeOut)

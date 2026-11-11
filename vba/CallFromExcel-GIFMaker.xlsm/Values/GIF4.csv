@@ -1,5 +1,5 @@
 ﻿,"JuliaExcel GIFMaker",0.15,1,,,
-,"WindowToActivate","GIF4-take2",,,,
+,"WindowToActivate","GIF4.xlsm",,,,
 ,"Keys","DelayBetween","DelayAfter","OtherCommand",,"GIFMaker - Hints"
 ,"{HOME}",,0,,,"Use in conjunction with ScreenToGif.exe"
 ,"Demo~",0.075,0,,,"This workbook must be open in a separate Excel instance from the instance that's being recorded."

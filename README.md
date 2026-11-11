@@ -32,7 +32,7 @@ Here's a quick demonstration of CallFromExcel's functions in action.
  * Replay the GIF by refreshing your browser (F5).
 
 <a href="#no-click">
-  <img src="images/demo4-take6.gif" alt="Calling Julia from Excel worksheet formulas with JuliaLaunch, JuliaEval and JuliaCall, with the Julia REPL echoing each call" />
+  <img src="images/demo.gif" alt="Calling Julia from Excel worksheet formulas with JuliaLaunch, JuliaEval and JuliaCall, with the Julia REPL echoing each call" />
 </a>
 
 ## Installation

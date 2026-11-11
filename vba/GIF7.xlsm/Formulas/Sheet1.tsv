@@ -1,0 +1,9 @@
+﻿Address	Formula
+A3	"=""Formula at A4 is "" & FORMULATEXT(A4)"
+A4	=JuliaLaunch()
+C7:G7	={8,7,6,5,4}
+A8:A12	={1;2;3;4;5}
+C9	"=""Formula at C10 is "" & FORMULATEXT(C10)"
+C10:G14	"=JuliaCall(""*"",A8:A12,C7:G7)"
+C16	"=""Formula at C17 is "" & FORMULATEXT(C17)"
+C17:G21	=MMULT(A8:A12,C7:G7)

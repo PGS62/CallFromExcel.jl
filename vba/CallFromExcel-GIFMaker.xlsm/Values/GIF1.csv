@@ -11,17 +11,6 @@
 ,"{ESCAPE}{BACKSPACE}",0,0,,,"That sends recorded keystrokes - more consistently than I'm ever able to type!"
 ,"{BACKSPACE}{BACKSPACE}",0,0,,,"Don't forget to click the stop recording asap after send keys method MakeGIF exits."
 ,"{]}",0,3,,,"In ScreenToGIF, delete frames before action starts and after action ends"
-,"add https://github.com/PGS62/JuliaExcel.jl~",0.06,8,,,"Delete duplicate frames but make timing be ""sum"""
+,"add https://github.com/PGS62/CallFromExcel.jl~",0.06,8,,,"Delete duplicate frames but make timing be ""sum"""
 ,,,,,,"Save GIF!"
 ,,,,,,"Upload to GitHub etc."
-,,,,,,
-,,,,,,
-,,,,,,
-,,,,,,
-,,,,,,
-,,,,,,
-,,,,,,
-,"Flag file!",,,,,
-,"C:\Temp\RecordingGIF.tmp",,,,,
-,,,,,,
-,#NAME?,,,,,

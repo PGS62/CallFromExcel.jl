@@ -1,2 +1,4 @@
-Version	Date	Time	Author	Comment
+﻿Version	Date	Time	Author	Comment
+3	11-Nov-2026	11:01	Philip Swannell	Broke links to SolumAddin.
+2	22-Aug-2026	15:23	Philip Swannell	Updated to today's version of JuliaExcel.
 1	07-Nov-2021	19:08	Philip Swannell	Added code in change event to illustrate the contents of formulas entered.

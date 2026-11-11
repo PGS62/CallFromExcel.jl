@@ -1,4 +1,5 @@
-AuditSheetComments.txt
-GIF4.xlsm
-Module1.bas
-Sheet1.cls
+﻿AuditSheetComments.txt
+Formulas\Sheet1.tsv
+Values\Audit.csv
+Values\Sheet1.csv
+VBA\Sheet1.cls

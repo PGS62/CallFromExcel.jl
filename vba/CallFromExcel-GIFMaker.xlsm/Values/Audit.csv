@@ -1,8 +1,10 @@
 ﻿,"Audit",,,,
 ,,,,,
-,"All 7 rows shown.",,,,
+,"All 9 rows shown.",,,,
 ,"Dbl-click","Double-click","Dbl-click","Double-click","Double-click to filter"
 ,"Version","Date","Time","Author","Comment"
+,9,2026-11-11,0.454131944446999,"Philip Swannell","Broke links to SolumAddin."
+,8,2026-11-11,0.448750000003201,"Philip Swannell","Re-recorded matrixarithmetic and functionbroadcasting gifs."
 ,7,2026-11-10,0.737407407410501,"Philip Swannell","Re-recorded roundtripping."
 ,6,2026-09-03,0.726921296292858,"Philip Swannell",
 ,5,2021-11-12,0.65854166666395,"Philip Swannell","Re-recorded installation."

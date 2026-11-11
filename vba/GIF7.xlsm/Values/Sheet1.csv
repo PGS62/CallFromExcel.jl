@@ -1,0 +1,21 @@
+﻿"Matrix arithmetic",,,,,,
+,,,,,,
+"Formula at A4 is =JuliaLaunch()",,,,,,
+"Julia is already running in window ""Julia 1.13.3 on Windows serving Excel PID 414180, port 2702""",,,,,,
+,,,,,,
+,,"Row Vector",,,,
+"Column Vector",,8,7,6,5,4
+1,,,,,,
+2,,"Formula at C10 is =JuliaCall(""*"",A8:A12,C7:G7)",,,,
+3,,8,7,6,5,4
+4,,16,14,12,10,8
+5,,24,21,18,15,12
+,,32,28,24,20,16
+,,40,35,30,25,20
+,,,,,,
+,,"Formula at C17 is =MMULT(A8:A12,C7:G7)",,,,
+,,8,7,6,5,4
+,,16,14,12,10,8
+,,24,21,18,15,12
+,,32,28,24,20,16
+,,40,35,30,25,20

@@ -1,0 +1,21 @@
+﻿Address	Formula
+B2	"=""Formula at B3 is "" & FORMULATEXT(B3)"
+B3	=JuliaLaunch()
+B5	"=""Formula at B6 is "" & FORMULATEXT(B6)"
+B6	"=JuliaCall(""display_results"",TRUE)"
+B8	"=""Formula at B9 is "" & FORMULATEXT(B9)"
+B9	=JuliaEval(A9)
+B11	"=""Formula at B12 is "" & FORMULATEXT(B12)"
+B12:E15	=JuliaEval(A12)
+B17	"=""Formula at B18 is "" & FORMULATEXT(B18)"
+B18:E21	=JuliaEval(A18)
+B23	"=""Formula at B24 is "" & FORMULATEXT(B24)"
+B24	=JuliaEval(A24)
+B26	"=""Formula at B27 is "" & FORMULATEXT(B27)"
+B27	=JuliaEval(A27)
+B29	"=""Formula at B30 is "" & FORMULATEXT(B30)"
+B30	=JuliaSetVar(A30,B18#)
+B32	"=""Formula at B33 is "" & FORMULATEXT(B33)"
+B33:E36	=JuliaEval(A33)
+B38	"=""Formula at B39 is "" & FORMULATEXT(B39)"
+B39:E42	=JuliaCall(A39,B12#,B18#)

@@ -1,5 +1,4 @@
 ﻿AuditSheetComments.txt
-Formulas\GIF1.tsv
 Formulas\GIF4.tsv
 Formulas\GIF5.tsv
 Formulas\GIF6.tsv

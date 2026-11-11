@@ -1,0 +1,15 @@
+﻿Address	Formula
+A3	"=""Formula at A4 is "" & FORMULATEXT(A4)"
+A4	=JuliaLaunch()
+C6	"=""Formula at C7 is "" & FORMULATEXT(C7)"
+H6	"=""Formula at H7 is "" & FORMULATEXT(H7)"
+C7:C11	"=JuliaCall(""identity"",A7:A11)"
+H7	"=JuliaCall(""typeof"",A7:A11)"
+F14	"=""Formula at F15 is "" & FORMULATEXT(F15)"
+F15:I15	"=JuliaCall(""identity"",A15:D15)"
+F17	"=""Formula at F18 is "" & FORMULATEXT(F18)"
+F18	"=JuliaCall(""typeof"",A15:D15)"
+F20	"=""Formula at F21 is "" & FORMULATEXT(F21)"
+F21:H23	"=JuliaCall(""identity"",A21:C23)"
+F25	"=""Formula at F26 is "" & FORMULATEXT(F26)"
+F26	"=JuliaCall(""typeof"",A21:C23)"

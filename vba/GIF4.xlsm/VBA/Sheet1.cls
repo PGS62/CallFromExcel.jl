@@ -20,13 +20,15 @@ Private Sub Worksheet_Change(ByVal Target As Range)
                 If IsEmpty(Target.Cells(0, 1)) Then
                     inMethod = True
                     With Target.Cells(0, 1)
-                        Formula = "=""Formula at " & Replace(.Address, "$", "") & " is "" & " & "FORMULATEXT(R[1]C)"
+                        Formula = "=""Formula at " & Replace(.Offset(1).Address, "$", "") & " is "" & " & "FORMULATEXT(R[1]C)"
+                        .Calculate
                         With .Font
                             .Italic = True
                             .ThemeColor = xlThemeColorAccent2
                             .TintAndShade = -0.249977111117893
                         End With
                         .Formula2R1C1 = Formula
+                        .Calculate
                     End With
                     inMethod = False
                 End If

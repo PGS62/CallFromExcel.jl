@@ -1,0 +1,42 @@
+﻿"Demo",,,,
+,"Formula at B3 is =JuliaLaunch()",,,
+"JuliaLaunch:","Julia launched in window ""Julia 1.13.3 on Windows serving Excel PID 409168, port 2703""",,,
+,,,,
+,"Formula at B6 is =JuliaCall(""display_results"",TRUE)",,,
+"Call display_results","Results from JuliaCall/JuliaEval will display in REPL",,,
+,,,,
+,"Formula at B9 is =JuliaEval(A9)",,,
+"using LinearAlgebra",0,,,
+,,,,
+,"Formula at B12 is =JuliaEval(A12)",,,
+"x=(1:4).+(1:4)'+10I",12,3,4,5
+,3,14,5,6
+,4,5,16,7
+,5,6,7,18
+,,,,
+,"Formula at B18 is =JuliaEval(A18)",,,
+"y=inv(x)",9.78571428571429E-02,-7.85714285714286E-03,-1.35714285714286E-02,-1.92857142857143E-02
+,-7.85714285714286E-03,8.78571428571429E-02,-1.64285714285714E-02,-2.07142857142857E-02
+,-1.35714285714286E-02,-1.64285714285714E-02,8.07142857142857E-02,-2.21428571428571E-02
+,-1.92857142857143E-02,-2.07142857142857E-02,-2.21428571428571E-02,7.64285714285714E-02
+,,,,
+,"Formula at B24 is =JuliaEval(A24)",,,
+"typeof(x)","Matrix{Int64} (alias for Array{Int64, 2})",,,
+,,,,
+,"Formula at B27 is =JuliaEval(A27)",,,
+"typeof(y)","Matrix{Float64} (alias for Array{Float64, 2})",,,
+,,,,
+,"Formula at B30 is =JuliaSetVar(A30,B18#)",,,
+"y2","Set global variable `y2` to 4x4 Matrix{Float64}",,,
+,,,,
+,"Formula at B33 is =JuliaEval(A33)",,,
+"y-y2",0,0,0,0
+,0,0,0,0
+,0,0,0,0
+,0,0,0,0
+,,,,
+,"Formula at B39 is =JuliaCall(A39,B12#,B18#)",,,
+"*",1,-2.77555756156289E-17,1.38777878078145E-17,-2.77555756156289E-17
+,-7.63278329429795E-17,1,8.32667268468867E-17,0
+,-6.59194920871187E-17,-2.77555756156289E-17,1,-2.77555756156289E-17
+,-3.46944695195361E-17,5.55111512312578E-17,2.77555756156289E-17,1

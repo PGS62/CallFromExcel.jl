@@ -1,4 +1,6 @@
 ﻿Version	Date	Time	Author	Comment
+9	11-Nov-2026	10:53	Philip Swannell	Broke links to SolumAddin.
+8	11-Nov-2026	10:46	Philip Swannell	Re-recorded matrixarithmetic and functionbroadcasting gifs.
 7	10-Nov-2026	17:41	Philip Swannell	Re-recorded roundtripping.
 6	03-Sep-2026	17:26	Philip Swannell	
 5	12-Nov-2021	15:48	Philip Swannell	Re-recorded installation.

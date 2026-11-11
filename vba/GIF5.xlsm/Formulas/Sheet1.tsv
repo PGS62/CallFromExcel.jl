@@ -1,0 +1,7 @@
+﻿Address	Formula
+A3	"=""Formula at A4 is "" & FORMULATEXT(A4)"
+A4	=JuliaLaunch()
+A6	"=""Formula at A7 is "" & FORMULATEXT(A7)"
+A7	=JuliaEval(A8)
+B11	"=""Formula at B12 is "" & FORMULATEXT(B12)"
+B12:D15	"=JuliaCall(""f."",A12:A15,B10:D10)"

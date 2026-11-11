@@ -101,8 +101,8 @@ Workaround meanwhile: `=IMREAL(SUBSTITUTE(JuliaEval(...),".",","))`.
 
 **Status (in progress on the `ribbon` branch).**
 
-- Done: the Julia tab; a Launch Julia split button, launching with saved settings; the Launch Settings dialog (project folder with Browse, other options, packages, bash statements, time-out, saved in the registry, resizable, tooltips).
-- To do: Include File, Show Julia Window, Close Julia and Help buttons; the Julia icon on the button and the dialog (pending the logo licence decision); README documentation of the ribbon. In particular, `JuliaLaunch`'s documentation (README and its `[ExcelFunction]` description) should say that it ignores the Launch Settings dialog, which applies only to the ribbon's Launch Julia button.
+- Done: the Julia tab; a Launch Julia split button, launching with saved settings; the Launch Settings dialog (project folder with Browse, other options, packages, bash statements, time-out, saved in the registry, resizable, tooltips); Show Julia Window; Close Julia (with confirmation); a Julia File group (file box with Browse, a recent-files drop-down ending in Clear history, and Include, which doesn't recalculate); Help.
+- To do: the Julia icon on the button and the dialog (pending the logo licence decision); README documentation of the ribbon. In particular, `JuliaLaunch`'s documentation (README and its `[ExcelFunction]` description) should say that it ignores the Launch Settings dialog, which applies only to the ribbon's Launch Julia button.
 
 **Problem.** Julia can only be started by a `JuliaLaunch` formula, and nothing in Excel's own interface says where to find help: the Add-ins dialog shows no description for any third-party XLL. (Only "Help on this function" in the Insert Function dialog and the function name in the IntelliSense pop-up link to the README.) JuliaInXL, Julia Computing's earlier Excel add-in, had a JULIA ribbon tab with "Launch Local Julia", "Select Julia File", "Include Julia File", a `tcp://localhost:9999` connection box, "Reconnect" and "Terminate".
 

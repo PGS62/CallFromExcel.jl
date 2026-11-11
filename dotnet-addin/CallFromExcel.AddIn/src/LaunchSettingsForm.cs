@@ -100,6 +100,8 @@ namespace CallFromExcel.AddIn
             Settings = settings;
 
             Text = "CallFromExcel - Launch Settings";
+            Icon windowIcon = JuliaIcon.WindowIcon(SystemInformation.SmallIconSize.Width);   // null: keep the default icon
+            if (windowIcon != null) Icon = windowIcon;
             Font = SystemFonts.MessageBoxFont;
             // Sizes are in multiples of the font's height, which grows with the display's scaling,
             // so the dialog keeps its proportions at any DPI (fixed pixel sizes didn't scale).

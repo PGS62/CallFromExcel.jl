@@ -17,13 +17,13 @@ namespace CallFromExcel.AddIn
     {
         public override string GetCustomUI(string RibbonID)
         {
-            return @"<customUI xmlns='http://schemas.microsoft.com/office/2009/07/customui' onLoad='OnRibbonLoad'>
+            return @"<customUI xmlns='http://schemas.microsoft.com/office/2009/07/customui' onLoad='OnRibbonLoad' loadImage='LoadImage'>
   <ribbon>
     <tabs>
       <tab id='CallFromExcelTab' label='Julia'>
         <group id='CallFromExcelGroup' label='Julia'>
           <splitButton id='LaunchSplit' size='large'>
-            <button id='LaunchJulia' label='Launch Julia' imageMso='MacroPlay'
+            <button id='LaunchJulia' label='Launch Julia' image='JuliaLogo'
                     onAction='OnLaunchJulia'
                     screentip='Launch Julia'
                     supertip='Launch a local Julia session for this Excel session, using the Launch Settings.' />
@@ -33,7 +33,7 @@ namespace CallFromExcel.AddIn
                       supertip='Choose the project folder, packages and other options the Launch Julia button uses. JuliaLaunch() formulas use their own arguments instead.' />
             </menu>
           </splitButton>
-          <button id='ShowJuliaWindow' label='Show Julia Window' imageMso='WindowSwitchWindowsMenuExcel'
+          <button id='ShowJuliaWindow' label='Show Julia Window' imageMso='WindowUnhide'
                   onAction='OnShowJuliaWindow'
                   supertip='Bring the Julia window serving this Excel session to the front, restoring it if it is minimised.' />
           <button id='CloseJulia' label='Close Julia' imageMso='PrintPreviewClose'
@@ -65,6 +65,15 @@ namespace CallFromExcel.AddIn
     </tabs>
   </ribbon>
 </customUI>";
+        }
+
+        // Images named with image='...' in the XML. Excel-DNA accepts a Bitmap, or the name of a
+        // built-in Office icon, used here when no julia.exe with an icon is found. 128 pixels, so
+        // the logo stays sharp when Office scales it for a high-DPI display.
+        public override object LoadImage(string imageId)
+        {
+            if (imageId == "JuliaLogo") return (object)JuliaIcon.Bitmap(128) ?? "MacroPlay";
+            return null;
         }
 
         public void OnLaunchJulia(IRibbonControl control)

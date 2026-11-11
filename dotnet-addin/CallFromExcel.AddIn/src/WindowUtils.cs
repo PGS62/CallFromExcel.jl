@@ -24,6 +24,26 @@ namespace CallFromExcel.AddIn
         [DllImport("user32.dll", CharSet = CharSet.Auto)]
         private static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
 
+        private const int SW_RESTORE = 9;
+
+        [DllImport("user32.dll")]
+        private static extern bool IsIconic(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+        [DllImport("user32.dll")]
+        private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+        // Restores the window if it's minimised, and brings it to the front. Windows allows the
+        // latter because Excel, the caller's process, is in the foreground (the user just
+        // clicked its ribbon).
+        public static void ShowAndActivate(IntPtr hWnd)
+        {
+            if (IsIconic(hWnd)) ShowWindow(hWnd, SW_RESTORE);
+            SetForegroundWindow(hWnd);
+        }
+
         public static string WindowTitleFromHandle(IntPtr hWnd)
         {
             int length = GetWindowTextLength(hWnd);

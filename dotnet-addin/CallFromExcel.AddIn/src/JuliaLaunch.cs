@@ -134,6 +134,13 @@ namespace CallFromExcel.AddIn
             return args;
         }
 
+        // Part of the title of the Julia window serving the Excel process pid - must match
+        // Julia's CallFromExcel.settitle.
+        internal static string JuliaWindowTitle(int pid)
+        {
+            return "serving Excel PID " + pid;
+        }
+
         public static string Launch(
             bool useLinux = false,
             bool minimiseWindow = false,
@@ -148,7 +155,7 @@ namespace CallFromExcel.AddIn
             commandLineOptions = NormaliseCommandLineOptions(userSuppliedCommandLineOptions);
 
             int pid = Process.GetCurrentProcess().Id;
-            string windowPartialTitle = "serving Excel PID " + pid; // must match Julia's CallFromExcel.settitle
+            string windowPartialTitle = JuliaWindowTitle(pid);
 
             bool foundWindow = WindowUtils.TryGetHandleFromPartialCaption(windowPartialTitle, out IntPtr hwndJulia);
             int existingPort = JuliaPort.ReadJuliaPortFromFile();

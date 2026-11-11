@@ -32,6 +32,14 @@ namespace CallFromExcel.AddIn
                       supertip='Choose the project folder, packages and other options the Launch Julia button uses. JuliaLaunch() formulas use their own arguments instead.' />
             </menu>
           </splitButton>
+          <button id='ShowJuliaWindow' label='Show Julia Window' imageMso='WindowSwitchWindowsMenuExcel'
+                  onAction='OnShowJuliaWindow'
+                  supertip='Bring the Julia window serving this Excel session to the front, restoring it if it is minimised.' />
+        </group>
+        <group id='CallFromExcelHelpGroup' label='Help'>
+          <button id='CallFromExcelHelp' label='Help' size='large' imageMso='Help'
+                  onAction='OnHelp'
+                  supertip='Open the CallFromExcel documentation on GitHub.' />
         </group>
       </tab>
     </tabs>
@@ -52,6 +60,35 @@ namespace CallFromExcel.AddIn
                 {
                     if (form.ShowDialog(new ExcelWindow()) == DialogResult.Yes) Launch(form.Settings);
                 }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(new ExcelWindow(), ex.Message, "CallFromExcel", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        public void OnShowJuliaWindow(IRibbonControl control)
+        {
+            string title = JuliaLaunch.JuliaWindowTitle(System.Diagnostics.Process.GetCurrentProcess().Id);
+            if (WindowUtils.TryGetHandleFromPartialCaption(title, out IntPtr hwnd))
+            {
+                WindowUtils.ShowAndActivate(hwnd);
+                return;
+            }
+            // Running but not found by its title: e.g. a session attached with serve_xl, whose
+            // window (VS Code's terminal, say) isn't titled by CallFromExcel.
+            string message = JuliaFunctions.JuliaIsRunning()
+                ? "Julia is running, but its window couldn't be found. If you attached your own Julia session with serve_xl, switch to it directly."
+                : "Julia isn't running. Use Launch Julia to start it.";
+            MessageBox.Show(new ExcelWindow(), message, "CallFromExcel", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
+        public void OnHelp(IRibbonControl control)
+        {
+            try
+            {
+                // The README's title - the anchor follows its wording, so keep the two in step.
+                System.Diagnostics.Process.Start(JuliaFunctions.HelpRoot + "callfromexceljl---call-julia-from-excel");
             }
             catch (Exception ex)
             {

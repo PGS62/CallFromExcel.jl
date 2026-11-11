@@ -21,7 +21,7 @@ namespace CallFromExcel.AddIn
         // Each function's HelpTopic is its section of the README. Excel opens it from "Help on
         // this function" in the Insert Function dialog, and IntelliSense makes the function's
         // name in its pop-up a link to it.
-        private const string HelpRoot = "https://github.com/PGS62/CallFromExcel.jl#";
+        internal const string HelpRoot = "https://github.com/PGS62/CallFromExcel.jl#";
 
         // Parameter order (UseLinux, MinimiseWindow, CommandLineOptions, Packages,
         // BashStatements, TimeOut) deliberately matches the old VBA worksheet function

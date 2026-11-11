@@ -30,7 +30,7 @@ namespace CallFromExcel.AddIn
         // formula that set a later positional argument (e.g.
         // "=JuliaLaunch(,,""--project=...."")" to set CommandLineOptions) by silently
         // shifting it onto the wrong parameter.
-        [ExcelFunction(Description = "Launches a local Julia session which listens to the current Excel session and responds to calls to JuliaEval etc.", HelpTopic = HelpRoot + "julialaunch", IsThreadSafe = false)]
+        [ExcelFunction(Description = "Launches a local Julia session which listens to the current Excel session and responds to calls to JuliaEval etc. Uses only its own arguments, not the ribbon's Launch Settings.", HelpTopic = HelpRoot + "julialaunch", IsThreadSafe = false)]
         public static object JuliaLaunch(
             [ExcelArgument(Name = "UseLinux", Description = "Launch Julia under WSL instead of natively on Windows.")] object useLinux,
             [ExcelArgument(Name = "MinimiseWindow", Description = "Launch Julia's console window minimised.")] object minimiseWindow,

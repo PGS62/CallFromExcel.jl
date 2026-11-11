@@ -2,7 +2,7 @@
 
 Call [Julia](https://julialang.org/) from Microsoft Excel worksheets and from VBA.  
 
-CallFromExcel is an Excel add-in that lets you use any Julia function in a worksheet formula. For example, `=JuliaEval("using LinearAlgebra")` loads one of Julia's standard libraries, then `=JuliaCall("eigvals", A1:J10)` passes a range to Julia as a matrix and returns its eigenvalues to the worksheet (as complex numbers, if the matrix isn't symmetric) - something Excel has no built-in function for. Keep your front end in Excel, and do the heavy computation in Julia. Installation doesn't need admin rights.
+CallFromExcel is an Excel add-in that lets you use any Julia function in a worksheet formula. For example, `=JuliaEval("using LinearAlgebra")` loads one of Julia's standard libraries, then `=JuliaCall("eigvals", A1:J10)` passes a range to Julia as a matrix and returns its eigenvalues to the worksheet (as complex numbers, if the matrix isn't symmetric) - something Excel has no built-in function for. Keep your front end in Excel, and do the heavy computation in Julia. A Julia tab on Excel's ribbon starts Julia and loads your Julia files. Installation doesn't need admin rights.
 
 CallFromExcel is compatible with Excel's [dynamic array formulas](https://support.microsoft.com/en-us/office/dynamic-array-formulas-and-spilled-array-behavior-205c6b06-03ba-4151-89a1-87a7eb36e531), and supports 64-bit Excel for Windows (not Mac, not 32-bit Excel). It works with Julia running under either Windows or Linux (via [WSL](https://docs.microsoft.com/en-us/windows/wsl/about)).
 
@@ -12,6 +12,7 @@ CallFromExcel is the successor to [JuliaExcel](https://github.com/PGS62/JuliaExc
 [Demo](#demo)  
 [Installation](#installation)  
 [Installation (Linux)](#installation-linux)  
+[The Julia ribbon tab](#the-julia-ribbon-tab)  
 [Upgrading from JuliaExcel](#upgrading-from-juliaexcel)  
 [Functions](#functions)  
 [Example VBA](#example-vba)  
@@ -47,7 +48,7 @@ Installation does not require admin rights on the PC.
    Pkg.build("CallFromExcel")
    ```
    `Pkg.build` is what installs the Excel add-in. `Pkg.add` usually does that too, but only the first time a given version of CallFromExcel is added to your PC - so if you've since removed the add-in from Excel, `Pkg.add` alone won't put it back.
- * Launch Excel. Check that the CallFromExcel functions are available by typing `=Julia` into a worksheet cell and checking that the auto-complete offers `JuliaCall`, `JuliaEval`, `JuliaInclude` etc.
+ * Launch Excel. Check that it shows a Julia tab on the ribbon, and that typing `=Julia` into a worksheet cell makes the auto-complete offer `JuliaCall`, `JuliaEval`, `JuliaInclude` etc.
  * Functions missing in Excel, or need to reinstall? Close Excel and run `Pkg.build("CallFromExcel")` again.
 <!--
 The process is illustrated in the GIF below. F5 to replay.
@@ -63,6 +64,23 @@ As an alternative to calling Julia running in a Windows process, CallFromExcel c
  * Install Julia under WSL by running `curl -fsSL https://install.julialang.org | sh` at the Ubuntu prompt, per the [official instructions](https://julialang.org/downloads/). This installs `juliaup`, which puts `julia` on the PATH automatically.
  * At the Julia prompt (under WSL) install CallFromExcel by copy-pasting   
   `using Pkg; Pkg.add(url="https://github.com/PGS62/CallFromExcel.jl")` into the REPL. 
+
+## The Julia ribbon tab
+The add-in adds a Julia tab to Excel's ribbon:
+
+<img src="images/ribbon.png" alt="The Julia tab on Excel's ribbon, with Launch Julia, Show Julia, Close Julia, Display Results, a Julia File box with Browse and Include, and Help" />
+
+|Control|What it does|
+|:------|:-----------|
+|**Launch Julia**|Starts Julia for this Excel session, using the Launch Settings.|
+|**Launch Settings...**|On Launch Julia's drop-down menu. Sets the project folder, other command line options, packages to load, whether to run under WSL, and so on. The settings are saved for you on this PC.|
+|**Show Julia**|Brings Julia's window to the front.|
+|**Close Julia**|Closes Julia, after asking for confirmation.|
+|**Display Results**|Shows each call from Excel, and its result, in Julia's window - as `CallFromExcel.display_results(true)` does.|
+|**File**, **Browse**, **Include**|Choose a Julia file - typed, pasted, browsed to or picked from recently used files - and include it, as `JuliaInclude` does. Include doesn't trigger recalculation.|
+|**Help**|Opens this page.|
+
+Launch Julia and a `JuliaLaunch` formula start Julia in the same way, but each with its own settings: a formula uses only its own arguments, so a workbook records how Julia should start and does so the same way on every PC, while the ribbon's Launch Settings are yours.
 
 ## Upgrading from JuliaExcel
 CallFromExcel replaces [JuliaExcel](https://github.com/PGS62/JuliaExcel.jl). Its worksheet functions have the same names, but some changes are needed to workbooks and code written for JuliaExcel.
@@ -125,7 +143,7 @@ End Sub
 ## Function Documentation
 
 ### `JuliaLaunch`
-Launches a local Julia session which listens to the current Excel session and responds to calls to `JuliaEval` etc.
+Launches a local Julia session which listens to the current Excel session and responds to calls to `JuliaEval` etc. Uses only its own arguments, not the ribbon's Launch Settings (see [The Julia ribbon tab](#the-julia-ribbon-tab)).
 ```
 JuliaLaunch([UseLinux], [MinimiseWindow], [CommandLineOptions], [Packages], [BashStatements], [TimeOut])
 ```
@@ -148,6 +166,8 @@ JuliaInclude(FileName)
 |Argument|Description|
 |:-------|:----------|
 |`FileName`|The full name of the file to be included.|
+
+The ribbon's Include button does the same for the file in its File box, without needing a formula.
 
 ### `JuliaEval`
 Evaluate a Julia expression and return the result to an Excel worksheet.
@@ -277,6 +297,8 @@ Other functions for managing a session started this way:
 * `CallFromExcel.stop_server()` stops the session listening to Excel, without closing Julia itself.
 * `CallFromExcel.server_status()` reports whether a server is currently running, which Excel process id it's serving, on which port, and the current `display_results` setting.
 
+On the ribbon, Display Results works with an attached session, but Show Julia can't find its window, and Close Julia closes it - Julia and all - rather than just detaching it. To detach, call `stop_server()` in the session instead.
+
 ## Debugging
 Every call to `JuliaCall`/`JuliaCallVBA`/`JuliaEval`/`JuliaEvalVBA` leaves a trace behind in Julia, so a problem can be debugged at the REPL without needing to repeat the call from Excel:
 
@@ -285,7 +307,7 @@ Every call to `JuliaCall`/`JuliaCallVBA`/`JuliaEval`/`JuliaEvalVBA` leaves a tra
 * `CallFromExcel.args_from_xl` holds the arguments most recently passed from Excel to `JuliaCall`/`JuliaCallVBA`, or the positional arguments for `JuliaCallNamedArgs`/`JuliaCallNamedArgsVBA`. For those, `CallFromExcel.kwargs_from_xl` holds the named arguments as a `NamedTuple`, and `last_question` is a call such as `myfunction(args_from_xl...; kwargs_from_xl...)`.
 * `CallFromExcel.answer_again()` evaluates `last_question` again, and you can wrap it with `@enter` or your own debugging tools.
 
-All of these only reflect the most recent call, so debug before making another one. Call `CallFromExcel.display_results(true)` to also have each call and its result echoed to the Julia console as it happens.
+All of these only reflect the most recent call, so debug before making another one. Call `CallFromExcel.display_results(true)`, or tick Display Results on the ribbon, to also have each call and its result echoed to the Julia console as it happens.
 
 ## Marshalling
 Two questions arose during implementation. First, what Julia type should data from a worksheet or VBA arrive as? Mostly that's easy to decide, but should a single-column or single-row range, or a one-dimensional VBA array, have one dimension or two in Julia? Second, in the other direction, how should a Julia vector come back to Excel?
@@ -343,7 +365,7 @@ Excel has no complex number type. Its functions such as `IMREAL`, `IMAGINARY` an
 Dates and times returned from Julia to a worksheet become Excel date serial numbers in the 1900 date system, Excel's default on Windows. In a workbook set to the 1904 date system (File > Options > Advanced > "Use 1904 date system"), they display 4 years and 1 day late. Dates passed from a worksheet to Julia arrive as plain numbers, as Excel stores them, whichever date system the workbook uses. Calls from VBA are unaffected, since VBA dates aren't serial numbers.
 
 ## How CallFromExcel works
-CallFromExcel's Excel add-in is written in C#, using [Excel-DNA](https://excel-dna.net/). Its worksheet functions are registered with Excel through the [Excel SDK](https://docs.microsoft.com/en-us/office/client-developer/excel/welcome-to-the-excel-software-development-kit), and VBA calls the same code through the object created by `CreateObject("CallFromExcel.ComServer")`. The add-in communicates with Julia over a local HTTP connection:
+CallFromExcel's Excel add-in is written in C#, using [Excel-DNA](https://excel-dna.net/). Its worksheet functions are registered with Excel through the [Excel SDK](https://docs.microsoft.com/en-us/office/client-developer/excel/welcome-to-the-excel-software-development-kit), and VBA calls the same code through the object created by `CreateObject("CallFromExcel.ComServer")`. The Julia ribbon tab is part of the same add-in, and its buttons use the same code too. The add-in communicates with Julia over a local HTTP connection:
 1) `JuliaLaunch` starts a Julia process (as a normal Windows process, or under WSL) running a small HTTP server (`CallFromExcel.start_server()`) on a free local port, and writes that port number to a file so the add-in can find it. If a session for the current Excel process already appears to be running, `JuliaLaunch` checks that it's actually responding before reusing it, rather than starting a duplicate.
 2) `JuliaEval` POSTs the Julia expression as plain text to the server's `/eval` endpoint. The Julia function `srv_eval_inner` (in `comms.jl`) evaluates it with `Meta.parseall`/`eval` and returns the result - encoded in CallFromExcel's own wire format - in the HTTP response body.
 3) `JuliaCall` and `JuliaCallVBA` instead encode the function name and its arguments (marshalled per the rules described in [Marshalling](#marshalling)) into that same wire format and POST it to the `/call` endpoint. `srv_call_inner` decodes it and invokes the named function directly, returning the result the same way. This avoids `Meta.parse`ing a literal expression, which is slow for calls passing large arrays. `JuliaCallNamedArgs` and `JuliaCallNamedArgsVBA` encode their arguments the same way but POST them to the `/callkw` endpoint, where Julia splits them at the `";"` into positional and named arguments.

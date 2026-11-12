@@ -1,10 +1,9 @@
 *.bas linguist-language=VBA
 *.cls linguist-language=VBA
 
-# The committed add-in in dotnet-addin/dist must be reproducible from these sources (see
-# .github/workflows/Runtests.yml). Line endings get into the build output, so fix them
-# as CRLF on every checkout, whatever core.autocrlf says.
-dotnet-addin/CallFromExcel.AddIn/** text eol=crlf
 # Update-Dist.ps1 writes this with an LF ending; check it out the same way so a rebuild
-# does not show it as modified.
+# does not show it as modified. (It is stored with LF too, so git archive - which Pkg uses
+# to verify the registered tree hash - writes it unchanged. Do NOT add eol=crlf rules for
+# files stored with LF: git archive would then write different bytes, and the General
+# registry's Treecheck fails.)
 dotnet-addin/dist/source-hash.txt text eol=lf

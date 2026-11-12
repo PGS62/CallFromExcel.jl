@@ -21,7 +21,7 @@ dotnet build -c Release
 
 A Release build also runs `Update-Dist.ps1`, which copies the add-in into `dist\` and updates `dist\source-hash.txt`. Commit `dist\` with every source change: `test/runtests.jl` fails if the source no longer matches the hash. To use a new build in Excel, close Excel and run `installer\Install.ps1`.
 
-`dist\` is reproducible: CI rebuilds it from source and fails if the result differs from what is committed. That relies on the exact .NET SDK pinned in `global.json`, on `.gitattributes` checking the add-in's sources out with CRLF line endings, and on Release builds having no PDB (whose path would otherwise be embedded in the DLL).
+`dist\` is reproducible: CI rebuilds it from source and fails if the result differs from what is committed. That relies on the exact .NET SDK pinned in `global.json`, on the sources being checked out with CRLF line endings (git's `core.autocrlf=true`, the default with Git for Windows), and on Release builds having no PDB (whose path would otherwise be embedded in the DLL).
 
 ## Testing
 

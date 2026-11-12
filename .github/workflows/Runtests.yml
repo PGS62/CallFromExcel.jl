@@ -28,6 +28,10 @@ jobs:
   reproducible-addin:
     runs-on: windows-latest
     steps:
+      # Line endings get into the build output, and dist/ is built from a CRLF checkout.
+      # (Not enforced with eol=crlf in .gitattributes: git archive would apply that too,
+      # breaking the tree hash the General registry checks.)
+      - run: git config --global core.autocrlf true
       - uses: actions/checkout@v7
       - uses: actions/setup-dotnet@v5
         with:
@@ -41,3 +45,23 @@ jobs:
           git status --porcelain -- dotnet-addin/dist
           git diff --exit-code --stat -- dotnet-addin/dist
           test -z "$(git status --porcelain -- dotnet-addin/dist)"
+
+  # The General registry checks that `git archive` of a registered commit unpacks to exactly
+  # the commit's tree (its "Treecheck"). .gitattributes rules such as eol=crlf break that.
+  archive-treehash:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: julia-actions/setup-julia@v3
+        with:
+          version: '1'
+      # Tar.tree_hash is what Pkg and the registry use; it ignores .gitattributes, unlike
+      # re-adding the unpacked files to git, which would undo an eol conversion and pass.
+      - name: git archive reproduces the tree hash
+        run: |
+          julia -e '
+              using Tar
+              expected = readchomp(`git rev-parse "HEAD^{tree}"`)
+              actual = Tar.tree_hash(open(`git archive HEAD`))
+              println("tree $expected, archive $actual")
+              expected == actual || exit(1)'

@@ -6,16 +6,10 @@ CallFromExcel is the successor to [JuliaExcel](https://github.com/PGS62/JuliaExc
 
 ### Changes
 
-- A Julia tab on Excel's ribbon launches Julia (with saved settings, including a project folder), shows or closes its window, switches `display_results` on and off, and includes Julia files chosen in a file box with a list of recent files. See [The Julia ribbon tab](README.md#the-julia-ribbon-tab).
-- Installing the package no longer installs the Excel add-in as a side effect (there is no longer a `deps/build.jl`). Install it with `using CallFromExcel; CallFromExcel.installme()`, after installing and after each update. The add-in checks that it's the same version as the Julia package it talks to, and if not, says so and how to fix it.
-- `JuliaLaunch` opens Julia in a classic console window showing the Julia logo, in its title bar and taskbar button, rather than in Windows Terminal (where the default terminal is Windows Terminal, as on Windows 11).
-- "Help on this function" in Excel's Insert Function dialog now opens the function's documentation on GitHub, as does clicking the function's name in its IntelliSense pop-up.
+- Now that CallFromExcel is in Julia's General registry, the installation instructions, and `JuliaLaunch`'s message when the package isn't installed, use `Pkg.add("CallFromExcel")`.
+- `using CallFromExcel` in the REPL reminds you to run `CallFromExcel.installme()` if the Excel add-in isn't installed, or is a different version from the package.
 
-### Performance
-
-- Julia decodes large ranges of numbers passed to `JuliaCall` about seven times faster: for 1,000,000 Doubles, from about 77 ms to about 11 ms. This takes about 70 ms off `=JuliaCall("sort", A1:A1000000)`.
-
-## [0.1.0] - 2026-11-09
+## [0.1.0] - 2026-11-12
 
 First release of CallFromExcel. If you're upgrading from JuliaExcel, see [Upgrading from JuliaExcel](README.md#upgrading-from-juliaexcel).
 
@@ -24,7 +18,10 @@ First release of CallFromExcel. If you're upgrading from JuliaExcel, see [Upgrad
 - The Excel add-in is rewritten in C#, using [Excel-DNA](https://excel-dna.net/), replacing JuliaExcel's VBA add-in `JuliaExcel.xlam`. The worksheet functions keep their names (`JuliaCall`, `JuliaEval`, `JuliaLaunch` etc.), and data now transfers between Excel and Julia two to three times faster, and about eight times faster for large DataFrames - see Performance below.
 - From VBA, functions are called through an object created with `CreateObject("CallFromExcel.ComServer")`, rather than through a reference to the add-in.
 - The Julia package is renamed `CallFromExcel`, so for example `JuliaExcel.serve_xl()` becomes `CallFromExcel.serve_xl()`.
-- Installation shows no dialogs, needs no admin rights, and uninstalls `JuliaExcel.xlam` if present. Install with `Pkg.add` followed by `Pkg.build("CallFromExcel")` - see [Installation](README.md#installation).
+- Installing the package doesn't install the Excel add-in: install it with `using CallFromExcel; CallFromExcel.installme()`, after installing and after each update. Installation shows no dialogs, needs no admin rights, and uninstalls `JuliaExcel.xlam` if present. The add-in checks that it's the same version as the Julia package it talks to, and if not, says so and how to fix it.
+- A Julia tab on Excel's ribbon launches Julia (with saved settings, including a project folder), shows or closes its window, switches `display_results` on and off, and includes Julia files chosen in a file box with a list of recent files. See [The Julia ribbon tab](README.md#the-julia-ribbon-tab).
+- `JuliaLaunch` opens Julia in a classic console window showing the Julia logo, in its title bar and taskbar button, rather than in Windows Terminal (where the default terminal is Windows Terminal, as on Windows 11).
+- "Help on this function" in Excel's Insert Function dialog now opens the function's documentation on GitHub, as does clicking the function's name in its IntelliSense pop-up.
 - CallFromExcel requires 64-bit Excel. JuliaExcel also supported 32-bit Excel.
 - CallFromExcel requires Julia 1.10 or later. JuliaExcel required 1.7 or later, but its `JuliaLaunch` always passed `--threads=auto,1`, which Julia only accepts from 1.9.
 - `JuliaLaunch` gives a clear error message, with installation instructions, if the CallFromExcel package isn't installed in Julia's active environment.
@@ -45,6 +42,8 @@ First release of CallFromExcel. If you're upgrading from JuliaExcel, see [Upgrad
 | One-way (Julia to Excel): `JuliaEval("DataFrame(rand(Float64,(5000,1024)),:auto)")` | 10.9 s\* | 1.34 s | 8.1x |
 
 *Each test times the recalculation of a worksheet formula, averaged over several recalculations and two runs. The "mixed values" cycle through a string, a Boolean and a Double. All figures measured on the same machine as JuliaExcel 2.0.0's: Intel Core Ultra 9 288V, 32GB RAM. The DataFrame row is different: it times a single call to `JuliaEval` from VBA (`DataframePerformanceTest` in `workbooks/TestCallFromExcel.xlsm`), and \*its JuliaExcel figure is for version 2.1.2, the last version that test was run on.*
+
+Since those measurements, Julia decodes large ranges of numbers passed to `JuliaCall` about seven times faster: for 1,000,000 Doubles, from about 77 ms to about 11 ms. This takes about 70 ms off `=JuliaCall("sort", A1:A1000000)`.
 
 ## JuliaExcel (predecessor), versions 2.4.1 and earlier
 

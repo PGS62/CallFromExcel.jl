@@ -210,6 +210,36 @@ function installme()
     nothing
 end
 
+# Written by Install.ps1 as its last step: the version of the add-in it installed.
+installed_version_file() =
+    joinpath(get(ENV, "APPDATA", ""), "Microsoft", "AddIns", "CallFromExcel", "version.txt")
+
+"""
+    addin_install_reminder(versionfile, pkgver)::Union{String,Nothing}
+A reminder to run `installme()` if `versionfile` (see `installed_version_file`) shows the Excel
+add-in isn't installed, or is a different version from `pkgver`; otherwise `nothing`. Used by
+`__init__`, so that `using CallFromExcel` in the REPL after `Pkg.add` or an update says what
+to do next. Can't tell if the add-in was later removed some other way, e.g. by unticking it in
+Excel's Add-ins dialog.
+"""
+function addin_install_reminder(versionfile::AbstractString, pkgver)
+    fix = "Close Excel, then run CallFromExcel.installme()."
+    isfile(versionfile) || return "CallFromExcel's Excel add-in is not installed. $fix"
+    installed = strip(read(versionfile, String))
+    installed == string(pkgver) && return nothing
+    "CallFromExcel's Excel add-in is version $installed, but this CallFromExcel package is \
+     version $pkgver. $fix"
+end
+
+function __init__()
+    # Only in an interactive session on Windows: not under WSL (the add-in is installed from
+    # Windows Julia), and not in tests or scripts.
+    if Sys.iswindows() && isinteractive()
+        msg = addin_install_reminder(installed_version_file(), pkgversion(@__MODULE__))
+        msg === nothing || @info msg
+    end
+end
+
 portfile() = joinpath(comms_folder(), "Port_$(getxlpid()).txt")
 
 """

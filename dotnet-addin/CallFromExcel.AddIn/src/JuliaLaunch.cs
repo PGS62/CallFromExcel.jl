@@ -489,10 +489,10 @@ namespace CallFromExcel.AddIn
                    "    CallFromExcel.start_server()\n" +
                    "    rm(" + JuliaLiteral.MakeJuliaLiteral(flagFileX) + ")\n" +
                    "catch e\n" +
-                   // Julia's own message suggests Pkg.add(\"CallFromExcel\"), which fails: the package isn't registered.
+                   // Clearer than Julia's own message: names the environment, and mentions --project.
                    "    theerror = if e isa ArgumentError && startswith(e.msg, \"Package " + PackageName + " not found\")\n" +
                    "        \"The " + PackageName + " package is not installed in Julia's active environment ($(Base.active_project())). " +
-                   "Install it with: import Pkg; Pkg.add(url=\\\"https://github.com/PGS62/CallFromExcel.jl\\\") " +
+                   "Install it with: import Pkg; Pkg.add(\\\"" + PackageName + "\\\") " +
                    "- or, if it is installed in a different environment, add --project=<that environment's folder> to JuliaLaunch's CommandLineOptions.\"\n" +
                    "    else\n" +
                    "        \"$e\"\n" +

@@ -46,7 +46,7 @@ Installation does not require admin rights on the PC.
 <!-- CHANGING THE INSTRUCTIONS BELOW? DON'T FORGET TO ALSO CHANGE THE "Installation (Linux)" SECTION -->
    ```
    using Pkg
-   Pkg.add(url="https://github.com/PGS62/CallFromExcel.jl")
+   Pkg.add("CallFromExcel")
    using CallFromExcel
    CallFromExcel.installme()
    ```
@@ -66,7 +66,7 @@ As an alternative to calling Julia running in a Windows process, CallFromExcel c
  * If necessary, install [WSL](https://docs.microsoft.com/en-us/windows/wsl/install) with the default Linux distribution, Ubuntu.
  * Install Julia under WSL by running `curl -fsSL https://install.julialang.org | sh` at the Ubuntu prompt, per the [official instructions](https://julialang.org/downloads/). This installs `juliaup`, which puts `julia` on the PATH automatically.
  * At the Julia prompt (under WSL) install CallFromExcel by copy-pasting   
-  `using Pkg; Pkg.add(url="https://github.com/PGS62/CallFromExcel.jl")` into the REPL. 
+  `using Pkg; Pkg.add("CallFromExcel")` into the REPL. 
 
 ## The Julia ribbon tab
 The add-in adds a Julia tab to Excel's ribbon:
@@ -388,4 +388,4 @@ The Excel add-in is written in C#, using [Excel-DNA](https://excel-dna.net/); it
 
 Philip Swannell  
 8 December 2021  
-Last updated 11 November 2026
+Last updated 12 November 2026

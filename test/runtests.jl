@@ -508,6 +508,21 @@ end
 
 end
 
+# `using CallFromExcel` in the REPL reminds the user to run installme() when the version file
+# Install.ps1 writes is missing or names a different version.
+@testset "Reminder to run installme()" begin
+    mktempdir() do dir
+        versionfile = joinpath(dir, "version.txt")
+        @test occursin("is not installed", CallFromExcel.addin_install_reminder(versionfile, v"0.1.1"))
+        write(versionfile, "0.1.0")
+        msg = CallFromExcel.addin_install_reminder(versionfile, v"0.1.1")
+        @test occursin("version 0.1.0", msg) && occursin("version 0.1.1", msg) && occursin("installme()", msg)
+        @test CallFromExcel.addin_install_reminder(versionfile, v"0.1.0") === nothing
+        write(versionfile, "0.1.0\r\n")   # tolerate a trailing newline
+        @test CallFromExcel.addin_install_reminder(versionfile, v"0.1.0") === nothing
+    end
+end
+
 # The add-in finds julia.exe by searching PATH. Windows accepts PATH entries in double quotes, but
 # .NET Framework's Path.Combine throws on them, which used to make every JuliaLaunch fail with
 # "Illegal characters in path." whenever such an entry came before Julia's folder. Calls the

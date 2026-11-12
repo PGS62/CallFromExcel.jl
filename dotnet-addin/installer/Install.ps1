@@ -345,6 +345,12 @@ Write-Output "Registered $xllDestPath to auto-load with Excel."
 Register-ComServer -DllPath $dllDestPath
 Write-Output "Registered CallFromExcel.ComServer for COM (CreateObject(""CallFromExcel.ComServer""))."
 
+# Record the installed add-in's version (its AssemblyInformationalVersion, which .NET reports
+# as ProductVersion) last, so it exists only after a complete install. The Julia package reads
+# it when loaded in the REPL and suggests installme() if it's missing or a different version.
+$installedVersion = (Get-Item $dllDestPath).VersionInfo.ProductVersion
+[IO.File]::WriteAllText((Join-Path $DestFolder "version.txt"), $installedVersion)
+
 Write-Output ""
 Write-Output "CallFromExcel is installed. Its functions (JuliaLaunch, JuliaCall, JuliaEval, ...) will be available the next time Excel starts."
 exit 0

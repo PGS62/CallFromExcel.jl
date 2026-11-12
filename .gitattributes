@@ -1,2 +1,7 @@
 *.bas linguist-language=VBA
 *.cls linguist-language=VBA
+
+# The committed add-in in dotnet-addin/dist must be reproducible from these sources (see
+# .github/workflows/Runtests.yml). Line endings get into the build output, so fix them
+# as CRLF on every checkout, whatever core.autocrlf says.
+dotnet-addin/CallFromExcel.AddIn/** text eol=crlf

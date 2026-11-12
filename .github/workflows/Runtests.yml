@@ -22,3 +22,22 @@ jobs:
           files: lcov.info
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
+
+  # The add-in in dotnet-addin/dist is committed, because Pkg.add users don't build it.
+  # Rebuild it from source here and fail if the result differs from what is committed.
+  reproducible-addin:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: dotnet-addin/global.json
+      - name: Build the add-in (Release)
+        working-directory: dotnet-addin/CallFromExcel.AddIn
+        run: dotnet build -c Release
+      - name: Compare with the committed dotnet-addin/dist
+        shell: bash
+        run: |
+          git status --porcelain -- dotnet-addin/dist
+          git diff --exit-code --stat -- dotnet-addin/dist
+          test -z "$(git status --porcelain -- dotnet-addin/dist)"

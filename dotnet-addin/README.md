@@ -21,6 +21,8 @@ dotnet build -c Release
 
 A Release build also runs `Update-Dist.ps1`, which copies the add-in into `dist\` and updates `dist\source-hash.txt`. Commit `dist\` with every source change: `test/runtests.jl` fails if the source no longer matches the hash. To use a new build in Excel, close Excel and run `installer\Install.ps1`.
 
+`dist\` is reproducible: CI rebuilds it from source and fails if the result differs from what is committed. That relies on the exact .NET SDK pinned in `global.json`, on `.gitattributes` checking the add-in's sources out with CRLF line endings, and on Release builds having no PDB (whose path would otherwise be embedded in the DLL).
+
 ## Testing
 
 - **Julia tests:** `Pkg.test()` from the repo root. On Windows with Excel installed, this also runs the VBA test suite via `vba\Run-VbaTests.ps1`, in a hidden Excel. That suite covers both the worksheet functions and the COM server, and runs against the *installed* add-in, so install your build first.

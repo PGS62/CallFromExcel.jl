@@ -203,7 +203,10 @@ function installme()
     # the new installer is non-interactive and fast, so there's nothing to stay responsive for,
     # and blocking lets any failure (e.g. the add-in not built yet, or Excel still running)
     # surface immediately here rather than silently in a detached background process.
-    run(`$exefile -ExecutionPolicy Bypass -NoProfile -File $installscript`)
+    # The installer prints its own explanation of any failure, so report just that it failed,
+    # not the ProcessFailedException that would repeat the command line under a stacktrace.
+    p = run(ignorestatus(`$exefile -ExecutionPolicy Bypass -NoProfile -File $installscript`))
+    success(p) || error("The Excel add-in was not installed: see the message above.")
     nothing
 end
 

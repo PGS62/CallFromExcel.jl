@@ -3,7 +3,7 @@
 #
 # Non-interactive by design: no MsgBox dialogs (unlike the old installer) - this is meant to
 # be callable unattended from Julia's installme(), as well as directly
-# by a user. All status is written to the output stream; failures throw a terminating error
+# by a user. All status is written to the output stream; a failure prints an error message
 # and this exits non-zero.
 #
 # Targets Windows PowerShell 5.1 (ships on every Windows install) deliberately - no PS7-only
@@ -40,6 +40,13 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+
+# Report any failure as just its message (not PowerShell's position and category details,
+# which bury it), and exit non-zero so callers such as installme() know it failed.
+trap {
+    [Console]::Error.WriteLine("ERROR: " + $_.Exception.Message)
+    exit 1
+}
 
 # dist\ is the committed copy of the Release build (see ..\Update-Dist.ps1).
 if ($XllSourcePath -eq "") { $XllSourcePath = Join-Path $PSScriptRoot "..\dist\CallFromExcel.AddIn64-packed.xll" }
@@ -241,7 +248,7 @@ function Copy-RequiredFile {
 #***************************************************************************************
 
 if (Get-Process -Name "EXCEL" -ErrorAction SilentlyContinue) {
-    throw "Excel is currently running. Close every Excel window (check Task Manager for a background EXCEL.EXE process too) and run this script again."
+    throw "Excel is currently running. Close every Excel window (check Task Manager for a background EXCEL.EXE process too), then try again."
 }
 
 $machineType = Get-ExcelMachineType

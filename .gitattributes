@@ -5,3 +5,6 @@
 # .github/workflows/Runtests.yml). Line endings get into the build output, so fix them
 # as CRLF on every checkout, whatever core.autocrlf says.
 dotnet-addin/CallFromExcel.AddIn/** text eol=crlf
+# Update-Dist.ps1 writes this with an LF ending; check it out the same way so a rebuild
+# does not show it as modified.
+dotnet-addin/dist/source-hash.txt text eol=lf

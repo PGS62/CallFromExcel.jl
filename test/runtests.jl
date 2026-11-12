@@ -468,6 +468,10 @@ end
               [string(CallFromExcel.xlport[]), token, string(pkgversion(CallFromExcel))]
         @test length(token) == 32
         @test CallFromExcel.decode_from_xl(String(post("/eval", "1+1").body)) == 2
+        # A function defined by one request can be called by the next, on the same kept-alive
+        # connection (HTTP.jl 2 serves those from one task, so this needs invokelatest).
+        post("/eval", "world_age_test(x) = 2x")
+        @test CallFromExcel.decode_from_xl(String(post("/call", CallFromExcel.encode_for_xl(Any["world_age_test", 21])).body)) == 42
         @test CallFromExcel.decode_from_xl(String(post("/call", CallFromExcel.encode_for_xl(Any["+", 1, 2])).body)) == 3
         @test CallFromExcel.decode_from_xl(String(post("/callkw",
             CallFromExcel.encode_for_xl(Any["round", 1.25, ";", "digits", 1])).body)) == 1.2

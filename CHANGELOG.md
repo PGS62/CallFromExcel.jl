@@ -7,6 +7,7 @@ CallFromExcel is the successor to [JuliaExcel](https://github.com/PGS62/JuliaExc
 ### Changes
 
 - Now that CallFromExcel is in Julia's General registry, the installation instructions, and `JuliaLaunch`'s message when the package isn't installed, use `Pkg.add("CallFromExcel")`.
+- CallFromExcel works with HTTP.jl 2 as well as 1.
 - `using CallFromExcel` in the REPL reminds you to run `CallFromExcel.installme()` if the Excel add-in isn't installed, or is a different version from the package.
 
 ## [0.1.0] - 2026-11-12

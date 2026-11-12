@@ -511,9 +511,13 @@ function start_server(start::Int=2700)
                 body = String(req.body)
                 # No default endpoint: the add-in always names one, so anything else is a bug worth
                 # reporting rather than guessing.
-                result = req.target == "/eval" ? srv_eval_inner(body) :
-                         req.target == "/call" ? srv_call_inner(body) :
-                         req.target == "/callkw" ? srv_call_inner(body; named_args=true) :
+                # invokelatest: so a request sees functions defined by earlier requests. HTTP.jl 2
+                # handles a kept-alive connection's requests in one long-running task, whose world
+                # age would otherwise stay at that connection's start - JuliaEval("f(x)=2x") then
+                # JuliaCall("f", 1) failed with a MethodError. (HTTP.jl 1 happened not to need it.)
+                result = req.target == "/eval" ? Base.invokelatest(srv_eval_inner, body) :
+                         req.target == "/call" ? Base.invokelatest(srv_call_inner, body) :
+                         req.target == "/callkw" ? Base.invokelatest(srv_call_inner, body; named_args=true) :
                          return HTTP.Response(404, "Unknown CallFromExcel endpoint $(req.target)")
                 _text_response(result)
             end

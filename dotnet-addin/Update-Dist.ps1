@@ -5,15 +5,12 @@
 # add-in's source files in dist\source-hash.txt. test/runtests.jl recomputes that hash and
 # fails if the source has changed since dist\ was last refreshed.
 #
-# Runs automatically after every Release build (see CallFromExcel.AddIn.csproj), which passes
-# the path of ExcelDna.Integration.dll.
+# Runs automatically after every Release build (see CallFromExcel.AddIn.csproj).
 #
 # Hash definition - must match source_hash in test/runtests.jl exactly: SHA-256 over every
 # file under CallFromExcel.AddIn\ except its bin\ and obj\ folders, in ordinal order of their
 # relative paths (forward slashes), each contributing <path> LF <bytes> LF, with all CR bytes
 # removed so that git's line-ending conversion can't change the result.
-
-param([Parameter(Mandatory = $true)][string]$ExcelDnaIntegrationPath)
 
 $ErrorActionPreference = "Stop"
 
@@ -25,16 +22,20 @@ if (-not (Test-Path $distDir)) { New-Item -ItemType Directory -Path $distDir | O
 Copy-Item (Join-Path $buildDir "publish\CallFromExcel.AddIn64-packed.xll") $distDir -Force
 Copy-Item (Join-Path $buildDir "CallFromExcel.AddIn.dll") $distDir -Force
 
-# The type library, made as TlbExp.exe would (TlbExp itself isn't part of the .NET SDK).
-# The Ribbon class is COM-visible and derives from an Excel-DNA class, so the exporter also
-# needs a type library for ExcelDna.Integration. That one is written to a temporary folder
-# and not shipped: VBA only reads it if asked about the Ribbon class, which no one needs.
-# The library is renamed from the assembly-derived CallFromExcel_AddIn to CallFromExcel, so VBA
+# The type library (for VBA's Tools > References), made as TlbExp.exe would - TlbExp itself
+# isn't part of the .NET SDK - but from a stand-in assembly built here in memory, holding only
+# copies of ICallFromExcelComServer and ComServer (same names, GUIDs, attributes, method order,
+# parameter names, optional flags and defaults; ComServer's methods are empty stubs). Exporting
+# the add-in's own DLL would also export its Ribbon class, which derives from Excel-DNA classes
+# implementing Office interfaces. The exporter finds those through Office's registered type
+# libraries, so the file would differ between machines with and without Office (as on CI).
+# The library is named CallFromExcel (not the assembly-derived CallFromExcel_AddIn), so VBA
 # code writes CallFromExcel.ComServer.
 Add-Type -TypeDefinition @"
 using System;
-using System.IO;
+using System.Linq;
 using System.Reflection;
+using System.Reflection.Emit;
 using System.Runtime.InteropServices;
 
 public static class TypeLibMaker
@@ -42,6 +43,7 @@ public static class TypeLibMaker
     [ComImport, Guid("00020406-0000-0000-C000-000000000046"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
     interface ICreateTypeLib
     {
+        // In vtable order; only SetName and SaveAllChanges are called.
         void CreateTypeInfo(); void SetName([MarshalAs(UnmanagedType.LPWStr)] string name);
         void SetVersion(); void SetGuid(); void SetDocString();
         void SetHelpFileName(); void SetHelpContext(); void SetLcid(); void SetLibFlags();
@@ -50,41 +52,89 @@ public static class TypeLibMaker
 
     class Sink : ITypeLibExporterNotifySink
     {
-        public string RefDir;
         public void ReportEvent(ExporterEventKind kind, int code, string message)
         {
             if (kind != ExporterEventKind.NOTIF_TYPECONVERTED) Console.WriteLine(message);
         }
         public object ResolveRef(Assembly asm)
         {
-            return Export(asm, Path.Combine(RefDir, asm.GetName().Name + ".tlb"), this, null);
+            throw new InvalidOperationException("The type library would depend on " + asm.FullName);
         }
     }
 
-    static object Export(Assembly asm, string tlbPath, Sink sink, string libName)
+    // The run-time equivalent of a type read from the reflection-only copy of the add-in.
+    // Only framework types (object, string, bool, int, ...) can appear in the COM interface.
+    static Type Runtime(Type t, Type srcIface, Type iface)
     {
-        object lib = new TypeLibConverter().ConvertAssemblyToTypeLib(asm, tlbPath, TypeLibExporterFlags.None, sink);
-        if (libName != null) ((ICreateTypeLib)lib).SetName(libName);
-        ((ICreateTypeLib)lib).SaveAllChanges();
-        return lib;
+        if (t == srcIface) return iface;
+        if (t.Assembly.GetName().Name != "mscorlib") throw new NotSupportedException("Unsupported type " + t.FullName);
+        return Type.GetType(t.AssemblyQualifiedName, true);
     }
 
-    public static void Make(string dllPath, string tlbPath, string excelDnaIntegrationPath, string refDir)
+    static CustomAttributeBuilder Copy(CustomAttributeData d, Type srcIface, Type iface)
     {
-        AppDomain.CurrentDomain.AssemblyResolve += (s, e) =>
-            new AssemblyName(e.Name).Name == "ExcelDna.Integration" ? Assembly.LoadFrom(excelDnaIntegrationPath) : null;
-        Export(Assembly.LoadFrom(dllPath), tlbPath, new Sink { RefDir = refDir }, "CallFromExcel");
+        Type[] types = d.Constructor.GetParameters().Select(p => Runtime(p.ParameterType, srcIface, iface)).ToArray();
+        object[] args = d.ConstructorArguments.Select((a, i) =>
+            a.Value is Type ? Runtime((Type)a.Value, srcIface, iface) :
+            types[i].IsEnum ? Enum.ToObject(types[i], a.Value) : a.Value).ToArray();
+        if (d.NamedArguments.Count > 0) throw new NotSupportedException("Named attribute arguments: " + d);
+        return new CustomAttributeBuilder(Runtime(d.Constructor.DeclaringType, srcIface, iface).GetConstructor(types), args);
+    }
+
+    public static void Make(string dllPath, string tlbPath, string ifaceName, string className, string libName)
+    {
+        AppDomain.CurrentDomain.ReflectionOnlyAssemblyResolve += (s, e) => Assembly.ReflectionOnlyLoad(e.Name);
+        Assembly src = Assembly.ReflectionOnlyLoadFrom(dllPath);
+        Type srcIface = src.GetType(ifaceName, true), srcClass = src.GetType(className, true);
+
+        var name = new AssemblyName(src.GetName().Name) { Version = src.GetName().Version };
+        AssemblyBuilder ab = AppDomain.CurrentDomain.DefineDynamicAssembly(name, AssemblyBuilderAccess.Run);
+        foreach (var d in CustomAttributeData.GetCustomAttributes(src).Where(d => d.Constructor.DeclaringType.Name == "GuidAttribute"))
+            ab.SetCustomAttribute(Copy(d, null, null));
+        ModuleBuilder mb = ab.DefineDynamicModule(name.Name);
+
+        TypeBuilder ib = mb.DefineType(ifaceName, TypeAttributes.Public | TypeAttributes.Interface | TypeAttributes.Abstract);
+        foreach (var d in CustomAttributeData.GetCustomAttributes(srcIface)) ib.SetCustomAttribute(Copy(d, null, null));
+        var srcMethods = srcIface.GetMethods().OrderBy(m => m.MetadataToken).ToArray();
+        var ifaceMethods = srcMethods.Select(m => Define(ib, m, MethodAttributes.Abstract, null, null)).ToArray();
+        Type iface = ib.CreateType();
+
+        TypeBuilder cb = mb.DefineType(className, TypeAttributes.Public | TypeAttributes.Class, typeof(object), new[] { iface });
+        foreach (var d in CustomAttributeData.GetCustomAttributes(srcClass)) cb.SetCustomAttribute(Copy(d, srcIface, iface));
+        cb.DefineDefaultConstructor(MethodAttributes.Public);
+        for (int i = 0; i < srcMethods.Length; i++)
+        {
+            MethodBuilder impl = Define(cb, srcMethods[i], MethodAttributes.Final, srcIface, iface);
+            ILGenerator il = impl.GetILGenerator();
+            il.Emit(OpCodes.Newobj, typeof(NotSupportedException).GetConstructor(Type.EmptyTypes));
+            il.Emit(OpCodes.Throw);
+            cb.DefineMethodOverride(impl, ifaceMethods[i]);
+        }
+        cb.CreateType();
+
+        object lib = new TypeLibConverter().ConvertAssemblyToTypeLib(ab, tlbPath, TypeLibExporterFlags.None, new Sink());
+        ((ICreateTypeLib)lib).SetName(libName);
+        ((ICreateTypeLib)lib).SaveAllChanges();
+    }
+
+    static MethodBuilder Define(TypeBuilder tb, MethodInfo m, MethodAttributes extra, Type srcIface, Type iface)
+    {
+        ParameterInfo[] ps = m.GetParameters();
+        MethodBuilder b = tb.DefineMethod(m.Name,
+            MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.HideBySig | MethodAttributes.NewSlot | extra,
+            Runtime(m.ReturnType, null, null), ps.Select(p => Runtime(p.ParameterType, null, null)).ToArray());
+        for (int i = 0; i < ps.Length; i++)
+        {
+            ParameterBuilder pb = b.DefineParameter(i + 1, ps[i].Attributes, ps[i].Name);
+            if ((ps[i].Attributes & ParameterAttributes.HasDefault) != 0) pb.SetConstant(ps[i].RawDefaultValue);
+            foreach (var d in CustomAttributeData.GetCustomAttributes(ps[i])) pb.SetCustomAttribute(Copy(d, null, null));
+        }
+        return b;
     }
 }
-"@
-$refDir = Join-Path ([IO.Path]::GetTempPath()) ("CallFromExcel-tlb-" + [Guid]::NewGuid())
-New-Item -ItemType Directory -Path $refDir | Out-Null
-try {
-    [TypeLibMaker]::Make((Join-Path $buildDir "CallFromExcel.AddIn.dll"), (Join-Path $distDir "CallFromExcel.AddIn.tlb"),
-        $ExcelDnaIntegrationPath, $refDir)
-} finally {
-    Remove-Item $refDir -Recurse -Force
-}
+"@ -ReferencedAssemblies System.Core
+[TypeLibMaker]::Make((Join-Path $buildDir "CallFromExcel.AddIn.dll"), (Join-Path $distDir "CallFromExcel.AddIn.tlb"),
+    "CallFromExcel.AddIn.ICallFromExcelComServer", "CallFromExcel.AddIn.ComServer", "CallFromExcel")
 
 $projectRoot = (Resolve-Path $projectDir).Path.TrimEnd('\') + '\'
 $files = Get-ChildItem $projectDir -Recurse -File | Where-Object {

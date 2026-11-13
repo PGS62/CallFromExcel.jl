@@ -23,7 +23,7 @@ namespace CallFromExcel.AddIn
     [InterfaceType(ComInterfaceType.InterfaceIsDual)]
     public interface ICallFromExcelComServer
     {
-        string Launch(bool minimiseWindow, string commandLineOptions, string packages, int timeoutSeconds);
+        string Launch(bool MinimiseWindow, string CommandLineOptions, string Packages, int TimeoutSeconds);
         string Post(string payload, string path);
         bool IsListening(int port);
         int GetPort();
@@ -88,9 +88,9 @@ namespace CallFromExcel.AddIn
     [ComDefaultInterface(typeof(ICallFromExcelComServer))]
     public class ComServer : ICallFromExcelComServer
     {
-        public string Launch(bool minimiseWindow, string commandLineOptions, string packages, int timeoutSeconds)
+        public string Launch(bool MinimiseWindow, string CommandLineOptions, string Packages, int TimeoutSeconds)
         {
-            return global::CallFromExcel.AddIn.JuliaLaunch.Launch(minimiseWindow: minimiseWindow, commandLineOptions: commandLineOptions, packages: packages, timeoutSeconds: timeoutSeconds);
+            return global::CallFromExcel.AddIn.JuliaLaunch.Launch(minimiseWindow: MinimiseWindow, commandLineOptions: CommandLineOptions, packages: Packages, timeoutSeconds: TimeoutSeconds);
         }
 
         public string Post(string payload, string path)

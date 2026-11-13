@@ -2,6 +2,12 @@
 
 CallFromExcel is the successor to [JuliaExcel](https://github.com/PGS62/JuliaExcel.jl), and its version numbers start again at 0.1.0. The entries from JuliaExcel 2.4.1 down are JuliaExcel's, kept for the record of how it evolved, including its performance.
 
+## [0.1.5] - 2026-11-13
+
+### Changes
+
+- `JuliaCall` and its relatives work with an anonymous function given as the function name, e.g. `=JuliaCall("(x->2x)", 1)`, which failed with "method too new to be called from this world context". Each such call defines a new function in Julia, so it's best not repeated many times.
+
 ## [0.1.4] - 2026-11-13
 
 ### Changes

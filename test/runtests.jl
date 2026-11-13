@@ -477,6 +477,11 @@ end
         # connection (HTTP.jl 2 serves those from one task, so this needs invokelatest).
         post("/eval", "world_age_test(x) = 2x")
         @test CallFromExcel.decode_from_xl(String(post("/call", CallFromExcel.encode_for_xl(Any["world_age_test", 21])).body)) == 42
+        # A function defined by the request itself, as an anonymous function is when its name is
+        # evaluated - so the call needs a newer world than the request started in.
+        @test CallFromExcel.decode_from_xl(String(post("/call", CallFromExcel.encode_for_xl(Any["(x->2x)", 21])).body)) == 42
+        @test vec(CallFromExcel.decode_from_xl(String(post("/call", CallFromExcel.encode_for_xl(Any["(x->2x).", [1, 2, 3]])).body))) == [2, 4, 6]
+        @test CallFromExcel.decode_from_xl(String(post("/callkw", CallFromExcel.encode_for_xl(Any["((x; k) -> x + k)", 1, ";", "k", 2])).body)) == 3
         @test CallFromExcel.decode_from_xl(String(post("/call", CallFromExcel.encode_for_xl(Any["+", 1, 2])).body)) == 3
         @test CallFromExcel.decode_from_xl(String(post("/callkw",
             CallFromExcel.encode_for_xl(Any["round", 1.25, ";", "digits", 1])).body)) == 1.2

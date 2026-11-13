@@ -447,10 +447,15 @@ function srv_call_inner(payload::String; named_args::Bool=false)::String
         fn_to_call = Main.eval(Meta.parse(fn_name))             # fast: parses only the short function name
         args_from_xl = decoded[2:end]
         named_args && ((args_from_xl, kwargs_from_xl) = split_named_args(args_from_xl))
+        # invokelatest, as well as the one around this whole function: evaluating fn_name can
+        # itself define a method - "(x->2x)" defines an anonymous function - which this
+        # function's world, fixed when it was entered, can't see ("method too new"). Each such
+        # call defines and compiles a new function, so it's fine occasionally, but leaks memory
+        # if repeated many times.
         if broadcasting
-            broadcast((xs...) -> fn_to_call(xs...; kwargs_from_xl...), args_from_xl...)
+            Base.invokelatest(broadcast, (xs...) -> fn_to_call(xs...; kwargs_from_xl...), args_from_xl...)
         else
-            fn_to_call(args_from_xl...; kwargs_from_xl...)
+            Base.invokelatest(fn_to_call, args_from_xl...; kwargs_from_xl...)
         end
     catch e
         success = false

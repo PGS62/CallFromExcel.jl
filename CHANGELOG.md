@@ -7,6 +7,7 @@ CallFromExcel is the successor to [JuliaExcel](https://github.com/PGS62/JuliaExc
 ### Changes
 
 - `JuliaLaunch` checks that the Julia package is the same version as the Excel add-in before doing anything else, so a mismatch gives the usual message saying how to fix it, rather than an error from calling something an older package doesn't have (such as `UndefVarError(:set_console_icon...)`). Under WSL, the message also says where to run each step, since `installme()` only works in Julia on Windows.
+- `JuliaLaunch(TRUE)` (Julia under WSL) no longer times out when a Julia on Windows, e.g. one serving another Excel, is already listening on the port Julia under WSL would choose. Julia under WSL can't see Windows' ports, so `JuliaLaunch` now picks the port.
 
 ## [0.1.2] - 2026-11-13
 

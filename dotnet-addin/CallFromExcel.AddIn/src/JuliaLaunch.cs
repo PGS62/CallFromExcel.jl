@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Net;
+using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 
@@ -313,7 +315,7 @@ namespace CallFromExcel.AddIn
             string literalCommand = JuliaLiteral.MakeJuliaLiteral(command);
             literalCommand = literalCommand.Substring(1, literalCommand.Length - 2);
 
-            string loadFileContents = BuildStartupScript(packages, pid, commsFolderX, errorFileX, flagFileX, literalCommand);
+            string loadFileContents = BuildStartupScript(packages, pid, commsFolderX, errorFileX, flagFileX, literalCommand, FirstFreePort());
             FileUtils.SaveTextFile(loadFile, loadFileContents);
 
             var stopwatch = Stopwatch.StartNew();
@@ -471,7 +473,33 @@ namespace CallFromExcel.AddIn
         // test/runtests.jl can check the generated script parses.
         public const string VersionMismatchMarker = "CallFromExcelVersionMismatch";
 
-        public static string BuildStartupScript(string packages, int pid, string commsFolderX, string errorFileX, string flagFileX, string literalCommand)
+        // The first port from `start` that nothing on Windows is listening on, where Julia then
+        // starts its server (start_server tries upwards from the port it's given). Chosen here,
+        // not by Julia, because Julia under WSL can't see Windows' ports: it took 2700 even with
+        // a Windows Julia (e.g. one serving another Excel) already listening there, and Windows
+        // then sent this Excel's requests to that one, which refused them. Ports forwarded from
+        // WSL count as taken here too, so two WSL sessions don't clash either. Public so
+        // test/runtests.jl can test it.
+        public static int FirstFreePort(int start = 2700)
+        {
+            for (int port = start; port < start + 100; port++)
+            {
+                var listener = new TcpListener(IPAddress.Loopback, port) { ExclusiveAddressUse = true };
+                try
+                {
+                    listener.Start();
+                    return port;
+                }
+                catch (SocketException) { }
+                finally
+                {
+                    listener.Stop();
+                }
+            }
+            return start;
+        }
+
+        public static string BuildStartupScript(string packages, int pid, string commsFolderX, string errorFileX, string flagFileX, string literalCommand, int port)
         {
             // PGS 8 Dec 2021 (ported comment): it's important to make "using CallFromExcel"
             // the last "using" statement, believed to help avoid "world-age" problems.
@@ -507,7 +535,7 @@ namespace CallFromExcel.AddIn
                    "        println(\"Julia $VERSION, using " + PackageName + " to serve Excel running as process ID " + pid + ".\")\n" +
                    "        println(\"Julia launched with command: " + literalCommand + " \")\n" +
                    "        CallFromExcel.set_console_icon()\n" +
-                   "        CallFromExcel.start_server()\n" +
+                   "        CallFromExcel.start_server(" + port + ")\n" +
                    "    end\n" +
                    "    rm(" + JuliaLiteral.MakeJuliaLiteral(flagFileX) + ")\n" +
                    "catch e\n" +

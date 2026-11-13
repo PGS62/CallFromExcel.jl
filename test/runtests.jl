@@ -613,13 +613,29 @@ if Sys.iswindows()
         folder = "C:/Users/a\$b/AppData/Local/Temp/@CallFromExcel"
         errorfile, flagfile = folder * "/LoadError_1234.txt", folder * "/Flag_1234.txt"
         script = "[void][Reflection.Assembly]::LoadFrom('$dll'); " *
-                 "[CallFromExcel.AddIn.JuliaLaunch]::BuildStartupScript('', 1234, '$folder', '$errorfile', '$flagfile', 'cmd')"
+                 "[CallFromExcel.AddIn.JuliaLaunch]::BuildStartupScript('', 1234, '$folder', '$errorfile', '$flagfile', 'cmd', 2712)"
         startup = read(`powershell -NoProfile -NonInteractive -Command $script`, String)
         strings(x) = x isa String ? [x] : x isa Expr ? reduce(vcat, strings.(x.args); init=String[]) : String[]
         found = strings(Meta.parseall(startup))
         @test folder in found
         @test errorfile in found
         @test flagfile in found
+        @test occursin("CallFromExcel.start_server(2712)", startup)
+    end
+
+    # JuliaLaunch picks the port, as the first one free on Windows, because Julia under WSL can't
+    # see Windows' ports. Holds a port, and checks that the next one is chosen.
+    @testset "JuliaLaunch picks a port that's free on Windows" begin
+        dll = joinpath(@__DIR__, "..", "dotnet-addin", "dist", "CallFromExcel.AddIn.dll")
+        free(start) = parse(Int, read(`powershell -NoProfile -NonInteractive -Command
+            "[void][Reflection.Assembly]::LoadFrom('$dll'); [CallFromExcel.AddIn.JuliaLaunch]::FirstFreePort($start)"`, String))
+        start = free(47800)
+        server = CallFromExcel.Sockets.listen(CallFromExcel.Sockets.IPv4("127.0.0.1"), start)
+        try
+            @test free(start) > start
+        finally
+            close(server)
+        end
     end
 
     # The startup script checks the package version before calling anything an older package may
@@ -633,7 +649,7 @@ if Sys.iswindows()
         jl(path) = replace(path, "\\" => "/")
         script = "[void][Reflection.Assembly]::LoadFrom('$dll'); " *
                  "[CallFromExcel.AddIn.JuliaLaunch]::BuildStartupScript('', 1234, '$(jl(dir))', " *
-                 "'$(jl(errorfile))', '$(jl(flagfile))', 'cmd')"
+                 "'$(jl(errorfile))', '$(jl(flagfile))', 'cmd', 2700)"
         startup = read(`powershell -NoProfile -NonInteractive -Command $script`, String)
         addinversion = "\"$(pkgversion(CallFromExcel))\""
         @test occursin(addinversion, startup)

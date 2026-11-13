@@ -645,35 +645,13 @@ ErrHandler:
 9         TestOneDArraysDisplayAsOneColumnOnSheet = False
 End Function
 
-' Builds a 1-based (ReDim(1 To n)) Variant array from a ParamArray of values. Deliberately
-' not VBA's own Array() function (which returns a 0-based array): when a 0-based array is
-' passed as a single argument to a COM method whose trailing parameter is a "params object[]"
-' (as JuliaCall/JuliaCallVBA/etc. all are), VBA's COM dispatch auto-spreads it into separate
-' positional arguments instead of passing it as one array value - confirmed by isolating this
-' exact case (TestElType originally used Array(...) here and failed with Julia reporting
-' eltype() called with 3 separate arguments, not 1 array argument). A non-zero-lower-bound
-' array (any ReDim(1 To n), the convention this whole codebase otherwise already uses) does
-' not trigger that spreading, so this is the correct way to build a single array argument
-' from VBA for any of the COM migration/VBA methods - not just a workaround for this test.
-Private Function OneBasedArray(ParamArray Values()) As Variant
-          Dim i As Long
-          Dim Result() As Variant
-1         ReDim Result(1 To UBound(Values) - LBound(Values) + 1)
-2         For i = LBound(Values) To UBound(Values)
-3             Assign Result(i - LBound(Values) + 1), Values(i)
-4         Next i
-5         OneBasedArray = Result
-End Function
-
-' Each array is built by its own statement into a local variable (Arr) before being passed to
-' the late-bound JuliaCall - never as a nested OneBasedArray(...) call-expression argument.
-' Nesting a function call directly as an argument to a late-bound COM Dispatch call (e.g.
-' "CallFromExcel.JuliaCall(\"eltype\", OneBasedArray(1, 2, 3))") was found (while debugging this
-' exact test) to unpredictably raise "Invalid procedure call or argument", even though the same
-' call succeeds once the array is assigned to a variable first. Not fully explained, but
-' reproducible and avoided this way - a real quirk of VBA's late-bound COM dispatch worth
-' knowing about for any future code passing a function's return value directly into a
-' ComServer method call.
+' Uses VBA's Array(), whose arrays are 0-based, as a regression test: while JuliaCall's
+' arguments were a "params object[]", a 0-based array passed as the only argument arrived in
+' Julia as separate arguments. Since 0.1.2 they are 30 optional arguments, so it arrives as one
+' array.
+' Each array is assigned to Arr before the call: passing a function's result directly as an
+' argument (e.g. CallFromExcel.JuliaCall("eltype", Array(1, 2, 3))) was once seen to raise
+' "Invalid procedure call or argument" - not explained, and possibly also a "params" effect.
 Function TestElType()
           Dim Arr As Variant
           Dim OK As Boolean
@@ -683,35 +661,35 @@ Function TestElType()
 
 2         OK = True
 
-3         Arr = OneBasedArray(1, 2, 3)
+3         Arr = Array(1, 2, 3)
 4         R = CallFromExcel.JuliaCall("eltype", Arr)
 5         If R <> "Int16" Then OK = False
 
-6         Arr = OneBasedArray(1!, 2!, 3!)
+6         Arr = Array(1!, 2!, 3!)
 7         R = CallFromExcel.JuliaCall("eltype", Arr)
 8         If R <> "Float32" Then OK = False
 
-9         Arr = OneBasedArray(1#, 2#, 3#)
+9         Arr = Array(1#, 2#, 3#)
 10        R = CallFromExcel.JuliaCall("eltype", Arr)
 11        If R <> "Float64" Then OK = False
 
-12        Arr = OneBasedArray(1, 2#, 3#)
+12        Arr = Array(1, 2#, 3#)
 13        R = CallFromExcel.JuliaCall("eltype", Arr)
 14        If R <> "Any" Then OK = False
 
-15        Arr = OneBasedArray("a", "b", "c")
+15        Arr = Array("a", "b", "c")
 16        R = CallFromExcel.JuliaCall("eltype", Arr)
 17        If R <> "String" Then OK = False
 
-18        Arr = OneBasedArray("a", 1, True)
+18        Arr = Array("a", 1, True)
 19        R = CallFromExcel.JuliaCall("eltype", Arr)
 20        If R <> "Any" Then OK = False
 
-21        Arr = OneBasedArray(True, False, True)
+21        Arr = Array(True, False, True)
 22        R = CallFromExcel.JuliaCall("eltype", Arr)
 23        If R <> "Bool" Then OK = False
 
-24        Arr = OneBasedArray(Empty, Empty, Empty)
+24        Arr = Array(Empty, Empty, Empty)
 25        R = CallFromExcel.JuliaCall("eltype", Arr)
 26        If R <> "Missing" Then OK = False
 

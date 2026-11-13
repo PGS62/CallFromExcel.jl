@@ -37,7 +37,7 @@ A Release build also runs `Update-Dist.ps1`, which copies the add-in into `dist\
 
 ## Design notes
 
-- **Late binding from VBA.** Functions taking a variable number of arguments (`JuliaCall` etc.) are `params object[]` methods, which VBA can only call through an object declared `As Object`.
+- **Early or late binding from VBA.** `ComServer` works both through `CreateObject` and through a reference to its type library, which `Update-Dist.ps1` generates and the installer registers. So `JuliaCall` and its relatives take 30 optional arguments, like `Application.Run`, rather than `params object[]`, which VBA can't call early-bound.
 - **Only intended functions are exported.** The `.dna` file sets `ExplicitExports="true"`, so only methods marked `[ExcelFunction]` become worksheet functions. The diagnostic functions in `src\JuliaCallDiag.cs` are hidden from the Function Wizard and IntelliSense.
 - **IntelliSense** for the worksheet functions comes from `ExcelDna.IntelliSense`, embedded in the add-in (`src\AddIn.cs`).
 - **HTTP, not ZMQ.** The per-call overhead of HTTP is under a millisecond. For large calls, the cost is in encoding, decoding and Excel's own marshalling, so a different transport wouldn't help.

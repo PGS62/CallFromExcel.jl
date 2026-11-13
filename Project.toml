@@ -1,6 +1,6 @@
 name = "CallFromExcel"
 uuid = "f3634bd0-8fd6-492a-8a51-244143c927d5"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Philip Swannell"]
 
 [deps]

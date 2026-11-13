@@ -93,14 +93,12 @@ CallFromExcel replaces [JuliaExcel](https://github.com/PGS62/JuliaExcel.jl). Its
 **Worksheet formulas.** In a workbook saved with JuliaExcel, Excel records the location of `JuliaExcel.xlam` in each formula that uses its functions, so after upgrading a formula such as `=JuliaLaunch()` appears as `='C:\Users\Public\JuliaExcel\JuliaExcel.xlam'!JuliaLaunch()`. Remove that path with Find and Replace (Ctrl+H): set "Within" to Workbook and "Look in" to Formulas, and replace the text `'C:\Users\Public\JuliaExcel\JuliaExcel.xlam'!` with nothing.
 
 **VBA.**
- * Remove the reference to JuliaExcel (VBA editor, Tools menu -> References).
- * Create an object to call CallFromExcel's functions through, and put it in front of each call, so `JuliaCall("f", x)` becomes `CallFromExcel.JuliaCall("f", x)` - see [Example VBA](#example-vba):
+ * Replace the reference to JuliaExcel with one to CallFromExcel (VBA editor, Tools menu -> References).
+ * Create an object to call CallFromExcel's functions through, and put it in front of each call, so `JuliaCall("f", x)` becomes `jl.JuliaCall("f", x)` - see [Example VBA](#example-vba):
    ```vba
-   Dim CallFromExcel As Object
-   Set CallFromExcel = CreateObject("CallFromExcel.ComServer")
+   Dim jl As New CallFromExcel.ComServer
    ```
-   Declare it `As Object`: functions such as `JuliaCall` that take a variable number of arguments can't be called otherwise.
- * If the only argument after the function name is an array created with VBA's `Array` function (or any other array whose lower bound is 0), it arrives in Julia as separate arguments rather than as one array. Create the array with `ReDim x(1 To n)` instead.
+ * From VBA, `JuliaCall`, `JuliaCallVBA`, `JuliaCallNamedArgs` and `JuliaCallNamedArgsVBA` take at most 30 arguments after the function name.
 
 **Julia.** Functions and variables formerly accessed as `JuliaExcel.xxx`, such as `JuliaExcel.serve_xl()` and `JuliaExcel.last_answer`, are now `CallFromExcel.xxx`, after `using CallFromExcel`.
 
@@ -122,17 +120,17 @@ CallFromExcel makes the following functions available from Excel worksheets and 
 |[JuliaExcelPID](#juliaexcelpid)|Returns the process id of the current Excel session. Only needed if more than one Excel instance is running - pass it to `serve_xl` to say which one to attach to.|
 
 ## Example VBA
-The VBA code below makes a call to `JuliaLaunch` and `JuliaEvalVBA` and then pastes the result to range A1:J10 in a new worksheet. VBA reaches CallFromExcel's functions through an object created with `CreateObject("CallFromExcel.ComServer")` - no reference (VBA editor, Tools menu -> References) is needed. Declare that object `As Object`, as below: functions such as `JuliaCall` that take a variable number of arguments can only be called that way.
+The VBA code below makes a call to `JuliaLaunch` and `JuliaEvalVBA` and then pastes the result to range A1:J10 in a new worksheet. VBA reaches CallFromExcel's functions through an object created with `CreateObject("CallFromExcel.ComServer")`, which needs no reference. Alternatively, add a reference to CallFromExcel (VBA editor, Tools menu -> References) and declare `Dim jl As New CallFromExcel.ComServer`: the VBA editor then shows each function's arguments as you type. But a workbook with that reference won't compile on a PC without CallFromExcel installed.
 
 ```vba
 Sub Demo()
 
-    Dim CallFromExcel As Object, ResultFromJulia As Variant, PasteHere As Range
+    Dim jl As Object, ResultFromJulia As Variant, PasteHere As Range
     
-    Set CallFromExcel = CreateObject("CallFromExcel.ComServer")
-    CallFromExcel.JuliaLaunch
+    Set jl = CreateObject("CallFromExcel.ComServer")
+    jl.JuliaLaunch
     
-    ResultFromJulia = CallFromExcel.JuliaEvalVBA("(1:10).^(1:10)'")
+    ResultFromJulia = jl.JuliaEvalVBA("(1:10).^(1:10)'")
 
     Set PasteHere = Application.Workbooks.Add.Worksheets(1) _
         .Cells(1, 1).Resize(UBound(ResultFromJulia, 1), _
@@ -207,7 +205,7 @@ JuliaSetVar(VariableName, RefersTo)
 ### `JuliaEvalVBA`
 Evaluate a Julia expression from VBA. Differs from `JuliaCall` in handling of 1-d arrays and strings longer than 32,767 characters. May return data of types that cannot be displayed on a worksheet, such as a dictionary or an array of arrays.
 ```
-CallFromExcel.JuliaEvalVBA(JuliaExpression)
+jl.JuliaEvalVBA(JuliaExpression)
 ```
 
 |Argument|Description|
@@ -217,7 +215,7 @@ CallFromExcel.JuliaEvalVBA(JuliaExpression)
 ### `JuliaCallVBA`
 Call a named Julia function from VBA. Differs from `JuliaCall` in handling of 1-d arrays and strings longer than 32,767 characters. May return data of types that cannot be displayed on a worksheet, such as a dictionary, an array of arrays, or arrays of dimension up to 9.
 ```
-CallFromExcel.JuliaCallVBA(JuliaFunction, [Arg1], [Arg2], ...)
+jl.JuliaCallVBA(JuliaFunction, [Arg1], [Arg2], ...)
 ```
 
 |Argument|Description|
@@ -245,7 +243,7 @@ A trailing `.` on the function name broadcasts over the positional arguments, as
 ### `JuliaCallNamedArgsVBA`
 Call a named Julia function from VBA, passing positional and named arguments, with `";"` marking where the named arguments start. Differs from `JuliaCallNamedArgs` in the same ways that `JuliaCallVBA` differs from `JuliaCall`.
 ```
-CallFromExcel.JuliaCallNamedArgsVBA(JuliaFunction, [Arg1], ..., ";", Name1, Value1, ...)
+jl.JuliaCallNamedArgsVBA(JuliaFunction, [Arg1], ..., ";", Name1, Value1, ...)
 ```
 
 |Argument|Description|
@@ -359,7 +357,7 @@ This matters when calling a Julia function that requires an integer, whether as 
 
 From VBA, numbers keep their VBA type: `Integer` arrives as `Int16`, `Long` as `Int32`, `LongLong` as `Int64`, `Single` as `Float32` and `Double` as `Float64`. So pass a `LongLong` (e.g. `2^` or `CLngLng(n)`) where Julia needs an `Int64`. Note that a literal such as `2` in VBA code is an `Integer`, which arrives as `Int16` - some Julia functions, such as `split`, require an `Int64` and won't accept that either.
 
-Julia's integer arithmetic wraps around on overflow rather than raising an error, and the narrower the type, the sooner that happens. So from VBA, `CallFromExcel.JuliaCall("*", 200, 200)` returns -25536, since both arguments arrive as `Int16`, where VBA itself would raise an Overflow error. Pass `LongLong` or `Double` values when results may be large.
+Julia's integer arithmetic wraps around on overflow rather than raising an error, and the narrower the type, the sooner that happens. So from VBA, `jl.JuliaCall("*", 200, 200)` returns -25536, since both arguments arrive as `Int16`, where VBA itself would raise an Overflow error. Pass `LongLong` or `Double` values when results may be large.
 
 ### Complex numbers return as text
 Excel has no complex number type. Its functions such as `IMREAL`, `IMAGINARY` and `IMSUM` work on text such as `"3+4i"` instead. So complex numbers in Julia return to Excel as text in exactly the format of Excel's own `COMPLEX` function, e.g. `"3+4i"`, `"-i"` or `"1.5+i"`, with 15 significant digits. As with `COMPLEX`, a number with a zero imaginary part returns as text without one, e.g. `"3"`. Text in this form passed from Excel to Julia arrives as a `String`, not as a complex number.

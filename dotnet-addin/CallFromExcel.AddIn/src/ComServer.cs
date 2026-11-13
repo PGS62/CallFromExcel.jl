@@ -7,14 +7,17 @@ namespace CallFromExcel.AddIn
     // live object reference, so results JuliaCall/JuliaEval can't display on a worksheet
     // (Dictionaries, nested arrays) go through here instead. Also still carries the
     // JuliaLaunch/JuliaHttpClient test-harness methods used while validating those ports.
-    // Dual, not IDispatch-only: IDispatch-only was tried to get COM VARARG export for the
-    // "params object[]" methods below (which would give JuliaCall/JuliaEval a ParamArray-style
-    // IntelliSense tooltip in the VBA editor, like Application.Run has) - but the combination
-    // of IDispatch-only + a vararg "object" (VARIANT)-returning method crashes the VBA editor's
-    // IntelliSense outright when typing e.g. "j.JuliaCall(" with an early-bound reference to
-    // this type library. Dual is stable; late-bound CreateObject/As Object callers (everything
-    // in this codebase) go through IDispatch either way, so this only costs the early-bound
-    // IntelliSense tooltip for the params-array methods, not any functionality.
+    //
+    // Callable both late-bound (Dim x As Object: Set x = CreateObject("CallFromExcel.ComServer"))
+    // and early-bound (Tools > References -> CallFromExcel, which the installer registers;
+    // Dim x As New CallFromExcel.ComServer), the latter giving the VBA editor's IntelliSense
+    // tooltips. Parameter names match the old JuliaExcel.xlam's, so the tooltips read as before.
+    //
+    // The JuliaCall family takes 30 [Optional] arguments, like Application.Run, rather than
+    // "params object[]": VBA can't call a vararg (params) method early-bound at all ("Function
+    // or interface marked as restricted, or the function uses an Automation type not supported
+    // in Visual Basic"), and with IDispatch-only + vararg its IntelliSense crashed outright.
+    // See ArgsList below for how omitted arguments are dropped.
     [ComVisible(true)]
     [Guid("8ba635c2-d745-4d97-8fec-6cbfb398ae6d")]
     [InterfaceType(ComInterfaceType.InterfaceIsDual)]
@@ -29,29 +32,53 @@ namespace CallFromExcel.AddIn
         // in allowing nested arrays and Dictionary results (AllowNesting=true,
         // JuliaVectorToXLColumn=false, no string-length limit), matching how those are
         // only ever called from VBA, never bound to a worksheet cell.
-        object JuliaCallVBA(string juliaFunction, params object[] args);
-        object JuliaEvalVBA(object juliaExpression);
-        object JuliaCallNamedArgsVBA(string juliaFunction, params object[] args);
+        object JuliaCallVBA(string JuliaFunction,
+            [Optional] object Arg1, [Optional] object Arg2, [Optional] object Arg3, [Optional] object Arg4, [Optional] object Arg5,
+            [Optional] object Arg6, [Optional] object Arg7, [Optional] object Arg8, [Optional] object Arg9, [Optional] object Arg10,
+            [Optional] object Arg11, [Optional] object Arg12, [Optional] object Arg13, [Optional] object Arg14, [Optional] object Arg15,
+            [Optional] object Arg16, [Optional] object Arg17, [Optional] object Arg18, [Optional] object Arg19, [Optional] object Arg20,
+            [Optional] object Arg21, [Optional] object Arg22, [Optional] object Arg23, [Optional] object Arg24, [Optional] object Arg25,
+            [Optional] object Arg26, [Optional] object Arg27, [Optional] object Arg28, [Optional] object Arg29, [Optional] object Arg30);
+        object JuliaEvalVBA(object JuliaExpression);
+        object JuliaCallNamedArgsVBA(string JuliaFunction,
+            [Optional] object Arg1, [Optional] object Arg2, [Optional] object Arg3, [Optional] object Arg4, [Optional] object Arg5,
+            [Optional] object Arg6, [Optional] object Arg7, [Optional] object Arg8, [Optional] object Arg9, [Optional] object Arg10,
+            [Optional] object Arg11, [Optional] object Arg12, [Optional] object Arg13, [Optional] object Arg14, [Optional] object Arg15,
+            [Optional] object Arg16, [Optional] object Arg17, [Optional] object Arg18, [Optional] object Arg19, [Optional] object Arg20,
+            [Optional] object Arg21, [Optional] object Arg22, [Optional] object Arg23, [Optional] object Arg24, [Optional] object Arg25,
+            [Optional] object Arg26, [Optional] object Arg27, [Optional] object Arg28, [Optional] object Arg29, [Optional] object Arg30);
 
         // Migration surface for VBA code that used to call these as bare Public Functions
         // in a referenced JuliaExcel.xlam (Tools > References -> JuliaExcel). Since the new
         // world has no xlam at all, old call sites become e.g.
-        //   Result = CallFromExcel.JuliaCall("sqrt", 16)
-        // with CallFromExcel declared once as CreateObject("CallFromExcel.ComServer") (or the
-        // early-bound equivalent after a Tools > References to this assembly's type library).
+        //   Result = jl.JuliaCall("sqrt", 16)
+        // with jl declared once as CreateObject("CallFromExcel.ComServer") (or
+        // early-bound, as New CallFromExcel.ComServer).
         // These intentionally keep the worksheet-style restrictions (string-length limit,
         // no nested arrays/Dictionaries, 1-D arrays become a column) that the original
         // JuliaCall/JuliaEval/JuliaCallNamedArgs/JuliaSetVar/JuliaInclude had even when called
         // from VBA - JuliaCallVBA/JuliaEvalVBA/JuliaCallNamedArgsVBA above remain the way to
         // lift those restrictions, exactly as before.
-        object JuliaCall(string juliaFunction, params object[] args);
-        object JuliaEval(object juliaExpression);
-        object JuliaCallNamedArgs(string juliaFunction, params object[] args);
-        object JuliaLaunch(bool useLinux = false, bool minimiseWindow = false, string commandLineOptions = "", string packages = "", string bashStatements = "", int timeOut = 30);
+        object JuliaCall(string JuliaFunction,
+            [Optional] object Arg1, [Optional] object Arg2, [Optional] object Arg3, [Optional] object Arg4, [Optional] object Arg5,
+            [Optional] object Arg6, [Optional] object Arg7, [Optional] object Arg8, [Optional] object Arg9, [Optional] object Arg10,
+            [Optional] object Arg11, [Optional] object Arg12, [Optional] object Arg13, [Optional] object Arg14, [Optional] object Arg15,
+            [Optional] object Arg16, [Optional] object Arg17, [Optional] object Arg18, [Optional] object Arg19, [Optional] object Arg20,
+            [Optional] object Arg21, [Optional] object Arg22, [Optional] object Arg23, [Optional] object Arg24, [Optional] object Arg25,
+            [Optional] object Arg26, [Optional] object Arg27, [Optional] object Arg28, [Optional] object Arg29, [Optional] object Arg30);
+        object JuliaEval(object JuliaExpression);
+        object JuliaCallNamedArgs(string JuliaFunction,
+            [Optional] object Arg1, [Optional] object Arg2, [Optional] object Arg3, [Optional] object Arg4, [Optional] object Arg5,
+            [Optional] object Arg6, [Optional] object Arg7, [Optional] object Arg8, [Optional] object Arg9, [Optional] object Arg10,
+            [Optional] object Arg11, [Optional] object Arg12, [Optional] object Arg13, [Optional] object Arg14, [Optional] object Arg15,
+            [Optional] object Arg16, [Optional] object Arg17, [Optional] object Arg18, [Optional] object Arg19, [Optional] object Arg20,
+            [Optional] object Arg21, [Optional] object Arg22, [Optional] object Arg23, [Optional] object Arg24, [Optional] object Arg25,
+            [Optional] object Arg26, [Optional] object Arg27, [Optional] object Arg28, [Optional] object Arg29, [Optional] object Arg30);
+        object JuliaLaunch(bool UseLinux = false, bool MinimiseWindow = false, string CommandLineOptions = "", string Packages = "", string BashStatements = "", int TimeOut = 30);
         bool JuliaIsRunning();
         int JuliaExcelPID();
-        object JuliaSetVar(string variableName, object refersTo);
-        object JuliaInclude(string fileName);
+        object JuliaSetVar(string VariableName, object RefersTo);
+        object JuliaInclude(string FileName);
     }
 
     [ComVisible(true)]
@@ -81,31 +108,79 @@ namespace CallFromExcel.AddIn
             return JuliaPort.GetJuliaPort();
         }
 
-        public object JuliaCallVBA(string juliaFunction, params object[] args)
+        public object JuliaCallVBA(string JuliaFunction,
+            object Arg1, object Arg2, object Arg3, object Arg4, object Arg5,
+            object Arg6, object Arg7, object Arg8, object Arg9, object Arg10,
+            object Arg11, object Arg12, object Arg13, object Arg14, object Arg15,
+            object Arg16, object Arg17, object Arg18, object Arg19, object Arg20,
+            object Arg21, object Arg22, object Arg23, object Arg24, object Arg25,
+            object Arg26, object Arg27, object Arg28, object Arg29, object Arg30)
         {
-            return CallVBACore(juliaFunction, args, "/call");
+            return CallVBACore(JuliaFunction, ArgsList(
+                Arg1, Arg2, Arg3, Arg4, Arg5, Arg6, Arg7, Arg8, Arg9, Arg10,
+                Arg11, Arg12, Arg13, Arg14, Arg15, Arg16, Arg17, Arg18, Arg19, Arg20,
+                Arg21, Arg22, Arg23, Arg24, Arg25, Arg26, Arg27, Arg28, Arg29, Arg30), "/call");
         }
 
-        public object JuliaCallNamedArgsVBA(string juliaFunction, params object[] args)
+        public object JuliaCallNamedArgsVBA(string JuliaFunction,
+            object Arg1, object Arg2, object Arg3, object Arg4, object Arg5,
+            object Arg6, object Arg7, object Arg8, object Arg9, object Arg10,
+            object Arg11, object Arg12, object Arg13, object Arg14, object Arg15,
+            object Arg16, object Arg17, object Arg18, object Arg19, object Arg20,
+            object Arg21, object Arg22, object Arg23, object Arg24, object Arg25,
+            object Arg26, object Arg27, object Arg28, object Arg29, object Arg30)
         {
-            return CallVBACore(juliaFunction, args, "/callkw");
+            return CallVBACore(JuliaFunction, ArgsList(
+                Arg1, Arg2, Arg3, Arg4, Arg5, Arg6, Arg7, Arg8, Arg9, Arg10,
+                Arg11, Arg12, Arg13, Arg14, Arg15, Arg16, Arg17, Arg18, Arg19, Arg20,
+                Arg21, Arg22, Arg23, Arg24, Arg25, Arg26, Arg27, Arg28, Arg29, Arg30), "/callkw");
         }
 
-        public object JuliaEvalVBA(object juliaExpression)
+        // The arguments actually passed to a JuliaCall-family method: trailing omitted ones are
+        // dropped. An omitted argument arrives as System.Reflection.Missing when called
+        // late-bound (via IDispatch), but early-bound (via the vtable) as the VT_ERROR
+        // DISP_E_PARAMNOTFOUND, which .NET boxes as a plain Int32 (see WireFormatEncode's note
+        // on VT_ERROR) - a genuine Long argument of exactly that value is not a realistic
+        // collision. An omission before a supplied argument (JuliaCall("f", , 2)) becomes
+        // Missing either way, which the encoder rejects.
+        private const int DISP_E_PARAMNOTFOUND = unchecked((int)0x80020004);
+        private static object[] ArgsList(params object[] args)
         {
-            string expression = JuliaExpressionToString(juliaExpression);
+            int n = args.Length;
+            for (int i = 0; i < n; i++)
+            {
+                if (args[i] is int && (int)args[i] == DISP_E_PARAMNOTFOUND) args[i] = System.Reflection.Missing.Value;
+            }
+            while (n > 0 && args[n - 1] is System.Reflection.Missing) n--;
+            var result = new object[n];
+            System.Array.Copy(args, result, n);
+            return result;
+        }
+
+        public object JuliaEvalVBA(object JuliaExpression)
+        {
+            string expression = JuliaExpressionToString(JuliaExpression);
             string responseWire = JuliaHttpClient.Post(expression, "/eval");
             object result = WireFormatDecode.Decode(responseWire, allowNesting: true, stringLengthLimit: 0, vectorToColumn: false);
             result = WireFormatDecode.MapErrorValues(result, MapToComError);
             return ForVba(result);
         }
 
-        public object JuliaCall(string juliaFunction, params object[] args)
+        public object JuliaCall(string JuliaFunction,
+            object Arg1, object Arg2, object Arg3, object Arg4, object Arg5,
+            object Arg6, object Arg7, object Arg8, object Arg9, object Arg10,
+            object Arg11, object Arg12, object Arg13, object Arg14, object Arg15,
+            object Arg16, object Arg17, object Arg18, object Arg19, object Arg20,
+            object Arg21, object Arg22, object Arg23, object Arg24, object Arg25,
+            object Arg26, object Arg27, object Arg28, object Arg29, object Arg30)
         {
-            return CallCore(juliaFunction, args, "/call");
+            return CallCore(JuliaFunction, ArgsList(
+                Arg1, Arg2, Arg3, Arg4, Arg5, Arg6, Arg7, Arg8, Arg9, Arg10,
+                Arg11, Arg12, Arg13, Arg14, Arg15, Arg16, Arg17, Arg18, Arg19, Arg20,
+                Arg21, Arg22, Arg23, Arg24, Arg25, Arg26, Arg27, Arg28, Arg29, Arg30), "/call");
         }
 
-        public object JuliaEval(object juliaExpression)
+        public object JuliaEval(object JuliaExpression)
         {
             try
             {
@@ -113,7 +188,7 @@ namespace CallFromExcel.AddIn
                 {
                     return "#Please call JuliaLaunch before calling JuliaEval or JuliaCall!";
                 }
-                string expression = JuliaExpressionToString(juliaExpression);
+                string expression = JuliaExpressionToString(JuliaExpression);
                 string responseWire = JuliaHttpClient.Post(expression, "/eval");
                 object result = WireFormatDecode.Decode(responseWire, allowNesting: false, stringLengthLimit: StringLengthLimit, vectorToColumn: true);
                 result = WireFormatDecode.MapErrorValues(result, MapToComError);
@@ -125,9 +200,18 @@ namespace CallFromExcel.AddIn
             }
         }
 
-        public object JuliaCallNamedArgs(string juliaFunction, params object[] args)
+        public object JuliaCallNamedArgs(string JuliaFunction,
+            object Arg1, object Arg2, object Arg3, object Arg4, object Arg5,
+            object Arg6, object Arg7, object Arg8, object Arg9, object Arg10,
+            object Arg11, object Arg12, object Arg13, object Arg14, object Arg15,
+            object Arg16, object Arg17, object Arg18, object Arg19, object Arg20,
+            object Arg21, object Arg22, object Arg23, object Arg24, object Arg25,
+            object Arg26, object Arg27, object Arg28, object Arg29, object Arg30)
         {
-            return CallCore(juliaFunction, args, "/callkw");
+            return CallCore(JuliaFunction, ArgsList(
+                Arg1, Arg2, Arg3, Arg4, Arg5, Arg6, Arg7, Arg8, Arg9, Arg10,
+                Arg11, Arg12, Arg13, Arg14, Arg15, Arg16, Arg17, Arg18, Arg19, Arg20,
+                Arg21, Arg22, Arg23, Arg24, Arg25, Arg26, Arg27, Arg28, Arg29, Arg30), "/callkw");
         }
 
         public bool JuliaIsRunning()
@@ -141,24 +225,24 @@ namespace CallFromExcel.AddIn
             return System.Diagnostics.Process.GetCurrentProcess().Id;
         }
 
-        public object JuliaSetVar(string variableName, object refersTo)
+        public object JuliaSetVar(string VariableName, object RefersTo)
         {
-            return CallCore("CallFromExcel.setvar", new[] { (object)variableName, refersTo }, "/call");
+            return CallCore("CallFromExcel.setvar", new[] { (object)VariableName, RefersTo }, "/call");
         }
 
-        public object JuliaInclude(string fileName)
+        public object JuliaInclude(string FileName)
         {
-            return CallCore("CallFromExcel.include", new object[] { fileName.Replace("\\", "/") }, "/call");
+            return CallCore("CallFromExcel.include", new object[] { FileName.Replace("\\", "/") }, "/call");
         }
 
         // Unlike the other migration wrappers above, this can't just delegate to
         // JuliaFunctions.JuliaLaunch (its CommandLineOptions/Packages/TimeOut parameters are
         // typed `object` to detect ExcelMissing, an XLL-only concept).
-        public object JuliaLaunch(bool useLinux = false, bool minimiseWindow = false, string commandLineOptions = "", string packages = "", string bashStatements = "", int timeOut = 30)
+        public object JuliaLaunch(bool UseLinux = false, bool MinimiseWindow = false, string CommandLineOptions = "", string Packages = "", string BashStatements = "", int TimeOut = 30)
         {
             try
             {
-                return global::CallFromExcel.AddIn.JuliaLaunch.Launch(useLinux: useLinux, minimiseWindow: minimiseWindow, commandLineOptions: commandLineOptions, packages: packages, bashStatements: bashStatements, timeoutSeconds: timeOut);
+                return global::CallFromExcel.AddIn.JuliaLaunch.Launch(useLinux: UseLinux, minimiseWindow: MinimiseWindow, commandLineOptions: CommandLineOptions, packages: Packages, bashStatements: BashStatements, timeoutSeconds: TimeOut);
             }
             catch (System.Exception ex)
             {

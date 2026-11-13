@@ -31,9 +31,8 @@ param(
     # different paths) - but this add-in's primary, recommended VBA pattern is late-bound
     # CreateObject("CallFromExcel.ComServer") (ProgID-based, no path stored anywhere) and
     # XLL worksheet functions (resolved by function name against loaded add-ins, not by path
-    # either) - see dotnet-addin/README.md. Only an optional early-bound Tools > References to
-    # the .tlb would store a path, and that's documented as an opt-in, not the recommended
-    # pattern, so the per-user Link Hell risk doesn't apply here the way it did for the xlam.
+    # either) - see dotnet-addin/README.md. So the per-user Link Hell risk doesn't apply here
+    # the way it did for the xlam.
     [string]$DestFolder = (Join-Path $env:APPDATA "Microsoft\AddIns\CallFromExcel"),
     [string]$OldXlamName = "JuliaExcel.xlam"
 )
@@ -179,11 +178,11 @@ function Get-OfficeVersion {
 #             step also needs ExcelDna.Integration.dll resolvable, which isn't shipped as a
 #             loose file (it's embedded only inside the packed .xll - see JuliaFunctions.cs's
 #             own notes on this). Writing the registry structure directly avoids both problems;
-#             it's simple, fixed boilerplate for a ComVisible/ClassInterface(None) class with no
-#             early-bound (vtable) registration needed, since this add-in's recommended VBA
-#             pattern is exclusively late-bound (CreateObject/As Object), which only needs
-#             CLSID+ProgID+InprocServer32 - no Interface IID registration at all (confirmed by
-#             comparing against RegAsm's own /regfile output, which likewise omits one).
+#             it's simple, fixed boilerplate for a ComVisible/ClassInterface(None) class, which
+#             only needs CLSID+ProgID+InprocServer32 - no Interface IID registration (confirmed
+#             by comparing against RegAsm's own /regfile output, which likewise omits one). Early-
+#             bound VBA calls don't need one either: the object lives in Excel's own process and
+#             thread, so no marshaling is involved. See Register-TypeLib for the type library.
 #
 #             The CLSID below must match the [Guid(...)] attribute on ComServer.cs's ComServer
 #             class exactly - update both places together if either ever changes.
@@ -212,6 +211,25 @@ function Register-ComServer {
         Set-RegValue -Path $inprocPath -Name "RuntimeVersion" -Value "v4.0.30319"
         Set-RegValue -Path $inprocPath -Name "CodeBase" -Value ([uri]$DllPath).AbsoluteUri
     }
+}
+
+# -----------------------------------------------------------------------------------------------
+# Function  : Register-TypeLib
+# Purpose   : Registers the type library (made by ..\Update-Dist.ps1) for the current user, so
+#             it is listed as "CallFromExcel" in the VBA editor's Tools > References. With that
+#             reference, VBA code can declare Dim jl As New CallFromExcel.ComServer and get
+#             IntelliSense. The VBA project records the reference by this GUID and version, not
+#             by file path, so it survives the file moving or another user's install folder.
+#             The GUID is the assembly's [Guid(...)] in AssemblyInfo.cs; the version is 1.0
+#             because the assembly version is 0.0.0.0. Update both if either ever changes.
+# -----------------------------------------------------------------------------------------------
+function Register-TypeLib {
+    param([string]$TlbPath)
+    $versionPath = "HKCU:\Software\Classes\TypeLib\{f3b6c2a0-6e7a-4b7d-9c1a-2e4d8a6b1c3f}\1.0"
+    Set-RegValue -Path $versionPath -Name "(Default)" -Value "CallFromExcel"
+    Set-RegValue -Path "$versionPath\FLAGS" -Name "(Default)" -Value "0"
+    Set-RegValue -Path "$versionPath\HELPDIR" -Name "(Default)" -Value (Split-Path $TlbPath)
+    Set-RegValue -Path "$versionPath\0\win64" -Name "(Default)" -Value $TlbPath
 }
 
 # Returns the PE "Machine" field of EXCEL.EXE (0x014C = 32-bit x86, 0x8664 = x64, 0xAA64 =
@@ -329,14 +347,7 @@ $tlbDestPath = Join-Path $DestFolder $TlbDestFileName
 
 Copy-RequiredFile -SourcePath $XllSourcePath -DestPath $xllDestPath
 Copy-RequiredFile -SourcePath $DllSourcePath -DestPath $dllDestPath
-# The .tlb is optional - only needed for early-bound Tools > References (see README); don't
-# fail the whole install if it's missing (e.g. not yet built with RegAsm /tlb).
-if (Test-Path -Path $TlbSourcePath -PathType Leaf) {
-    Copy-RequiredFile -SourcePath $TlbSourcePath -DestPath $tlbDestPath
-    Write-Output "Copied $tlbDestPath (Tools > References > Browse to this for early-bound IntelliSense)."
-} else {
-    Write-Output "No .tlb found at $TlbSourcePath - skipping (early-bound Tools > References won't be available; late-bound CreateObject still works)."
-}
+Copy-RequiredFile -SourcePath $TlbSourcePath -DestPath $tlbDestPath
 
 Remove-ExcelAddinFromRegistry -RegPath $regPath -AddinNameFragment $XllDestFileName | Out-Null
 Install-ExcelAddin -RegPath $regPath -AddinFullName $xllDestPath
@@ -344,6 +355,9 @@ Write-Output "Registered $xllDestPath to auto-load with Excel."
 
 Register-ComServer -DllPath $dllDestPath
 Write-Output "Registered CallFromExcel.ComServer for COM (CreateObject(""CallFromExcel.ComServer""))."
+
+Register-TypeLib -TlbPath $tlbDestPath
+Write-Output "Registered its type library (VBA editor: Tools > References > CallFromExcel)."
 
 # Record the installed add-in's version (its AssemblyInformationalVersion, which .NET reports
 # as ProductVersion) last, so it exists only after a complete install. The Julia package reads

@@ -25,7 +25,7 @@ namespace CallFromExcel.AddIn
   <ribbon>
     <tabs>
       <tab id='CallFromExcelTab' label='Julia'>
-        <group id='CallFromExcelGroup' label='Julia'>
+        <group id='CallFromExcelGroup' label='CallFromExcel.jl'>
           <splitButton id='LaunchSplit' size='large'>
             <button id='LaunchJulia' label='Launch Julia' image='JuliaLogo'
                     onAction='OnLaunchJulia'
@@ -46,8 +46,6 @@ namespace CallFromExcel.AddIn
           <checkBox id='DisplayResults' label='Display Results'
                     getPressed='GetDisplayResultsPressed' onAction='OnDisplayResults'
                         supertip='Show each call from Excel, and the result returned, in the Julia window - as display_results(true) does in Julia. Ticked when it is on in the running Julia session.' />
-        </group>
-        <group id='CallFromExcelFileGroup' label='Julia File'>
           <box id='IncludeFileRow' boxStyle='horizontal'>
             <comboBox id='IncludeFileBox' label='File:' sizeString='C:\Users\username\Documents\Projects\Example\src\example.jl'
                       getText='GetIncludeText' onChange='OnIncludeTextChanged'
@@ -62,8 +60,6 @@ namespace CallFromExcel.AddIn
           <button id='IncludeFile' label='Include' imageMso='CodeEdit' getEnabled='GetIncludeEnabled'
                   onAction='OnIncludeFile'
                   supertip='Load the file in the box into Julia, as JuliaInclude does, making the functions it defines available to JuliaCall and JuliaEval. Does not trigger recalculation.' />
-        </group>
-        <group id='CallFromExcelHelpGroup' label='&#160;CallFromExcel.jl&#160;'>
           <button id='CallFromExcelHelp' label='Help' size='large' imageMso='Help'
                   onAction='OnHelp'
                   getSupertip='GetHelpSupertip' />

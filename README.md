@@ -71,7 +71,7 @@ As an alternative to calling Julia running in a Windows process, CallFromExcel c
 ## The Julia ribbon tab
 The add-in adds a Julia tab to Excel's ribbon:
 
-<img src="images/ribbon.png" alt="The Julia tab on Excel's ribbon, with Launch Julia, Show Julia, Close Julia, Display Results, a Julia File box with Browse and Include, and Help" />
+<img src="images/ribbon.png" alt="The Julia tab on Excel's ribbon, with one group, CallFromExcel.jl: Launch Julia, Show Julia, Close Julia, Display Results, a Julia File box with Browse and Include, Help and About" />
 
 |Control|What it does|
 |:------|:-----------|

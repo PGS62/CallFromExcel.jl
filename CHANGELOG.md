@@ -2,6 +2,12 @@
 
 CallFromExcel is the successor to [JuliaExcel](https://github.com/PGS62/JuliaExcel.jl), and its version numbers start again at 0.1.0. The entries from JuliaExcel 2.4.1 down are JuliaExcel's, kept for the record of how it evolved, including its performance.
 
+## [Unreleased]
+
+### Changes
+
+- When Launch Julia on the ribbon fails because the Julia package is a different version from the Excel add-in, or isn't installed, the error dialog has a Copy Julia Command button, which copies the command that fixes it to the clipboard.
+
 ## [0.1.3] - 2026-11-13
 
 ### Changes

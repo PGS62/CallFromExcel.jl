@@ -659,25 +659,42 @@ if Sys.iswindows()
         @test readlines(errorfile) == ["CallFromExcelVersionMismatch", string(pkgversion(CallFromExcel)),
                                        dirname(Base.active_project())]
         @test !isfile(flagfile)
+
+        # Without the package: the message starts as the add-in expects (NotInstalledStart), so
+        # its error dialog can offer to copy the Pkg.add command it contains. An empty project,
+        # and a load path without the default environment, which may have the package.
+        rm(errorfile); touch(flagfile)
+        empty = mktempdir()
+        write(scriptfile, startup)
+        run(addenv(`$(Base.julia_cmd()) --project=$empty --startup-file=no $scriptfile`, "JULIA_LOAD_PATH" => "@;@stdlib");
+            wait=true)
+        notinstalled = read(errorfile, String)
+        @test startswith(notinstalled, "The CallFromExcel package is not installed in Julia's active environment")
+        @test occursin("import Pkg; Pkg.add(\"CallFromExcel\")", notinstalled)
+        @test !isfile(flagfile)
     end
 
     # The four version-mismatch messages: the package or the add-in older, natively or under
-    # WSL, where installme() (Windows only) can't be run in the same Julia.
+    # WSL, where installme() (Windows only) can't be run in the same Julia. Each comes with the
+    # Julia command the ribbon's error dialog offers to copy.
     @testset "Version-mismatch messages" begin
         dll = joinpath(@__DIR__, "..", "dotnet-addin", "dist", "CallFromExcel.AddIn.dll")
-        msg(v, folder, wsl) = "[CallFromExcel.AddIn.JuliaPort]::MismatchMessage('$v', '$folder', \$$wsl)"
+        err(v, folder, wsl) = "\$e = [CallFromExcel.AddIn.JuliaPort]::MismatchError('$v', '$folder', \$$wsl); \$e.Message; \$e.JuliaCommand"
         script = "[void][Reflection.Assembly]::LoadFrom('$dll')\n" * join(
-            [msg("0.0.1", "", false), msg("0.0.1", "C:\\p", false), msg("9.0.0", "", false),
-             msg("0.0.1", "/home/p", true), msg("9.0.0", "", true)], "\n")
+            [err("0.0.1", "", false), err("0.0.1", "C:\\p", false), err("9.0.0", "", false),
+             err("0.0.1", "/home/p", true), err("9.0.0", "", true)], "\n")
         ps1 = tempname() * ".ps1"
         write(ps1, script)
-        m = readlines(`powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $ps1`)
+        out = readlines(`powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $ps1`)
         rm(ps1)
-        @test occursin("then start Julia and run: using Pkg; Pkg.update(\"CallFromExcel\"); using CallFromExcel; CallFromExcel.installme()", m[1])
-        @test occursin("start Julia with julia --project=\"C:\\p\" and run: using Pkg", m[2])
-        @test occursin("Close Excel, then start Julia and run: using CallFromExcel; CallFromExcel.installme()", m[3])
-        @test occursin("start Julia under WSL with julia --project=\"/home/p\" and run: using Pkg; Pkg.update(\"CallFromExcel\") - then", m[4])
-        @test occursin("start Julia on Windows and run: using Pkg; Pkg.update(\"CallFromExcel\"); using CallFromExcel; CallFromExcel.installme()", m[5])
+        m, cmd = out[1:2:end], out[2:2:end]   # each message, then its command
+        update = "using Pkg; Pkg.update(\"CallFromExcel\")"
+        install = "using CallFromExcel; CallFromExcel.installme()"
+        @test occursin("then start Julia and run: $update; $install", m[1]) && cmd[1] == "$update; $install"
+        @test occursin("start Julia with julia --project=\"C:\\p\" and run: using Pkg", m[2]) && cmd[2] == "$update; $install"
+        @test occursin("Close Excel, then start Julia and run: $install", m[3]) && cmd[3] == install
+        @test occursin("start Julia under WSL with julia --project=\"/home/p\" and run: $update - then", m[4]) && cmd[4] == update
+        @test occursin("start Julia on Windows and run: $update; $install", m[5]) && cmd[5] == "$update; $install"
     end
 
     # Under WSL, JuliaLaunch passes the startup file's path to Julia through wsl.exe and bash. An

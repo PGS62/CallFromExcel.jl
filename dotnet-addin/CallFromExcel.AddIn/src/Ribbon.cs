@@ -98,7 +98,7 @@ namespace CallFromExcel.AddIn
             }
             catch (Exception ex)
             {
-                MessageBox.Show(new ExcelWindow(), ex.Message, DialogTitle, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                ShowError(ex);
             }
         }
 
@@ -302,7 +302,7 @@ namespace CallFromExcel.AddIn
             }
             catch (Exception ex)
             {
-                MessageBox.Show(new ExcelWindow(), ex.Message, DialogTitle, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                ShowError(ex);
             }
             finally
             {
@@ -326,7 +326,7 @@ namespace CallFromExcel.AddIn
             }
             catch (Exception ex)
             {
-                MessageBox.Show(new ExcelWindow(), ex.Message, DialogTitle, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                ShowError(ex);
             }
         }
 
@@ -338,7 +338,7 @@ namespace CallFromExcel.AddIn
             }
             catch (Exception ex)
             {
-                MessageBox.Show(new ExcelWindow(), ex.Message, DialogTitle, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                ShowError(ex);
             }
         }
 
@@ -354,6 +354,19 @@ namespace CallFromExcel.AddIn
             catch (Exception ex)
             {
                 SetStatusBar(null);
+                ShowError(ex);
+            }
+        }
+
+        // An error message, with a button to copy the Julia command that fixes it if it has one.
+        private static void ShowError(Exception ex)
+        {
+            if (ex is JuliaCommandException withCommand)
+            {
+                using (var form = new CommandErrorForm(withCommand)) form.ShowDialog(new ExcelWindow());
+            }
+            else
+            {
                 MessageBox.Show(new ExcelWindow(), ex.Message, DialogTitle, MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }

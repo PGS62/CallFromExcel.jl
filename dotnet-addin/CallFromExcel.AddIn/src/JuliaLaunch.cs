@@ -385,12 +385,16 @@ namespace CallFromExcel.AddIn
                 string[] error = FileUtils.ReadTextFile(errorFile).Split('\n');
                 if (error[0].Trim() == VersionMismatchMarker)
                 {
-                    throw new InvalidOperationException(JuliaPort.MismatchMessage(
-                        error.Length > 1 ? error[1].Trim() : "", error.Length > 2 ? error[2].Trim() : null, useLinux));
+                    throw JuliaPort.MismatchError(
+                        error.Length > 1 ? error[1].Trim() : "", error.Length > 2 ? error[2].Trim() : null, useLinux);
+                }
+                string text = string.Join("\n", error).Trim();
+                if (text.StartsWith(NotInstalledStart, StringComparison.Ordinal))
+                {
+                    throw new JuliaCommandException(text, AddPackageCommand);
                 }
                 throw new InvalidOperationException(
-                    "Julia launched but encountered an error when executing '" + loadFile + "' the error was: " +
-                    string.Join("\n", error));
+                    "Julia launched but encountered an error when executing '" + loadFile + "' the error was: " + text);
             }
 
             // Under WSL the port can take a while to become reachable from Windows after Julia
@@ -473,6 +477,11 @@ namespace CallFromExcel.AddIn
         // test/runtests.jl can check the generated script parses.
         public const string VersionMismatchMarker = "CallFromExcelVersionMismatch";
 
+        // The start-up script's message when the package isn't installed, which LaunchCore
+        // recognises by its start, so the ribbon can offer to copy the command that fixes it.
+        public const string NotInstalledStart = "The " + PackageName + " package is not installed in Julia's active environment";
+        public const string AddPackageCommand = "import Pkg; Pkg.add(\"" + PackageName + "\")";
+
         // The first port from `start` that nothing on Windows is listening on, where Julia then
         // starts its server (start_server tries upwards from the port it's given). Chosen here,
         // not by Julia, because Julia under WSL can't see Windows' ports: it took 2700 even with
@@ -541,8 +550,8 @@ namespace CallFromExcel.AddIn
                    "catch e\n" +
                    // Clearer than Julia's own message: names the environment, and mentions --project.
                    "    theerror = if e isa ArgumentError && startswith(e.msg, \"Package " + PackageName + " not found\")\n" +
-                   "        \"The " + PackageName + " package is not installed in Julia's active environment ($(Base.active_project())). " +
-                   "Install it with: import Pkg; Pkg.add(\\\"" + PackageName + "\\\") " +
+                   "        \"" + NotInstalledStart + " ($(Base.active_project())). " +
+                   "Install it with: " + AddPackageCommand.Replace("\"", "\\\"") + " " +
                    "- or, if it is installed in a different environment, add --project=<that environment's folder> to JuliaLaunch's CommandLineOptions.\"\n" +
                    "    else\n" +
                    "        \"$e\"\n" +

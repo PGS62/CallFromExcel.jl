@@ -82,6 +82,7 @@ The add-in adds a Julia tab to Excel's ribbon:
 |**Display Results**|Shows each call from Excel, and its result, in Julia's window - as `CallFromExcel.display_results(true)` does.|
 |**File**, **Browse**, **Include**|Choose a Julia file - typed, pasted, browsed to or picked from recently used files - and include it, as `JuliaInclude` does. Include doesn't trigger recalculation.|
 |**Help**|Opens this page.|
+|**About**|Shows the add-in's version, the CallFromExcel version in the Julia session it is connected to, and a link to this page.|
 
 Launch Julia and a `JuliaLaunch` formula start Julia in the same way, but each with its own settings: a formula uses only its own arguments, so a workbook records how Julia should start and does so the same way on every PC, while the ribbon's Launch Settings are yours.
 

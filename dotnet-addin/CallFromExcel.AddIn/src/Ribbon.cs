@@ -67,6 +67,9 @@ namespace CallFromExcel.AddIn
           <button id='CallFromExcelHelp' label='Help' size='large' imageMso='Help'
                   onAction='OnHelp'
                   getSupertip='GetHelpSupertip' />
+          <button id='CallFromExcelAbout' label='About' size='large' imageMso='Info'
+                  onAction='OnAbout'
+                  supertip='Show the version of the CallFromExcel add-in, and of the CallFromExcel package in the Julia session it is connected to, with a link to the project on GitHub.' />
         </group>
       </tab>
     </tabs>
@@ -324,6 +327,18 @@ namespace CallFromExcel.AddIn
             {
                 // The README's title - the anchor follows its wording, so keep the two in step.
                 System.Diagnostics.Process.Start(JuliaFunctions.HelpRoot + "callfromexceljl---call-julia-from-excel");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(new ExcelWindow(), ex.Message, DialogTitle, MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        public void OnAbout(IRibbonControl control)
+        {
+            try
+            {
+                using (var about = new AboutForm()) about.ShowDialog(new ExcelWindow());
             }
             catch (Exception ex)
             {

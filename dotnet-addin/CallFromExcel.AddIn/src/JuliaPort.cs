@@ -95,16 +95,16 @@ namespace CallFromExcel.AddIn
             return LineFromFile(port, 2) ?? "";
         }
 
-        // How to start Julia in the environment of the Julia listening on `port`, from the
-        // project folder the port file records: "start Julia" for Julia's default environment
-        // (recorded as ""), with --project for any other. A Julia package older than 0.1.2
-        // records no folder, so the environment is then described rather than named.
-        private static string StartJulia(int port)
+        // How to start Julia in a given environment: "start Julia" for Julia's default
+        // environment (folder ""), with --project for a project folder. A Julia package older
+        // than 0.1.2 records no folder (null), so the environment is then described rather than
+        // named.
+        private static string StartJulia(string folder, bool wsl)
         {
-            string folder = LineFromFile(port, 3);
-            if (folder == null) return "start Julia in the environment you use with Excel";
-            if (folder == "") return "start Julia";
-            return "start Julia with julia --project=\"" + folder + "\"";
+            string julia = wsl ? "start Julia under WSL" : "start Julia";
+            if (folder == null) return julia + " in the environment you use with Excel";
+            if (folder == "") return julia;
+            return julia + " with julia --project=\"" + folder + "\"";
         }
 
         // This add-in's version, the AssemblyInformationalVersion that test/runtests.jl keeps
@@ -122,26 +122,41 @@ namespace CallFromExcel.AddIn
         // this add-in. The two must match - e.g. a change to the wire format changes both - and
         // since installing a package no longer installs the add-in, updating one without the
         // other is easy: this turns that into a clear message rather than baffling errors.
+        public static void CheckVersion(int port)
+        {
+            string juliaVersion = port == _cachedPort ? _cachedVersion : VersionFromFile(port);
+            if (juliaVersion == AddInVersion) return;
+            throw new InvalidOperationException(MismatchMessage(juliaVersion, LineFromFile(port, 3), LineFromFile(port, 4) == "WSL"));
+        }
+
+        // The message for a Julia running CallFromExcel `juliaVersion` ("" if too old to say)
+        // in project `folder` (see StartJulia), natively or under WSL. Also used by JuliaLaunch,
+        // whose start-up script checks the version before calling anything in the package that
+        // an older version may lack.
+        //
         // The fix depends on which is older. An older add-in is reinstalled from the package. An
         // older package is updated first - running installme() against it would downgrade the
         // add-in - and then installme() is run too, since the update may go past the add-in's
         // version. That needs a new Julia session: in one that has already loaded the package,
         // using CallFromExcel after Pkg.update keeps the old version, and installme() with it.
-        public static void CheckVersion(int port)
+        // installme() only works in Julia on Windows, so under WSL an older package is just
+        // updated (if that goes past the add-in, the next launch says so), and an older add-in
+        // is updated from Julia on Windows.
+        public static string MismatchMessage(string juliaVersion, string folder, bool wsl)
         {
-            string juliaVersion = port == _cachedPort ? _cachedVersion : VersionFromFile(port);
-            if (juliaVersion == AddInVersion) return;
-            string prefix = "CallFromExcel's Excel add-in (version " + AddInVersion + ") doesn't match the CallFromExcel " +
+            string message = "CallFromExcel's Excel add-in (version " + AddInVersion + ") doesn't match the CallFromExcel " +
                 "package Julia has loaded (" + (juliaVersion == "" ? "an older version" : "version " + juliaVersion) + "). ";
-            if (juliaVersion == "" || IsOlder(juliaVersion, AddInVersion))
-            {
-                throw new InvalidOperationException(prefix +
-                    "Close Excel and Julia, then " + StartJulia(port) + " and run: " +
-                    "using Pkg; Pkg.update(\"CallFromExcel\"); using CallFromExcel; CallFromExcel.installme()");
-            }
-            throw new InvalidOperationException(prefix +
-                "Close Excel, then " + StartJulia(port) + " and run: " +
-                "using CallFromExcel; CallFromExcel.installme()");
+            const string Update = "using Pkg; Pkg.update(\"CallFromExcel\")";
+            const string Install = "using CallFromExcel; CallFromExcel.installme()";
+            bool packageOlder = juliaVersion == "" || IsOlder(juliaVersion, AddInVersion);
+            if (packageOlder && wsl)
+                return message + "Close Julia, then " + StartJulia(folder, true) + " and run: " + Update +
+                    " - then launch Julia from Excel again.";
+            if (packageOlder)
+                return message + "Close Excel and Julia, then " + StartJulia(folder, false) + " and run: " + Update + "; " + Install;
+            if (wsl)
+                return message + "Close Excel, then start Julia on Windows and run: " + Update + "; " + Install;
+            return message + "Close Excel, then " + StartJulia(folder, false) + " and run: " + Install;
         }
 
         // Whether version a is older than version b, comparing their numeric parts; false if

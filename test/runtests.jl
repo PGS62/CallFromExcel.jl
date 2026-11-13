@@ -464,9 +464,10 @@ end
             CallFromExcel.HTTP.post(url(path), headers, body; status_exception=false)
         # The port file holds the port, the session token, the package version (which the
         # add-in checks against its own) and the project folder, for Excel to read.
-        @test readlines(CallFromExcel.portfile()) ==
+        @test split(read(CallFromExcel.portfile(), String), "\n") ==
               [string(CallFromExcel.xlport[]), token, string(pkgversion(CallFromExcel)),
-               dirname(Base.active_project())]   # Pkg.test's own environment, not the default
+               dirname(Base.active_project()),   # Pkg.test's own environment, not the default
+               Sys.iswindows() ? "" : "WSL"]
         @test CallFromExcel.project_folder("C:\\p\\Project.toml", "C:\\d\\Project.toml") == "C:\\p"
         @test CallFromExcel.project_folder("C:\\d\\Project.toml", "C:\\d\\Project.toml") == ""
         @test CallFromExcel.project_folder(nothing, "C:\\d\\Project.toml") == ""
@@ -619,6 +620,48 @@ if Sys.iswindows()
         @test folder in found
         @test errorfile in found
         @test flagfile in found
+    end
+
+    # The startup script checks the package version before calling anything an older package may
+    # lack, and reports a mismatch through the error file. Runs a generated script, with the
+    # add-in's version in it replaced by another, in a new Julia using this package.
+    @testset "JuliaLaunch's startup script checks the package version first" begin
+        dll = joinpath(@__DIR__, "..", "dotnet-addin", "dist", "CallFromExcel.AddIn.dll")
+        dir = mktempdir()
+        errorfile, flagfile = joinpath(dir, "LoadError.txt"), joinpath(dir, "Flag.txt")
+        touch(flagfile)
+        jl(path) = replace(path, "\\" => "/")
+        script = "[void][Reflection.Assembly]::LoadFrom('$dll'); " *
+                 "[CallFromExcel.AddIn.JuliaLaunch]::BuildStartupScript('', 1234, '$(jl(dir))', " *
+                 "'$(jl(errorfile))', '$(jl(flagfile))', 'cmd')"
+        startup = read(`powershell -NoProfile -NonInteractive -Command $script`, String)
+        addinversion = "\"$(pkgversion(CallFromExcel))\""
+        @test occursin(addinversion, startup)
+        scriptfile = joinpath(dir, "StartUp.jl")
+        write(scriptfile, replace(startup, addinversion => "\"0.0.1\""))
+        run(`$(Base.julia_cmd()) --project=$(dirname(Base.active_project())) --startup-file=no $scriptfile`)
+        @test readlines(errorfile) == ["CallFromExcelVersionMismatch", string(pkgversion(CallFromExcel)),
+                                       dirname(Base.active_project())]
+        @test !isfile(flagfile)
+    end
+
+    # The four version-mismatch messages: the package or the add-in older, natively or under
+    # WSL, where installme() (Windows only) can't be run in the same Julia.
+    @testset "Version-mismatch messages" begin
+        dll = joinpath(@__DIR__, "..", "dotnet-addin", "dist", "CallFromExcel.AddIn.dll")
+        msg(v, folder, wsl) = "[CallFromExcel.AddIn.JuliaPort]::MismatchMessage('$v', '$folder', \$$wsl)"
+        script = "[void][Reflection.Assembly]::LoadFrom('$dll')\n" * join(
+            [msg("0.0.1", "", false), msg("0.0.1", "C:\\p", false), msg("9.0.0", "", false),
+             msg("0.0.1", "/home/p", true), msg("9.0.0", "", true)], "\n")
+        ps1 = tempname() * ".ps1"
+        write(ps1, script)
+        m = readlines(`powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $ps1`)
+        rm(ps1)
+        @test occursin("then start Julia and run: using Pkg; Pkg.update(\"CallFromExcel\"); using CallFromExcel; CallFromExcel.installme()", m[1])
+        @test occursin("start Julia with julia --project=\"C:\\p\" and run: using Pkg", m[2])
+        @test occursin("Close Excel, then start Julia and run: using CallFromExcel; CallFromExcel.installme()", m[3])
+        @test occursin("start Julia under WSL with julia --project=\"/home/p\" and run: using Pkg; Pkg.update(\"CallFromExcel\") - then", m[4])
+        @test occursin("start Julia on Windows and run: using Pkg; Pkg.update(\"CallFromExcel\"); using CallFromExcel; CallFromExcel.installme()", m[5])
     end
 
     # Under WSL, JuliaLaunch passes the startup file's path to Julia through wsl.exe and bash. An

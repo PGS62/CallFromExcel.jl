@@ -2,6 +2,12 @@
 
 CallFromExcel is the successor to [JuliaExcel](https://github.com/PGS62/JuliaExcel.jl), and its version numbers start again at 0.1.0. The entries from JuliaExcel 2.4.1 down are JuliaExcel's, kept for the record of how it evolved, including its performance.
 
+## [Unreleased]
+
+### Changes
+
+- `JuliaLaunch` checks that the Julia package is the same version as the Excel add-in before doing anything else, so a mismatch gives the usual message saying how to fix it, rather than an error from calling something an older package doesn't have (such as `UndefVarError(:set_console_icon...)`). Under WSL, the message also says where to run each step, since `installme()` only works in Julia on Windows.
+
 ## [0.1.2] - 2026-11-13
 
 ### Changes

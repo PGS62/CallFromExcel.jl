@@ -545,11 +545,13 @@ function start_server(start::Int=2700)
     mkpath(comms_folder())
     # Port, session token, and this package's version, which the Excel add-in checks against
     # its own (JuliaPort.CheckVersion) - the two must match, and since installing the package
-    # doesn't install the add-in, they can drift apart. Then the project folder, which the
-    # add-in's mismatch message names, so it can say how to start Julia to fix it.
+    # doesn't install the add-in, they can drift apart. Then the project folder, and "WSL" if
+    # this isn't Julia on Windows (Excel only talks to that or to Julia under WSL), which the
+    # add-in's mismatch message uses to say how to start Julia to fix it.
     open(portfile(), "w") do f
         write(f, string(port, "\n", session_token[], "\n", pkgversion(@__MODULE__), "\n",
-            project_folder(Base.active_project(), Base.load_path_expand("@v#.#"))))
+            project_folder(Base.active_project(), Base.load_path_expand("@v#.#")), "\n",
+            Sys.iswindows() ? "" : "WSL"))
     end
     xlport[] = port
     settitle()

@@ -380,9 +380,15 @@ namespace CallFromExcel.AddIn
 
             if (File.Exists(errorFile))
             {
+                string[] error = FileUtils.ReadTextFile(errorFile).Split('\n');
+                if (error[0].Trim() == VersionMismatchMarker)
+                {
+                    throw new InvalidOperationException(JuliaPort.MismatchMessage(
+                        error.Length > 1 ? error[1].Trim() : "", error.Length > 2 ? error[2].Trim() : null, useLinux));
+                }
                 throw new InvalidOperationException(
                     "Julia launched but encountered an error when executing '" + loadFile + "' the error was: " +
-                    FileUtils.ReadTextFile(errorFile));
+                    string.Join("\n", error));
             }
 
             // Under WSL the port can take a while to become reachable from Windows after Julia
@@ -463,6 +469,8 @@ namespace CallFromExcel.AddIn
         // The file paths go through MakeJuliaLiteral: a '$' in the temp folder's path (e.g. from
         // the user name) would otherwise be Julia string interpolation. Public so
         // test/runtests.jl can check the generated script parses.
+        public const string VersionMismatchMarker = "CallFromExcelVersionMismatch";
+
         public static string BuildStartupScript(string packages, int pid, string commsFolderX, string errorFileX, string flagFileX, string literalCommand)
         {
             // PGS 8 Dec 2021 (ported comment): it's important to make "using CallFromExcel"
@@ -479,14 +487,28 @@ namespace CallFromExcel.AddIn
                 usingStatements.Append("    using " + trimmed + "\n");
             }
 
+            // The version check comes first, as the rest calls functions that an older
+            // CallFromExcel may not have. A mismatch is reported through the error file as
+            // VersionMismatchMarker, Julia's version and its project folder ("" for the default
+            // environment, as in comms.jl's project_folder), for LaunchCore to turn into the
+            // same message as JuliaPort.CheckVersion's.
+            string addInVersion = JuliaLiteral.MakeJuliaLiteral(JuliaPort.AddInVersion);
             return "try\n" +
                    usingStatements +
-                   "    CallFromExcel.setxlpid(" + pid + ")\n" +
-                   "    CallFromExcel.comms_folder(" + JuliaLiteral.MakeJuliaLiteral(commsFolderX) + ")\n" +
-                   "    println(\"Julia $VERSION, using " + PackageName + " to serve Excel running as process ID " + pid + ".\")\n" +
-                   "    println(\"Julia launched with command: " + literalCommand + " \")\n" +
-                   "    CallFromExcel.set_console_icon()\n" +
-                   "    CallFromExcel.start_server()\n" +
+                   "    juliaversion = string(pkgversion(CallFromExcel))\n" +
+                   "    if juliaversion != " + addInVersion + "\n" +
+                   "        @error \"CallFromExcel $juliaversion doesn't match the Excel add-in, version \" * " + addInVersion + " * \". Excel says how to fix this.\"\n" +
+                   "        projectfile = Base.active_project()\n" +
+                   "        folder = projectfile === nothing || projectfile == Base.load_path_expand(\"@v#.#\") ? \"\" : dirname(projectfile)\n" +
+                   "        write(" + JuliaLiteral.MakeJuliaLiteral(errorFileX) + ", \"" + VersionMismatchMarker + "\\n$juliaversion\\n$folder\")\n" +
+                   "    else\n" +
+                   "        CallFromExcel.setxlpid(" + pid + ")\n" +
+                   "        CallFromExcel.comms_folder(" + JuliaLiteral.MakeJuliaLiteral(commsFolderX) + ")\n" +
+                   "        println(\"Julia $VERSION, using " + PackageName + " to serve Excel running as process ID " + pid + ".\")\n" +
+                   "        println(\"Julia launched with command: " + literalCommand + " \")\n" +
+                   "        CallFromExcel.set_console_icon()\n" +
+                   "        CallFromExcel.start_server()\n" +
+                   "    end\n" +
                    "    rm(" + JuliaLiteral.MakeJuliaLiteral(flagFileX) + ")\n" +
                    "catch e\n" +
                    // Clearer than Julia's own message: names the environment, and mentions --project.

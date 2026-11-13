@@ -462,10 +462,14 @@ end
         token = CallFromExcel.session_token[],
         post(path, body; headers=["X-CallFromExcel-Token" => token]) =
             CallFromExcel.HTTP.post(url(path), headers, body; status_exception=false)
-        # The port file holds the port, the session token, and the package version (which the
-        # add-in checks against its own), for Excel to read.
+        # The port file holds the port, the session token, the package version (which the
+        # add-in checks against its own) and the project folder, for Excel to read.
         @test readlines(CallFromExcel.portfile()) ==
-              [string(CallFromExcel.xlport[]), token, string(pkgversion(CallFromExcel))]
+              [string(CallFromExcel.xlport[]), token, string(pkgversion(CallFromExcel)),
+               dirname(Base.active_project())]   # Pkg.test's own environment, not the default
+        @test CallFromExcel.project_folder("C:\\p\\Project.toml", "C:\\d\\Project.toml") == "C:\\p"
+        @test CallFromExcel.project_folder("C:\\d\\Project.toml", "C:\\d\\Project.toml") == ""
+        @test CallFromExcel.project_folder(nothing, "C:\\d\\Project.toml") == ""
         @test length(token) == 32
         @test CallFromExcel.decode_from_xl(String(post("/eval", "1+1").body)) == 2
         # A function defined by one request can be called by the next, on the same kept-alive
@@ -521,6 +525,9 @@ end
         write(versionfile, "0.1.0")
         msg = CallFromExcel.addin_install_reminder(versionfile, v"0.1.1")
         @test occursin("version 0.1.0", msg) && occursin("version 0.1.1", msg) && occursin("installme()", msg)
+        # An add-in newer than the package: update the package, don't downgrade the add-in.
+        msg = CallFromExcel.addin_install_reminder(versionfile, v"0.0.9")
+        @test occursin("Pkg.update(\"CallFromExcel\")", msg) && occursin("restart Julia", msg)
         @test CallFromExcel.addin_install_reminder(versionfile, v"0.1.0") === nothing
         write(versionfile, "0.1.0\r\n")   # tolerate a trailing newline
         @test CallFromExcel.addin_install_reminder(versionfile, v"0.1.0") === nothing

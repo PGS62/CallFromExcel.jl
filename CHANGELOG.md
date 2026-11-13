@@ -8,6 +8,7 @@ CallFromExcel is the successor to [JuliaExcel](https://github.com/PGS62/JuliaExc
 
 - VBA code can use a reference to CallFromExcel (VBA editor, Tools menu -> References) and `Dim jl As New CallFromExcel.ComServer`, so the VBA editor shows each function's arguments as you type, as it did with JuliaExcel. `CreateObject("CallFromExcel.ComServer")` still works without a reference.
 - From VBA, `JuliaCall`, `JuliaCallVBA`, `JuliaCallNamedArgs` and `JuliaCallNamedArgsVBA` now take at most 30 arguments after the function name. An array created with VBA's `Array` function now arrives in Julia as one array even when it's the only argument; previously it arrived as separate arguments.
+- When the Excel add-in is newer than the Julia package, the version-mismatch messages (in Excel, and from `using CallFromExcel` in the REPL) now say to update the package before running `installme()`, rather than just to run `installme()`, which would downgrade the add-in. And the message in Excel says how to start Julia in the right environment: plain `julia` for Julia's default environment, or `julia --project="..."` naming the project folder Julia was launched with.
 
 ## [0.1.1] - 2026-11-12
 

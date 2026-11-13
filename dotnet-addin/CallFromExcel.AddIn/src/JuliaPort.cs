@@ -74,18 +74,37 @@ namespace CallFromExcel.AddIn
             return filePort == port ? token : "";
         }
 
-        // The CallFromExcel version the port file records for `port` - "" if it records none,
-        // as from a Julia package older than this check.
-        private static string VersionFromFile(int port)
+        // Line `index` (0-based) of the port file, if the file records `port` and has that line;
+        // otherwise null, as for a line added after the Julia package that wrote the file.
+        private static string LineFromFile(int port, int index)
         {
             try
             {
                 string[] lines = FileUtils.ReadTextFile(PortFilePath()).Split('\n');
-                if (!int.TryParse(lines[0].Trim(), out int filePort) || filePort != port) return "";
-                return lines.Length > 2 ? lines[2].Trim() : "";
+                if (!int.TryParse(lines[0].Trim(), out int filePort) || filePort != port) return null;
+                return lines.Length > index ? lines[index].Trim() : null;
             }
-            catch (IOException) { return ""; }
-            catch (UnauthorizedAccessException) { return ""; }
+            catch (IOException) { return null; }
+            catch (UnauthorizedAccessException) { return null; }
+        }
+
+        // The CallFromExcel version the port file records for `port` - "" if it records none,
+        // as from a Julia package older than this check.
+        private static string VersionFromFile(int port)
+        {
+            return LineFromFile(port, 2) ?? "";
+        }
+
+        // How to start Julia in the environment of the Julia listening on `port`, from the
+        // project folder the port file records: "start Julia" for Julia's default environment
+        // (recorded as ""), with --project for any other. A Julia package older than 0.1.2
+        // records no folder, so the environment is then described rather than named.
+        private static string StartJulia(int port)
+        {
+            string folder = LineFromFile(port, 3);
+            if (folder == null) return "start Julia in the environment you use with Excel";
+            if (folder == "") return "start Julia";
+            return "start Julia with julia --project=\"" + folder + "\"";
         }
 
         // This add-in's version, the AssemblyInformationalVersion that test/runtests.jl keeps
@@ -103,15 +122,34 @@ namespace CallFromExcel.AddIn
         // this add-in. The two must match - e.g. a change to the wire format changes both - and
         // since installing a package no longer installs the add-in, updating one without the
         // other is easy: this turns that into a clear message rather than baffling errors.
+        // The fix depends on which is older. An older add-in is reinstalled from the package. An
+        // older package is updated first - running installme() against it would downgrade the
+        // add-in - and then installme() is run too, since the update may go past the add-in's
+        // version. That needs a new Julia session: in one that has already loaded the package,
+        // using CallFromExcel after Pkg.update keeps the old version, and installme() with it.
         public static void CheckVersion(int port)
         {
             string juliaVersion = port == _cachedPort ? _cachedVersion : VersionFromFile(port);
             if (juliaVersion == AddInVersion) return;
-            throw new InvalidOperationException(
-                "CallFromExcel's Excel add-in (version " + AddInVersion + ") doesn't match the CallFromExcel " +
-                "package Julia has loaded (" + (juliaVersion == "" ? "an older version" : "version " + juliaVersion) +
-                "). Close Excel, then in Julia, in the environment you use with Excel, run: " +
+            string prefix = "CallFromExcel's Excel add-in (version " + AddInVersion + ") doesn't match the CallFromExcel " +
+                "package Julia has loaded (" + (juliaVersion == "" ? "an older version" : "version " + juliaVersion) + "). ";
+            if (juliaVersion == "" || IsOlder(juliaVersion, AddInVersion))
+            {
+                throw new InvalidOperationException(prefix +
+                    "Close Excel and Julia, then " + StartJulia(port) + " and run: " +
+                    "using Pkg; Pkg.update(\"CallFromExcel\"); using CallFromExcel; CallFromExcel.installme()");
+            }
+            throw new InvalidOperationException(prefix +
+                "Close Excel, then " + StartJulia(port) + " and run: " +
                 "using CallFromExcel; CallFromExcel.installme()");
+        }
+
+        // Whether version a is older than version b, comparing their numeric parts; false if
+        // either doesn't parse.
+        private static bool IsOlder(string a, string b)
+        {
+            return Version.TryParse(a.Split('-', '+')[0], out Version va) &&
+                   Version.TryParse(b.Split('-', '+')[0], out Version vb) && va < vb;
         }
 
         // The token to send to the Julia listening on `port`.

@@ -217,7 +217,8 @@ installed_version_file() =
 """
     addin_install_reminder(versionfile, pkgver)::Union{String,Nothing}
 A reminder to run `installme()` if `versionfile` (see `installed_version_file`) shows the Excel
-add-in isn't installed, or is a different version from `pkgver`; otherwise `nothing`. Used by
+add-in isn't installed, or is older than `pkgver`, or to update the package if the add-in is
+newer (`installme()` would then downgrade the add-in); otherwise `nothing`. Used by
 `__init__`, so that `using CallFromExcel` in the REPL after `Pkg.add` or an update says what
 to do next. Can't tell if the add-in was later removed some other way, e.g. by unticking it in
 Excel's Add-ins dialog.
@@ -227,6 +228,13 @@ function addin_install_reminder(versionfile::AbstractString, pkgver)
     isfile(versionfile) || return "CallFromExcel's Excel add-in is not installed. $fix"
     installed = strip(read(versionfile, String))
     installed == string(pkgver) && return nothing
+    installedver = tryparse(VersionNumber, installed)
+    if installedver !== nothing && installedver > pkgver
+        # installme() as well, since the update may go past the add-in's version; in a new
+        # session, as this one has the old version loaded.
+        fix = "Update the package with: using Pkg; Pkg.update(\"CallFromExcel\"). Then close Excel, \
+               restart Julia and run: using CallFromExcel; CallFromExcel.installme()"
+    end
     "CallFromExcel's Excel add-in is version $installed, but this CallFromExcel package is \
      version $pkgver. $fix"
 end
@@ -241,6 +249,13 @@ function __init__()
 end
 
 portfile() = joinpath(comms_folder(), "Port_$(getxlpid()).txt")
+
+"""
+    project_folder(active, default)::String
+The folder of the active project file `active`, as given to `julia --project`, or "" if it is
+Julia's default environment `default` (or there is no active project).
+"""
+project_folder(active, default) = active === nothing || active == default ? "" : dirname(active)
 
 """
     _encode_result_for_xl(result)::String
@@ -530,9 +545,11 @@ function start_server(start::Int=2700)
     mkpath(comms_folder())
     # Port, session token, and this package's version, which the Excel add-in checks against
     # its own (JuliaPort.CheckVersion) - the two must match, and since installing the package
-    # doesn't install the add-in, they can drift apart.
+    # doesn't install the add-in, they can drift apart. Then the project folder, which the
+    # add-in's mismatch message names, so it can say how to start Julia to fix it.
     open(portfile(), "w") do f
-        write(f, string(port, "\n", session_token[], "\n", pkgversion(@__MODULE__)))
+        write(f, string(port, "\n", session_token[], "\n", pkgversion(@__MODULE__), "\n",
+            project_folder(Base.active_project(), Base.load_path_expand("@v#.#"))))
     end
     xlport[] = port
     settitle()

@@ -63,7 +63,7 @@ namespace CallFromExcel.AddIn
             var link = new LinkLabel { Text = RepositoryUrl, AutoSize = true, Margin = new Padding(0, em / 2, 0, 0) };
             link.LinkClicked += (sender, e) => OpenRepository();
             grid.Controls.Add(link, 1, 3);
-            grid.Controls.Add(Line("Copyright (c) 2021 Philip Swannell. MIT License.", em), 1, 4);
+            grid.Controls.Add(Line("Copyright (c) 2021-2026 Philip Swannell. MIT License.", em), 1, 4);
 
             var ok = new Button
             {

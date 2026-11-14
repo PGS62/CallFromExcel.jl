@@ -12,6 +12,7 @@ CallFromExcel is the successor to [JuliaExcel](https://github.com/PGS62/JuliaExc
 - When Julia's process exits before start-up finishes, the message shows the command line options it was given, with a link to Julia's documentation of them - and doesn't suggest them as the cause when there were none.
 - In Launch Settings, the project folder remembers up to 10 recent folders, as the ribbon's File box does (which now also remembers 10, up from 5). Its list also has "(Default environment)" and "(Temporary environment)", and "command line options" links to Julia's documentation of them.
 - Fixed a long `IOError: write: operation canceled` error printed in Julia's window just after a successful launch, seen on a machine where Julia's first request took over 2 seconds to compile. Julia now handles a request of its own before telling Excel it's ready, and `JuliaLaunch` waits longer for it.
+- `installme()` refuses, saying to restart Julia, when the session loaded CallFromExcel before the package was updated. It would otherwise install the add-in for the old version, or fail to find it if updating had deleted it.
 - UI tweaks: Julia's window shows the Julia icon as soon as it opens; Excel shows its busy mouse pointer while Launch Julia is starting Julia; the error dialogs' sound now plays reliably; shorter tooltips for the Help and About buttons.
 
 ## [0.1.5] - 2026-11-13

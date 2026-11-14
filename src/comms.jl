@@ -194,6 +194,10 @@ package must be the same version. If they aren't, Excel says so on launching Jul
 function installme()
     Sys.iswindows() || throw("CallFromExcel.installme (which installs a Microsoft Excel \
         addin) can only be run from Julia on Windows")
+    # The add-in installed is the one shipped with the loaded package, so it must be the
+    # package the environment now has - not an older one still loaded in this session.
+    stale = stale_session_message(pathof(@__MODULE__), Base.locate_package(Base.PkgId(@__MODULE__)))
+    stale === nothing || error(stale)
     installscript = normpath(joinpath(@__DIR__, "..", "dotnet-addin", "installer", "Install.ps1"))
     exefile = "C:/Windows/System32/WindowsPowerShell/v1.0/powershell.exe"
     isfile(exefile) || throw("Cannot find PowerShell at '$exefile'")
@@ -208,6 +212,25 @@ function installme()
     p = run(ignorestatus(`$exefile -ExecutionPolicy Bypass -NoProfile -File $installscript`))
     success(p) || error("The Excel add-in was not installed: see the message above.")
     nothing
+end
+
+"""
+    stale_session_message(loaded, current)::Union{String,Nothing}
+A message for `installme()` if this Julia session's CallFromExcel (`loaded`, its main file) isn't
+the one the active environment would load now (`current`, as `Base.locate_package` finds it), or
+`nothing` if it is (or the environment no longer has the package). That happens when the package
+is updated in a session that had already loaded it: Julia keeps the loaded version, and
+installme() would then install that version's add-in - an old one, or none at all if updating
+deleted its folder.
+"""
+function stale_session_message(loaded, current)
+    (loaded === nothing || current === nothing) && return nothing
+    same(a, b) = Sys.iswindows() ? lowercase(normpath(a)) == lowercase(normpath(b)) : normpath(a) == normpath(b)
+    same(loaded, current) && return nothing
+    "This Julia session loaded CallFromExcel from $(dirname(dirname(loaded))), but the active \
+     environment now has a different version, in $(dirname(dirname(current))) - most likely it \
+     was updated after this session loaded it. installme() would install the add-in for the \
+     loaded version, so restart Julia, then run: using CallFromExcel; CallFromExcel.installme()"
 end
 
 # Written by Install.ps1 as its last step: the version of the add-in it installed.

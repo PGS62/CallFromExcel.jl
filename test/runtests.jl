@@ -545,6 +545,20 @@ end
 
 # `using CallFromExcel` in the REPL reminds the user to run installme() when the version file
 # Install.ps1 writes is missing or names a different version.
+# installme() refuses when the session's CallFromExcel isn't the one the environment now has
+# (updated after it was loaded), as it would install the loaded version's add-in.
+@testset "installme() spots a package updated after it was loaded" begin
+    old = joinpath("C:", "depot", "packages", "CallFromExcel", "Mm96J", "src", "CallFromExcel.jl")
+    new = joinpath("C:", "depot", "packages", "CallFromExcel", "PHo8V", "src", "CallFromExcel.jl")
+    msg = CallFromExcel.stale_session_message(old, new)
+    @test occursin("Mm96J", msg) && occursin("PHo8V", msg) && occursin("restart Julia", msg)
+    @test CallFromExcel.stale_session_message(new, new) === nothing
+    @test CallFromExcel.stale_session_message(old, nothing) === nothing
+    # As this test session is: the loaded package is the one its environment has.
+    @test CallFromExcel.stale_session_message(pathof(CallFromExcel),
+              Base.locate_package(Base.PkgId(CallFromExcel))) === nothing
+end
+
 @testset "Reminder to run installme()" begin
     mktempdir() do dir
         versionfile = joinpath(dir, "version.txt")

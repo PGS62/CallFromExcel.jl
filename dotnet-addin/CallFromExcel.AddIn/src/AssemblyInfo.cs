@@ -7,4 +7,4 @@ using System.Runtime.InteropServices;
 
 // CallFromExcel's version, shown in the ribbon's Help tooltip. Must equal the version in
 // Project.toml - test/runtests.jl checks this, so update both together at each release.
-[assembly: AssemblyInformationalVersion("0.1.5")]
+[assembly: AssemblyInformationalVersion("0.1.6")]

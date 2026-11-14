@@ -471,6 +471,7 @@ end
         @test CallFromExcel.project_folder("C:\\p\\Project.toml", "C:\\d\\Project.toml") == "C:\\p"
         @test CallFromExcel.project_folder("C:\\d\\Project.toml", "C:\\d\\Project.toml") == ""
         @test CallFromExcel.project_folder(nothing, "C:\\d\\Project.toml") == ""
+        @test CallFromExcel.project_folder("C:\\t\\Project.toml", "C:\\d\\Project.toml", true) == ""   # @temp
         @test length(token) == 32
         @test CallFromExcel.decode_from_xl(String(post("/eval", "1+1").body)) == 2
         # A function defined by one request can be called by the next, on the same kept-alive
@@ -685,6 +686,22 @@ if Sys.iswindows()
         run(`$(Base.julia_cmd()) --project=$missingfolder --startup-file=no $scriptfile`)
         missingmessage = read(errorfile, String)
         @test startswith(missingmessage, "The project folder $missingfolder doesn't exist.")
+        @test !isfile(flagfile)
+
+        # --project=@temp, a temporary environment: refused by Julia 1.10, which would read it as
+        # a permanent shared environment named "temp". From 1.11, the folder exists, so the script
+        # gets to the version check (made to fail, as above), which names the default environment
+        # (""), not the temporary folder. The load path finds CallFromExcel in this test's
+        # environment.
+        rm(errorfile); touch(flagfile)
+        write(scriptfile, replace(startup, addinversion => "\"0.0.1\""))
+        run(addenv(`$(Base.julia_cmd()) --project=@temp --startup-file=no $scriptfile`,
+                   "JULIA_LOAD_PATH" => "@;$(dirname(Base.active_project()));@stdlib"))
+        if VERSION < v"1.11"
+            @test startswith(read(errorfile, String), "--project=@temp, a temporary environment, needs Julia 1.11 or later")
+        else
+            @test split(read(errorfile, String), "\n") == ["CallFromExcelVersionMismatch", string(pkgversion(CallFromExcel)), ""]
+        end
         @test !isfile(flagfile)
     end
 

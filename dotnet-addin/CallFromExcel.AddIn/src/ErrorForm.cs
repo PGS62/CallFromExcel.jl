@@ -156,10 +156,20 @@ namespace CallFromExcel.AddIn
 
         // The sound an error MessageBox makes - useful here, as the dialog can open behind the
         // Julia window that has just been launched.
+        // Played as a MessageBox plays it: Windows' "Critical Stop" sound (alias SystemHand), in
+        // the system sounds' own audio session. SystemSounds.Hand (MessageBeep), used at first,
+        // plays in Excel's session, and wasn't heard after a failed launch.
         protected override void OnShown(EventArgs e)
         {
             base.OnShown(e);
-            System.Media.SystemSounds.Hand.Play();
+            const uint SND_ASYNC = 0x1, SND_NODEFAULT = 0x2, SND_ALIAS = 0x10000, SND_SYSTEM = 0x200000;
+            if (!PlaySound("SystemHand", IntPtr.Zero, SND_ALIAS | SND_ASYNC | SND_NODEFAULT | SND_SYSTEM))
+            {
+                System.Media.SystemSounds.Hand.Play();
+            }
         }
+
+        [System.Runtime.InteropServices.DllImport("winmm.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+        private static extern bool PlaySound(string sound, IntPtr module, uint flags);
     }
 }

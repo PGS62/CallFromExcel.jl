@@ -392,7 +392,8 @@ namespace CallFromExcel.AddIn
                 {
                     throw new JuliaCommandException(text, AddPackageCommand);
                 }
-                if (text.StartsWith(ProjectMissingStart, StringComparison.Ordinal))
+                if (text.StartsWith(ProjectMissingStart, StringComparison.Ordinal) ||
+                    text.StartsWith(TemporaryNeedsJuliaStart, StringComparison.Ordinal))
                 {
                     throw new InvalidOperationException(text);
                 }
@@ -488,6 +489,9 @@ namespace CallFromExcel.AddIn
         // The start of the start-up script's message when the --project folder doesn't exist.
         public const string ProjectMissingStart = "The project folder";
 
+        // The start of its message when --project=@temp is used with Julia 1.10.
+        public const string TemporaryNeedsJuliaStart = "--project=@temp, a temporary environment, needs Julia 1.11";
+
         // Julia's documentation of its command line options.
         public const string CommandLineDocsUrl = "https://docs.julialang.org/en/v1/manual/command-line-interface/#command-line-switches-for-julia";
 
@@ -569,9 +573,19 @@ namespace CallFromExcel.AddIn
             // only runs after the packages have loaded.
             string addInVersion = JuliaLiteral.MakeJuliaLiteral(JuliaPort.AddInVersion);
             string errorFile = JuliaLiteral.MakeJuliaLiteral(errorFileX);
+            // --project=@temp, a temporary environment, needs Julia 1.11: Julia 1.10 reads it as
+            // the permanent shared environment named "temp" instead, so it's refused there. With a
+            // temporary environment, packages come from the default environment, so a mismatch
+            // message names that ("" as the folder), not the temporary folder, gone by then.
             return "try\n" +
                    "    projectfile = Base.active_project()\n" +
-                   "    if projectfile !== nothing && !isdir(dirname(projectfile))\n" +
+                   "    temporary = Base.JLOptions().project != C_NULL && unsafe_string(Base.JLOptions().project) == \"@temp\"\n" +
+                   "    if temporary && VERSION < v\"1.11\"\n" +
+                   "        theerror = \"" + TemporaryNeedsJuliaStart + " or later, but this is Julia $VERSION. " +
+                   "Choose a different Project folder in Launch Settings, or change the --project option in JuliaLaunch's CommandLineOptions.\"\n" +
+                   "        @error theerror\n" +
+                   "        write(" + errorFile + ", theerror)\n" +
+                   "    elseif projectfile !== nothing && !isdir(dirname(projectfile))\n" +
                    "        theerror = \"" + ProjectMissingStart + " $(dirname(projectfile)) doesn't exist. " +
                    "Check the Project folder in Launch Settings, or the --project option in JuliaLaunch's CommandLineOptions.\"\n" +
                    "        @error theerror\n" +
@@ -581,7 +595,7 @@ namespace CallFromExcel.AddIn
                    "        juliaversion = string(pkgversion(CallFromExcel))\n" +
                    "        if juliaversion != " + addInVersion + "\n" +
                    "            @error \"CallFromExcel $juliaversion doesn't match the Excel add-in, version \" * " + addInVersion + " * \". Excel says how to fix this.\"\n" +
-                   "            folder = projectfile === nothing || projectfile == Base.load_path_expand(\"@v#.#\") ? \"\" : dirname(projectfile)\n" +
+                   "            folder = temporary || projectfile === nothing || projectfile == Base.load_path_expand(\"@v#.#\") ? \"\" : dirname(projectfile)\n" +
                    "            write(" + errorFile + ", \"" + VersionMismatchMarker + "\\n$juliaversion\\n$folder\")\n" +
                    "        else\n" +
                    "            CallFromExcel.setxlpid(" + pid + ")\n" +

@@ -251,11 +251,18 @@ end
 portfile() = joinpath(comms_folder(), "Port_$(getxlpid()).txt")
 
 """
-    project_folder(active, default)::String
+    project_folder(active, default, temporary=false)::String
 The folder of the active project file `active`, as given to `julia --project`, or "" if it is
-Julia's default environment `default` (or there is no active project).
+Julia's default environment `default` (or there is no active project). Also "" for a temporary
+environment (`--project=@temp`, `temporary`): its packages come from the default environment,
+and its folder is deleted when Julia exits, so the add-in's messages name the default
+environment instead.
 """
-project_folder(active, default) = active === nothing || active == default ? "" : dirname(active)
+project_folder(active, default, temporary::Bool=false) =
+    temporary || active === nothing || active == default ? "" : dirname(active)
+
+# Whether Julia was started with --project=@temp, a temporary environment (Julia 1.11 and later).
+temporary_project() = Base.JLOptions().project != C_NULL && unsafe_string(Base.JLOptions().project) == "@temp"
 
 """
     _encode_result_for_xl(result)::String
@@ -555,7 +562,7 @@ function start_server(start::Int=2700)
     # add-in's mismatch message uses to say how to start Julia to fix it.
     open(portfile(), "w") do f
         write(f, string(port, "\n", session_token[], "\n", pkgversion(@__MODULE__), "\n",
-            project_folder(Base.active_project(), Base.load_path_expand("@v#.#")), "\n",
+            project_folder(Base.active_project(), Base.load_path_expand("@v#.#"), temporary_project()), "\n",
             Sys.iswindows() ? "" : "WSL"))
     end
     xlport[] = port

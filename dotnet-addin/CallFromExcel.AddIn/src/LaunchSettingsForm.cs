@@ -17,7 +17,11 @@ namespace CallFromExcel.AddIn
         // File box holds recent files (see UpdateFolderList).
         private readonly ComboBox _projectFolder = new ComboBox { Dock = DockStyle.Fill, DropDownStyle = ComboBoxStyle.DropDown };
         private static readonly RecentList RecentFolders = new RecentList(@"Software\CallFromExcel\ProjectFolders");
-        private const string NoFolderItem = "(No folder)";
+        // Julia's own names for these: its default environment (@v1.x), used with no --project,
+        // and a temporary environment (--project=@temp, Julia 1.11 and later), deleted on exit.
+        private const string DefaultEnvironmentItem = "(Default environment)";
+        private const string TemporaryEnvironmentItem = "(Temporary environment)";
+        private const string TemporaryEnvironment = "@temp";
         private const string ClearHistoryItem = "Clear history";
         private string _textBeforeDropDown = "";
         private readonly Button _browse = new Button { Text = "Browse...", AutoSize = false, Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left };
@@ -45,7 +49,10 @@ namespace CallFromExcel.AddIn
             "you call from Excel rely on particular packages or versions.\n\n" +
             "Leave blank to use your default environment (e.g. @v1.13).\n" +
             "Julia also finds packages installed in your default environment, so\n" +
-            "CallFromExcel can be installed either there or in the project.";
+            "CallFromExcel can be installed either there or in the project.\n\n" +
+            "@temp, (Temporary environment) in the list, starts Julia in a new,\n" +
+            "empty environment, deleted when Julia exits - for trying out packages\n" +
+            "without adding them to a project. Needs Julia 1.11 or later.";
         private const string OtherOptionsTip =
             "Any other Julia command line options, separated by spaces,\n" +
             "e.g. --banner=no or --threads=4. -L and --load aren't allowed.";
@@ -193,28 +200,32 @@ namespace CallFromExcel.AddIn
             FormClosing += (sender, e) => { if (DialogResult != DialogResult.Cancel) Store(); };
         }
 
-        // The project folder's list, as the ribbon's Julia File box: "(No folder)" first, when
-        // there is a folder, to empty the box; the recent folders; and "Clear history" last, when
-        // there is history to clear.
+        // The project folder's list, as the ribbon's Julia File box has: "(Default environment)",
+        // when there is a folder, to empty the box; "(Temporary environment)", unless that's
+        // already chosen, for @temp; the recent folders; and "Clear history" last, when there is
+        // history to clear.
         private void UpdateFolderList()
         {
             string text = _projectFolder.Text;   // clearing the items can clear the text too
             _projectFolder.Items.Clear();
             if (_projectFolder.Text != text) _projectFolder.Text = text;
-            if (_projectFolder.Text.Trim() != "") _projectFolder.Items.Add(NoFolderItem);
+            if (text.Trim() != "") _projectFolder.Items.Add(DefaultEnvironmentItem);
+            if (text.Trim() != TemporaryEnvironment) _projectFolder.Items.Add(TemporaryEnvironmentItem);
             List<string> recent = RecentFolders.Items;
             foreach (string folder in recent) _projectFolder.Items.Add(folder);
             if (recent.Count > 0) _projectFolder.Items.Add(ClearHistoryItem);
         }
 
-        // Choosing "(No folder)" or "Clear history" acts, rather than putting that text in the box.
-        // The box sets its text to the chosen item after this event, hence BeginInvoke.
+        // Choosing "(Default environment)", "(Temporary environment)" or "Clear history" acts,
+        // rather than putting that text in the box. The box sets its text to the chosen item after
+        // this event, hence BeginInvoke.
         private void OnFolderItemChosen()
         {
             string chosen = _projectFolder.SelectedItem as string;
-            if (chosen == NoFolderItem)
+            if (chosen == DefaultEnvironmentItem || chosen == TemporaryEnvironmentItem)
             {
-                BeginInvoke((Action)(() => { _projectFolder.Text = ""; UpdateFolderList(); }));
+                string folder = chosen == DefaultEnvironmentItem ? "" : TemporaryEnvironment;
+                BeginInvoke((Action)(() => { _projectFolder.Text = folder; UpdateFolderList(); }));
             }
             else if (chosen == ClearHistoryItem)
             {
@@ -291,7 +302,9 @@ namespace CallFromExcel.AddIn
             // (under WSL, e.g. /home/me/proj or @myenv) can't be checked from here, so goes too.
             string folder = Settings.ProjectFolder;
             bool windowsPath = folder.Length >= 2 && (folder[1] == ':' || folder.StartsWith(@"\\", StringComparison.Ordinal));
-            if (folder != "" && (!windowsPath || System.IO.Directory.Exists(folder))) RecentFolders.Add(folder);
+            // @temp has its own item, so isn't added.
+            if (folder != "" && folder != TemporaryEnvironment && (!windowsPath || System.IO.Directory.Exists(folder)))
+                RecentFolders.Add(folder);
             Settings.OtherOptions = _otherOptions.Text.Trim();
             Settings.Packages = _packages.Text.Trim();
             // JuliaLaunch delimits bash statements with line feeds.

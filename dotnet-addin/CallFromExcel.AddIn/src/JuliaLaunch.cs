@@ -301,8 +301,8 @@ namespace CallFromExcel.AddIn
             // Run in the classic console window (conhost) rather than the user's default terminal.
             // Where that's Windows Terminal (the default on Windows 11), the taskbar would show
             // Terminal's icon, and Julia's window couldn't be found by its title. In conhost the
-            // taskbar shows Julia's icon (for a Microsoft Store Julia), Julia sets its title-bar
-            // icon itself (set_console_icon, in the start-up script), and MinimiseWindow is
+            // taskbar shows Julia's icon (for a Microsoft Store Julia), the add-in sets its title-bar
+            // icon (JuliaIcon.TrySetOnConsole, below), and MinimiseWindow is
             // respected. Still started via ShellExecute (see below), so networking for a Store
             // Julia is unaffected - checked with a loopback connection to Julia under conhost.
             processArguments = "\"" + processFileName + "\" " + processArguments;
@@ -355,20 +355,19 @@ namespace CallFromExcel.AddIn
             // activated process) reliable -- confirmed it correctly detects a deliberately
             // bad command-line option's quick exit, and correctly stays false throughout a
             // real successful launch.
+            // The window's Julia icon is set as soon as the window appears (within the first few
+            // seconds), not left to Julia, which can only do it once its packages have loaded.
+            bool iconSet = false;
             while (File.Exists(flagFile))
             {
                 Thread.Sleep(50);
+                if (!iconSet && stopwatch.Elapsed.TotalSeconds < 10)
+                {
+                    iconSet = JuliaIcon.TrySetOnConsole(juliaProcess.Id);
+                }
                 if (juliaProcess.HasExited)
                 {
-                    // No exit code in the message: juliaProcess is conhost (see above), which
-                    // exits with 0 whatever Julia's own exit code was.
-                    string errDescription = "Julia's process exited before start-up finished.";
-                    if (userSuppliedCommandLineOptions != "")
-                    {
-                        errDescription += " Check the CommandLineOptions are valid " +
-                                           "(https://docs.julialang.org/en/v1/manual/command-line-interface/#command-line-interface)";
-                    }
-                    throw new InvalidOperationException(errDescription);
+                    throw ProcessExitedError(userSuppliedCommandLineOptions.Trim(), useLinux, bashStatements);
                 }
                 if (stopwatch.Elapsed.TotalSeconds > timeoutSeconds)
                 {
@@ -392,6 +391,10 @@ namespace CallFromExcel.AddIn
                 if (text.StartsWith(NotInstalledStart, StringComparison.Ordinal))
                 {
                     throw new JuliaCommandException(text, AddPackageCommand);
+                }
+                if (text.StartsWith(ProjectMissingStart, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException(text);
                 }
                 throw new InvalidOperationException(
                     "Julia launched but encountered an error when executing '" + loadFile + "' the error was: " + text);
@@ -482,6 +485,32 @@ namespace CallFromExcel.AddIn
         public const string NotInstalledStart = "The " + PackageName + " package is not installed in Julia's active environment";
         public const string AddPackageCommand = "import Pkg; Pkg.add(\"" + PackageName + "\")";
 
+        // The start of the start-up script's message when the --project folder doesn't exist.
+        public const string ProjectMissingStart = "The project folder";
+
+        // Julia's documentation of its command line options.
+        public const string CommandLineDocsUrl = "https://docs.julialang.org/en/v1/manual/command-line-interface/#command-line-switches-for-julia";
+
+        // The error when Julia's process exits before start-up finishes. An invalid command line
+        // option is the usual cause, so with options of the user's own the message shows them,
+        // with a link to Julia's documentation of them; without, it doesn't suggest them.
+        // No exit code: the process watched is conhost (see LaunchCore), which exits with 0
+        // whatever Julia's own exit code was.
+        private static Exception ProcessExitedError(string options, bool useLinux, string bashStatements)
+        {
+            const string exited = "Julia's process exited before start-up finished. ";
+            if (options != "")
+            {
+                return new HelpLinkException(exited + "Julia stops straight away if a command line option isn't valid, " +
+                    "so check the options it was given: " + options + ". Julia's command line options are described at " +
+                    CommandLineDocsUrl, CommandLineDocsUrl, options);
+            }
+            string where = useLinux ? " under WSL" : "";
+            string bash = useLinux && !string.IsNullOrEmpty(bashStatements) ? ", and that the Bash statements are valid" : "";
+            return new InvalidOperationException(exited + "Julia may have failed to start, or its window may have been closed. " +
+                "Check that Julia starts from a command prompt" + where + bash + ".");
+        }
+
         // The first port from `start` that nothing on Windows is listening on, where Julia then
         // starts its server (start_server tries upwards from the port it's given). Chosen here,
         // not by Julia, because Julia under WSL can't see Windows' ports: it took 2700 even with
@@ -520,31 +549,47 @@ namespace CallFromExcel.AddIn
             foreach (string pkg in allPackages.Split(','))
             {
                 string trimmed = pkg.Trim();
-                usingStatements.Append("    println(\"using " + trimmed + "\")\n");
-                usingStatements.Append("    using " + trimmed + "\n");
+                usingStatements.Append("        println(\"using " + trimmed + "\")\n");
+                usingStatements.Append("        using " + trimmed + "\n");
             }
 
-            // The version check comes first, as the rest calls functions that an older
+            // First, that the project folder exists: Julia accepts --project naming a folder that
+            // doesn't, as a new empty project, and still finds CallFromExcel in the default
+            // environment - so a mistyped folder would otherwise go unnoticed. Reported through the
+            // error file, starting ProjectMissingStart.
+            //
+            // Then the version check, before anything else in the package, which an older
             // CallFromExcel may not have. A mismatch is reported through the error file as
             // VersionMismatchMarker, Julia's version and its project folder ("" for the default
             // environment, as in comms.jl's project_folder), for LaunchCore to turn into the
             // same message as JuliaPort.CheckVersion's.
+            //
+            // The add-in sets the window's icon itself (JuliaIcon.TrySetOnConsole), as soon as the
+            // window appears, rather than leaving it to CallFromExcel.set_console_icon here, which
+            // only runs after the packages have loaded.
             string addInVersion = JuliaLiteral.MakeJuliaLiteral(JuliaPort.AddInVersion);
+            string errorFile = JuliaLiteral.MakeJuliaLiteral(errorFileX);
             return "try\n" +
-                   usingStatements +
-                   "    juliaversion = string(pkgversion(CallFromExcel))\n" +
-                   "    if juliaversion != " + addInVersion + "\n" +
-                   "        @error \"CallFromExcel $juliaversion doesn't match the Excel add-in, version \" * " + addInVersion + " * \". Excel says how to fix this.\"\n" +
-                   "        projectfile = Base.active_project()\n" +
-                   "        folder = projectfile === nothing || projectfile == Base.load_path_expand(\"@v#.#\") ? \"\" : dirname(projectfile)\n" +
-                   "        write(" + JuliaLiteral.MakeJuliaLiteral(errorFileX) + ", \"" + VersionMismatchMarker + "\\n$juliaversion\\n$folder\")\n" +
+                   "    projectfile = Base.active_project()\n" +
+                   "    if projectfile !== nothing && !isdir(dirname(projectfile))\n" +
+                   "        theerror = \"" + ProjectMissingStart + " $(dirname(projectfile)) doesn't exist. " +
+                   "Check the Project folder in Launch Settings, or the --project option in JuliaLaunch's CommandLineOptions.\"\n" +
+                   "        @error theerror\n" +
+                   "        write(" + errorFile + ", theerror)\n" +
                    "    else\n" +
-                   "        CallFromExcel.setxlpid(" + pid + ")\n" +
-                   "        CallFromExcel.comms_folder(" + JuliaLiteral.MakeJuliaLiteral(commsFolderX) + ")\n" +
-                   "        println(\"Julia $VERSION, using " + PackageName + " to serve Excel running as process ID " + pid + ".\")\n" +
-                   "        println(\"Julia launched with command: " + literalCommand + " \")\n" +
-                   "        CallFromExcel.set_console_icon()\n" +
-                   "        CallFromExcel.start_server(" + port + ")\n" +
+                   usingStatements +
+                   "        juliaversion = string(pkgversion(CallFromExcel))\n" +
+                   "        if juliaversion != " + addInVersion + "\n" +
+                   "            @error \"CallFromExcel $juliaversion doesn't match the Excel add-in, version \" * " + addInVersion + " * \". Excel says how to fix this.\"\n" +
+                   "            folder = projectfile === nothing || projectfile == Base.load_path_expand(\"@v#.#\") ? \"\" : dirname(projectfile)\n" +
+                   "            write(" + errorFile + ", \"" + VersionMismatchMarker + "\\n$juliaversion\\n$folder\")\n" +
+                   "        else\n" +
+                   "            CallFromExcel.setxlpid(" + pid + ")\n" +
+                   "            CallFromExcel.comms_folder(" + JuliaLiteral.MakeJuliaLiteral(commsFolderX) + ")\n" +
+                   "            println(\"Julia $VERSION, using " + PackageName + " to serve Excel running as process ID " + pid + ".\")\n" +
+                   "            println(\"Julia launched with command: " + literalCommand + " \")\n" +
+                   "            CallFromExcel.start_server(" + port + ")\n" +
+                   "        end\n" +
                    "    end\n" +
                    "    rm(" + JuliaLiteral.MakeJuliaLiteral(flagFileX) + ")\n" +
                    "catch e\n" +

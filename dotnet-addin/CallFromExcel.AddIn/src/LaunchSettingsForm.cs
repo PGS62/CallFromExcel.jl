@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
 using System.Windows.Forms.VisualStyles;
@@ -12,7 +13,13 @@ namespace CallFromExcel.AddIn
     {
         private readonly CheckBox _useLinux = new CheckBox { Text = "Run Julia under Linux (WSL)", AutoSize = true };
         private readonly CheckBox _minimise = new CheckBox { Text = "Minimise Julia's window", AutoSize = true };
-        private readonly TextBox _projectFolder = new TextBox { Dock = DockStyle.Fill };
+        // A combo box whose list holds the recently used project folders, as the ribbon's Julia
+        // File box holds recent files (see UpdateFolderList).
+        private readonly ComboBox _projectFolder = new ComboBox { Dock = DockStyle.Fill, DropDownStyle = ComboBoxStyle.DropDown };
+        private static readonly RecentList RecentFolders = new RecentList(@"Software\CallFromExcel\ProjectFolders");
+        private const string NoFolderItem = "(No folder)";
+        private const string ClearHistoryItem = "Clear history";
+        private string _textBeforeDropDown = "";
         private readonly Button _browse = new Button { Text = "Browse...", AutoSize = false, Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left };
         private readonly TextBox _otherOptions = new TextBox { Dock = DockStyle.Fill };
         private readonly TextBox _packages = new TextBox { Dock = DockStyle.Fill };
@@ -41,8 +48,7 @@ namespace CallFromExcel.AddIn
             "CallFromExcel can be installed either there or in the project.";
         private const string OtherOptionsTip =
             "Any other Julia command line options, separated by spaces,\n" +
-            "e.g. --banner=no or --threads=4. See julia --help for the full list.\n" +
-            "-L and --load aren't allowed.";
+            "e.g. --banner=no or --threads=4. -L and --load aren't allowed.";
         private const string PackagesTip =
             "Packages to load when Julia starts, separated by commas,\n" +
             "e.g. DataFrames, CSV. They must be installed in the project\n" +
@@ -135,7 +141,12 @@ namespace CallFromExcel.AddIn
             grid.Controls.Add(_minimise, 0, 1);
             grid.SetColumnSpan(_minimise, 3);
             AddRow(grid, em, 2, "Project folder:", _projectFolder, _browse, ProjectFolderTip);
-            AddRow(grid, em, 3, "Other command line options:", _otherOptions, null, OtherOptionsTip);
+            // "command line options" links to Julia's documentation of them.
+            const string optionsLabel = "Other command line options:";
+            const string linked = "command line options";
+            var optionsLink = new LinkLabel { Text = optionsLabel, LinkArea = new LinkArea(optionsLabel.IndexOf(linked), linked.Length) };
+            optionsLink.LinkClicked += (sender, e) => OpenUrl(JuliaLaunch.CommandLineDocsUrl);
+            AddRow(grid, em, 3, optionsLink, _otherOptions, null, OtherOptionsTip);
             AddRow(grid, em, 4, "Packages to load:", _packages, null, PackagesTip);
             _bashLabel = AddRow(grid, em, BashRow, "Bash statements:", _bash, null, BashTip);
             _bash.MinimumSize = new Size(0, 5 * em + em / 2);
@@ -176,14 +187,67 @@ namespace CallFromExcel.AddIn
 
             _useLinux.CheckedChanged += (sender, e) => UpdateEnabled();
             _browse.Click += (sender, e) => Browse();
+            _projectFolder.DropDown += (sender, e) => { _textBeforeDropDown = _projectFolder.Text; UpdateFolderList(); };
+            _projectFolder.SelectionChangeCommitted += (sender, e) => OnFolderItemChosen();
+            UpdateFolderList();
             FormClosing += (sender, e) => { if (DialogResult != DialogResult.Cancel) Store(); };
+        }
+
+        // The project folder's list, as the ribbon's Julia File box: "(No folder)" first, when
+        // there is a folder, to empty the box; the recent folders; and "Clear history" last, when
+        // there is history to clear.
+        private void UpdateFolderList()
+        {
+            string text = _projectFolder.Text;   // clearing the items can clear the text too
+            _projectFolder.Items.Clear();
+            if (_projectFolder.Text != text) _projectFolder.Text = text;
+            if (_projectFolder.Text.Trim() != "") _projectFolder.Items.Add(NoFolderItem);
+            List<string> recent = RecentFolders.Items;
+            foreach (string folder in recent) _projectFolder.Items.Add(folder);
+            if (recent.Count > 0) _projectFolder.Items.Add(ClearHistoryItem);
+        }
+
+        // Choosing "(No folder)" or "Clear history" acts, rather than putting that text in the box.
+        // The box sets its text to the chosen item after this event, hence BeginInvoke.
+        private void OnFolderItemChosen()
+        {
+            string chosen = _projectFolder.SelectedItem as string;
+            if (chosen == NoFolderItem)
+            {
+                BeginInvoke((Action)(() => { _projectFolder.Text = ""; UpdateFolderList(); }));
+            }
+            else if (chosen == ClearHistoryItem)
+            {
+                RecentFolders.Clear();
+                string keep = _textBeforeDropDown;
+                BeginInvoke((Action)(() => { _projectFolder.Text = keep; UpdateFolderList(); }));
+            }
+        }
+
+        private void OpenUrl(string url)
+        {
+            try
+            {
+                System.Diagnostics.Process.Start(url);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, ex.Message, Ribbon.DialogTitle, MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         // A label and its field, with the same tooltip on both - the label's still shows when the
         // field is disabled (Bash statements, without WSL).
         private Label AddRow(TableLayoutPanel grid, int em, int row, string label, Control field, Control extra, string tip)
         {
-            var labelControl = new Label { Text = label, AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(em / 5, em / 3, em * 2 / 3, em / 3) };
+            return AddRow(grid, em, row, new Label { Text = label }, field, extra, tip);
+        }
+
+        private Label AddRow(TableLayoutPanel grid, int em, int row, Label labelControl, Control field, Control extra, string tip)
+        {
+            labelControl.AutoSize = true;
+            labelControl.Anchor = AnchorStyles.Left;
+            labelControl.Margin = new Padding(em / 5, em / 3, em * 2 / 3, em / 3);
             grid.Controls.Add(labelControl, 0, row);
             _tips.SetToolTip(labelControl, tip);
             _tips.SetToolTip(field, tip);
@@ -211,7 +275,11 @@ namespace CallFromExcel.AddIn
         private void Browse()
         {
             string folder = FolderPicker.Pick(Handle, "Choose the Julia project folder", _projectFolder.Text.Trim());
-            if (folder != null) _projectFolder.Text = folder;
+            if (folder == null) return;
+            _projectFolder.Text = folder;
+            // Remembered straight away, even if the dialog is then cancelled: it was chosen, and
+            // exists. A typed folder is remembered on Launch or Save (Store).
+            RecentFolders.Add(folder);
         }
 
         private void Store()
@@ -219,6 +287,11 @@ namespace CallFromExcel.AddIn
             Settings.UseLinux = _useLinux.Checked;
             Settings.MinimiseWindow = _minimise.Checked;
             Settings.ProjectFolder = _projectFolder.Text.Trim();
+            // To the history if it exists, so a mistyped folder doesn't get there. A Linux path
+            // (under WSL, e.g. /home/me/proj or @myenv) can't be checked from here, so goes too.
+            string folder = Settings.ProjectFolder;
+            bool windowsPath = folder.Length >= 2 && (folder[1] == ':' || folder.StartsWith(@"\\", StringComparison.Ordinal));
+            if (folder != "" && (!windowsPath || System.IO.Directory.Exists(folder))) RecentFolders.Add(folder);
             Settings.OtherOptions = _otherOptions.Text.Trim();
             Settings.Packages = _packages.Text.Trim();
             // JuliaLaunch delimits bash statements with line feeds.

@@ -2,6 +2,18 @@
 
 CallFromExcel is the successor to [JuliaExcel](https://github.com/PGS62/JuliaExcel.jl), and its version numbers start again at 0.1.0. The entries from JuliaExcel 2.4.1 down are JuliaExcel's, kept for the record of how it evolved, including its performance.
 
+## [Unreleased]
+
+### Changes
+
+- Julia's window shows the Julia icon as soon as it opens, rather than a few seconds later.
+- While Launch Julia on the ribbon is starting Julia, Excel shows its busy mouse pointer.
+- When Julia's process exits before start-up finishes, the message shows the command line options it was given, with a link to Julia's documentation of them - and doesn't suggest them as the cause when there were none.
+- `JuliaLaunch` reports a project folder (`--project`) that doesn't exist. Julia accepts one, as a new empty project, so the mistake went unnoticed.
+- In Launch Settings, the project folder remembers recent folders, with "(No folder)" and "Clear history" in its list, as the ribbon's File box does; and "command line options" links to Julia's documentation of them.
+- The ribbon's File box and the project folder each remember up to 10 recent items (the File box remembered 5).
+- Shorter tooltips for the ribbon's Help and About buttons.
+
 ## [0.1.5] - 2026-11-13
 
 ### Changes

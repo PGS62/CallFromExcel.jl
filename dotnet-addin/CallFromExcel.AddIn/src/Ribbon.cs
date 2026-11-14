@@ -62,10 +62,10 @@ namespace CallFromExcel.AddIn
                   supertip='Load the file in the box into Julia, as JuliaInclude does, making the functions it defines available to JuliaCall and JuliaEval. Does not trigger recalculation.' />
           <button id='CallFromExcelHelp' label='Help' size='large' imageMso='Help'
                   onAction='OnHelp'
-                  getSupertip='GetHelpSupertip' />
+                  supertip='Open the CallFromExcel.jl documentation on GitHub.' />
           <button id='CallFromExcelAbout' label='About' size='large' imageMso='Info'
                   onAction='OnAbout'
-                  supertip='Show the version of the CallFromExcel add-in, and of the CallFromExcel package in the Julia session it is connected to, with a link to the project on GitHub.' />
+                  supertip='Show the version of the CallFromExcel add-in, and of the CallFromExcel package in the Julia session it is connected to.' />
         </group>
       </tab>
     </tabs>
@@ -310,13 +310,6 @@ namespace CallFromExcel.AddIn
             }
         }
 
-        public string GetHelpSupertip(IRibbonControl control)
-        {
-            string version = typeof(Ribbon).Assembly
-                .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "";
-            return "CallFromExcel " + version + "\n\nOpen the CallFromExcel documentation on GitHub.";
-        }
-
         public void OnHelp(IRibbonControl control)
         {
             try
@@ -342,13 +335,28 @@ namespace CallFromExcel.AddIn
             }
         }
 
+        // Excel's own mouse pointers (XlMousePointer): busy while Julia launches, and back to
+        // normal however the launch ends - including before any error dialog appears.
+        private const int XlWait = 2;
+        private const int XlDefault = -4143;
+
         private static void Launch(LaunchSettings s)
         {
             try
             {
                 SetStatusBar("Launching Julia...");
-                ShowBriefly(JuliaLaunch.Launch(s.UseLinux, s.MinimiseWindow, s.CommandLineOptions,
-                                               s.Packages, s.BashStatements, s.TimeOut));
+                string message;
+                SetCursor(XlWait);
+                try
+                {
+                    message = JuliaLaunch.Launch(s.UseLinux, s.MinimiseWindow, s.CommandLineOptions,
+                                                 s.Packages, s.BashStatements, s.TimeOut);
+                }
+                finally
+                {
+                    SetCursor(XlDefault);
+                }
+                ShowBriefly(message);
                 _ribbon?.InvalidateControl("DisplayResults");
             }
             catch (Exception ex)
@@ -358,12 +366,30 @@ namespace CallFromExcel.AddIn
             }
         }
 
-        // An error message, with a button to copy the Julia command that fixes it if it has one.
+        private static void SetCursor(int cursor)
+        {
+            try
+            {
+                object app = ExcelDnaUtil.Application;
+                app.GetType().InvokeMember("Cursor", BindingFlags.SetProperty, null, app, new object[] { cursor });
+            }
+            catch (Exception)
+            {
+                // A pointer that doesn't change is no reason to stop the launch.
+            }
+        }
+
+        // An error message - with a button to copy the Julia command that fixes it, or a link to a
+        // page that helps, if it has one.
         private static void ShowError(Exception ex)
         {
             if (ex is JuliaCommandException withCommand)
             {
-                using (var form = new CommandErrorForm(withCommand)) form.ShowDialog(new ExcelWindow());
+                using (var form = ErrorForm.For(withCommand)) form.ShowDialog(new ExcelWindow());
+            }
+            else if (ex is HelpLinkException withLink)
+            {
+                using (var form = ErrorForm.For(withLink)) form.ShowDialog(new ExcelWindow());
             }
             else
             {

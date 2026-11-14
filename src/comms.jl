@@ -680,10 +680,13 @@ end
     set_console_icon()
 
 Give this Julia session's console window the icon embedded in `julia.exe`, in its title bar
-and taskbar button. Called by the start-up script `JuliaLaunch` writes, which runs Julia in the
-classic console window (conhost); that shows its own generic icon otherwise. Does nothing
-except on Windows. Under Windows Terminal, `GetConsoleWindow` returns a hidden stand-in
-window, so this has no visible effect there.
+and taskbar button. Was called by the start-up script `JuliaLaunch` writes, which runs Julia in
+the classic console window (conhost); that shows its own generic icon otherwise. The add-in now
+sets the icon itself, as soon as the window appears; this is kept because add-ins up to 0.1.2
+call it before checking the package's version, so without it they'd fail with an
+`UndefVarError` rather than the version-mismatch message. Does nothing except on Windows.
+Under Windows Terminal, `GetConsoleWindow` returns a hidden stand-in window, so this has no
+visible effect there.
 """
 function set_console_icon()
     Sys.iswindows() || return nothing

@@ -677,6 +677,15 @@ if Sys.iswindows()
         @test startswith(notinstalled, "The CallFromExcel package is not installed in Julia's active environment")
         @test occursin("import Pkg; Pkg.add(\"CallFromExcel\")", notinstalled)
         @test !isfile(flagfile)
+
+        # A --project folder that doesn't exist: Julia would accept it as a new, empty project
+        # and still find CallFromExcel in the default environment, so the script checks first.
+        rm(errorfile); touch(flagfile)
+        missingfolder = joinpath(dir, "no such folder")
+        run(`$(Base.julia_cmd()) --project=$missingfolder --startup-file=no $scriptfile`)
+        missingmessage = read(errorfile, String)
+        @test startswith(missingmessage, "The project folder $missingfolder doesn't exist.")
+        @test !isfile(flagfile)
     end
 
     # The four version-mismatch messages: the package or the add-in older, natively or under

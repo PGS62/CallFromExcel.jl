@@ -11,7 +11,7 @@ namespace CallFromExcel.AddIn
     internal static class IncludeFiles
     {
         private const string KeyPath = @"Software\CallFromExcel\IncludeFiles";
-        private const int MaxRecent = 5;
+        private static readonly RecentList RecentFiles = new RecentList(KeyPath);
 
         public static string Current
         {
@@ -31,28 +31,10 @@ namespace CallFromExcel.AddIn
             }
         }
 
-        public static List<string> Recent
-        {
-            get
-            {
-                using (RegistryKey key = Registry.CurrentUser.OpenSubKey(KeyPath))
-                {
-                    return (key?.GetValue("Recent") as string[] ?? new string[0]).ToList();
-                }
-            }
-        }
+        public static List<string> Recent => RecentFiles.Items;
 
         // Puts a file at the top of the recent list: one just chosen (Choose) or included.
-        public static void AddRecent(string fileName)
-        {
-            List<string> recent = Recent;
-            recent.RemoveAll(f => string.Equals(f, fileName, StringComparison.OrdinalIgnoreCase));
-            recent.Insert(0, fileName);
-            using (RegistryKey key = Registry.CurrentUser.CreateSubKey(KeyPath))
-            {
-                key.SetValue("Recent", recent.Take(MaxRecent).ToArray(), RegistryValueKind.MultiString);
-            }
-        }
+        public static void AddRecent(string fileName) => RecentFiles.Add(fileName);
 
         // Makes path the current file, typed, pasted, picked from the list or browsed to; and puts
         // it on the recent list if the file exists, so a mistyped path doesn't get there. (Office
@@ -64,13 +46,7 @@ namespace CallFromExcel.AddIn
             if (chosen != "" && System.IO.File.Exists(chosen)) AddRecent(chosen);
         }
 
-        public static void ClearRecent()
-        {
-            using (RegistryKey key = Registry.CurrentUser.CreateSubKey(KeyPath))
-            {
-                key.DeleteValue("Recent", false);
-            }
-        }
+        public static void ClearRecent() => RecentFiles.Clear();
 
         // A typed or pasted path, trimmed, without the quotes Explorer's "Copy as path" adds.
         public static string Clean(string path)

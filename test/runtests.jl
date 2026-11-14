@@ -523,6 +523,22 @@ end
 
 end
 
+# The worksheet functions' descriptions (ExcelFunction/ExcelArgument attributes) are the only
+# source of their IntelliSense and Function Wizard help. Excel-DNA cuts any longer than Excel's
+# limit when registering them - 253 characters for a function's and its last argument's
+# (it adds ". "), 255 for the others - with only a log warning, and IntelliSense shows the cut
+# text too. So all are kept within 253.
+@testset "Function and argument descriptions fit Excel's limit" begin
+    for file in ("JuliaFunctions.cs", "JuliaCallDiag.cs")
+        src = read(joinpath(@__DIR__, "..", "dotnet-addin", "CallFromExcel.AddIn", "src", file), String)
+        for m in eachmatch(r"Description = \"((?:[^\"\\]|\\.)*)\"", src)
+            text = replace(m.captures[1], r"\\(.)" => s"\1")
+            length(text) <= 253 || @error "Description too long ($(length(text)) characters) in $file" text
+            @test length(text) <= 253
+        end
+    end
+end
+
 # `using CallFromExcel` in the REPL reminds the user to run installme() when the version file
 # Install.ps1 writes is missing or names a different version.
 @testset "Reminder to run installme()" begin

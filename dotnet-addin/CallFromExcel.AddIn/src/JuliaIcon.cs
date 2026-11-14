@@ -44,7 +44,22 @@ namespace CallFromExcel.AddIn
         // WSL), not conhost itself - so it's found among the windows of conhost's children.
         // Done here rather than by Julia (CallFromExcel.set_console_icon) so the icon appears as
         // soon as the window does, not seconds later once Julia has loaded its packages.
+        // The icon is cosmetic, so any failure finding it or the window (e.g. a folder that can't
+        // be read, which Lazy would then rethrow on every call) gives up on it - true - rather
+        // than failing the launch it's called from.
         public static bool TrySetOnConsole(int conhostPid)
+        {
+            try
+            {
+                return SetOnConsole(conhostPid);
+            }
+            catch (Exception)
+            {
+                return true;
+            }
+        }
+
+        private static bool SetOnConsole(int conhostPid)
         {
             Icon small = SmallWindowIcon.Value, large = LargeWindowIcon.Value;
             if (small == null || large == null) return true;

@@ -61,7 +61,7 @@ namespace CallFromExcel.AddIn
             grid.Controls.Add(Line("Excel add-in: version " + JuliaPort.AddInVersion + "\n" + JuliaSessionText(), em), 1, 2);
 
             var link = new LinkLabel { Text = RepositoryUrl, AutoSize = true, Margin = new Padding(0, em / 2, 0, 0) };
-            link.LinkClicked += (sender, e) => OpenRepository();
+            link.LinkClicked += (sender, e) => WebPage.Open(RepositoryUrl, this);
             grid.Controls.Add(link, 1, 3);
             grid.Controls.Add(Line("Copyright (c) 2021-2026 Philip Swannell. MIT License.", em), 1, 4);
 
@@ -98,18 +98,6 @@ namespace CallFromExcel.AddIn
             if (version == "") return "Julia session" + where + ": an older CallFromExcel";
             string match = version == JuliaPort.AddInVersion ? "" : " - doesn't match the add-in";
             return "Julia session" + where + ": CallFromExcel version " + version + match;
-        }
-
-        private void OpenRepository()
-        {
-            try
-            {
-                System.Diagnostics.Process.Start(RepositoryUrl);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(this, ex.Message, Ribbon.DialogTitle, MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
         }
     }
 }

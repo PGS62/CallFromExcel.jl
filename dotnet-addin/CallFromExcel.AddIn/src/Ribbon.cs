@@ -312,15 +312,8 @@ namespace CallFromExcel.AddIn
 
         public void OnHelp(IRibbonControl control)
         {
-            try
-            {
-                // The README's title - the anchor follows its wording, so keep the two in step.
-                System.Diagnostics.Process.Start(JuliaFunctions.HelpRoot + "callfromexceljl---call-julia-from-excel");
-            }
-            catch (Exception ex)
-            {
-                ShowError(ex);
-            }
+            // The README's title - the anchor follows its wording, so keep the two in step.
+            WebPage.Open(JuliaFunctions.HelpRoot + "callfromexceljl---call-julia-from-excel", new ExcelWindow());
         }
 
         public void OnAbout(IRibbonControl control)

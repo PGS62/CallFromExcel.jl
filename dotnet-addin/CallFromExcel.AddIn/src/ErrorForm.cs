@@ -68,7 +68,7 @@ namespace CallFromExcel.AddIn
                 if (highlight.Item2 == Kind.Link)
                 {
                     var link = (LinkLabel)Paragraph(new LinkLabel(), part, Font, em, em / 2);
-                    link.LinkClicked += (sender, e) => OpenUrl(part);
+                    link.LinkClicked += (sender, e) => WebPage.Open(part, this);
                     text.Controls.Add(link);
                 }
                 else
@@ -117,18 +117,6 @@ namespace CallFromExcel.AddIn
                 }
             };
             return copy;
-        }
-
-        private void OpenUrl(string url)
-        {
-            try
-            {
-                System.Diagnostics.Process.Start(url);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(this, ex.Message, Ribbon.DialogTitle, MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
         }
 
         // Text between highlighted parts, as a paragraph. After one, it's a sentence of its own:

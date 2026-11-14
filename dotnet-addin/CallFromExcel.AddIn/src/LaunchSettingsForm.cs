@@ -155,7 +155,7 @@ namespace CallFromExcel.AddIn
             const string optionsLabel = "Other command line options:";
             const string linked = "command line options";
             var optionsLink = new LinkLabel { Text = optionsLabel, LinkArea = new LinkArea(optionsLabel.IndexOf(linked), linked.Length) };
-            optionsLink.LinkClicked += (sender, e) => OpenUrl(JuliaLaunch.CommandLineDocsUrl);
+            optionsLink.LinkClicked += (sender, e) => WebPage.Open(JuliaLaunch.CommandLineDocsUrl, this);
             AddRow(grid, em, 3, optionsLink, _otherOptions, null, OtherOptionsTip);
             AddRow(grid, em, 4, "Packages to load:", _packages, null, PackagesTip);
             _bashLabel = AddRow(grid, em, BashRow, "Bash statements:", _bash, null, BashTip);
@@ -199,6 +199,21 @@ namespace CallFromExcel.AddIn
             _browse.Click += (sender, e) => Browse();
             _projectFolder.DropDown += (sender, e) => { _textBeforeDropDown = _projectFolder.Text; UpdateFolderList(); };
             _projectFolder.SelectionChangeCommitted += (sender, e) => OnFolderItemChosen();
+            // Items are chosen only from the open list. On a closed combo box, Up/Down and the
+            // mouse wheel step through the items too, committing each - so passing over
+            // "Clear history" would clear it. Up/Down open the list instead; the wheel does nothing.
+            _projectFolder.KeyDown += (sender, e) =>
+            {
+                if (!_projectFolder.DroppedDown && !e.Alt && (e.KeyCode == Keys.Up || e.KeyCode == Keys.Down))
+                {
+                    _projectFolder.DroppedDown = true;
+                    e.Handled = e.SuppressKeyPress = true;
+                }
+            };
+            _projectFolder.MouseWheel += (sender, e) =>
+            {
+                if (!_projectFolder.DroppedDown) ((HandledMouseEventArgs)e).Handled = true;
+            };
             UpdateFolderList();
             FormClosing += (sender, e) => { if (DialogResult != DialogResult.Cancel) Store(); };
         }
@@ -235,18 +250,6 @@ namespace CallFromExcel.AddIn
                 RecentFolders.Clear();
                 string keep = _textBeforeDropDown;
                 BeginInvoke((Action)(() => { _projectFolder.Text = keep; UpdateFolderList(); }));
-            }
-        }
-
-        private void OpenUrl(string url)
-        {
-            try
-            {
-                System.Diagnostics.Process.Start(url);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(this, ex.Message, Ribbon.DialogTitle, MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 

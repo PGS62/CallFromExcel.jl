@@ -6,15 +6,13 @@ CallFromExcel is the successor to [JuliaExcel](https://github.com/PGS62/JuliaExc
 
 ### Changes
 
-- Julia's window shows the Julia icon as soon as it opens, rather than a few seconds later.
-- While Launch Julia on the ribbon is starting Julia, Excel shows its busy mouse pointer.
-- When Julia's process exits before start-up finishes, the message shows the command line options it was given, with a link to Julia's documentation of them - and doesn't suggest them as the cause when there were none.
+- Temporary environments: with `--project=@temp`, Julia starts in a new, empty environment that it deletes when it exits, and any of `JuliaLaunch`'s `Packages` that aren't installed are installed into it - preferring versions already installed, so they're already precompiled. A convenient way to try out packages from Excel without adding them to a project. Needs Julia 1.11 or later; with Julia 1.10, `JuliaLaunch` says so, rather than Julia quietly using a permanent environment named "temp".
+- Outside a temporary environment, a package in `Packages` that isn't installed gives a message naming it and its environment, and Launch Julia's error dialog offers to copy the `Pkg.add` command for it.
 - `JuliaLaunch` reports a project folder (`--project`) that doesn't exist. Julia accepts one, as a new empty project, so the mistake went unnoticed.
-- In Launch Settings, the project folder remembers recent folders, with "(No folder)" and "Clear history" in its list, as the ribbon's File box does; and "command line options" links to Julia's documentation of them.
-- Launch Settings' project folder list has "(Default environment)", replacing "(No folder)", and "(Temporary environment)", which uses `--project=@temp`: a new, empty environment that Julia deletes when it exits. `@temp` needs Julia 1.11 or later; with Julia 1.10, `JuliaLaunch` says so, rather than Julia quietly using a permanent environment named "temp".
-- With `--project=@temp`, any of `JuliaLaunch`'s `Packages` that aren't installed are installed into the temporary environment, preferring versions already installed, so they're already precompiled. Otherwise, a package in `Packages` that isn't installed gives a message naming it and its environment, and Launch Julia's error dialog offers to copy the `Pkg.add` command for it.
-- The ribbon's File box and the project folder each remember up to 10 recent items (the File box remembered 5).
-- Shorter tooltips for the ribbon's Help and About buttons.
+- When Julia's process exits before start-up finishes, the message shows the command line options it was given, with a link to Julia's documentation of them - and doesn't suggest them as the cause when there were none.
+- In Launch Settings, the project folder remembers up to 10 recent folders, as the ribbon's File box does (which now also remembers 10, up from 5). Its list also has "(Default environment)" and "(Temporary environment)", and "command line options" links to Julia's documentation of them.
+- Fixed a long `IOError: write: operation canceled` error printed in Julia's window just after a successful launch, seen on a machine where Julia's first request took over 2 seconds to compile. Julia now handles a request of its own before telling Excel it's ready, and `JuliaLaunch` waits longer for it.
+- UI tweaks: Julia's window shows the Julia icon as soon as it opens; Excel shows its busy mouse pointer while Launch Julia is starting Julia; the error dialogs' sound now plays reliably; shorter tooltips for the Help and About buttons.
 
 ## [0.1.5] - 2026-11-13
 

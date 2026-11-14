@@ -261,8 +261,10 @@ environment instead.
 project_folder(active, default, temporary::Bool=false) =
     temporary || active === nothing || active == default ? "" : dirname(active)
 
-# Whether Julia was started with --project=@temp, a temporary environment (Julia 1.11 and later).
-temporary_project() = Base.JLOptions().project != C_NULL && unsafe_string(Base.JLOptions().project) == "@temp"
+# Whether Julia was started in a temporary environment (Julia 1.11 and later): by --project=@temp,
+# or, without --project, by the JULIA_PROJECT environment variable - as Julia itself decides.
+temporary_project() =
+    (Base.JLOptions().project != C_NULL ? unsafe_string(Base.JLOptions().project) : get(ENV, "JULIA_PROJECT", "")) == "@temp"
 
 """
     _encode_result_for_xl(result)::String
@@ -554,6 +556,7 @@ function start_server(start::Int=2700)
             port > start + 100 && rethrow()
         end
     end
+    warm_up(port)
     mkpath(comms_folder())
     # Port, session token, and this package's version, which the Excel add-in checks against
     # its own (JuliaPort.CheckVersion) - the two must match, and since installing the package
@@ -575,6 +578,30 @@ end
 # falls back to chunked transfer-encoding, which clients reassemble less efficiently.
 _text_response(s::String) = HTTP.Response(200, ["Content-Type" => "text/plain; charset=utf-8",
     "Content-Length" => string(ncodeunits(s))], s)
+
+"""
+    warm_up(port)
+Sends the new server a `/ping` and waits for the answer, before `start_server` writes the port
+file that tells Excel the server is ready. The first request compiles the request-handling code,
+which took over 2 seconds on one machine (a fresh install, with HTTP.jl 1): longer than the
+add-in waits for its own first `/ping`, so it gave up, and Julia then printed an alarming
+`IOError: write: operation canceled` when its answer found the connection closed. Done here,
+that compilation happens before Excel is waiting. Any failure is ignored: this only saves time.
+"""
+function warm_up(port::Integer)
+    try
+        sock = Sockets.connect("127.0.0.1", port)
+        try
+            write(sock, "POST /ping HTTP/1.1\r\nHost: 127.0.0.1\r\nX-CallFromExcel-Token: $(session_token[])\r\n" *
+                        "Content-Length: 0\r\nConnection: close\r\n\r\n")
+            readline(sock)   # the status line: the request has been handled
+        finally
+            close(sock)
+        end
+    catch
+    end
+    nothing
+end
 
 """
     _reject_request(req, port) -> Union{HTTP.Response,Nothing}

@@ -502,6 +502,10 @@ end
         # /ping has no side effects.
         post("/eval", "40+2")
         @test post("/ping", "").status == 200
+        # start_server's warm-up ping (made before Excel is told the server is ready) is answered,
+        # and on a port nothing listens on it fails quietly, as it only saves time.
+        @test CallFromExcel.warm_up(CallFromExcel.xlport[]) === nothing
+        @test CallFromExcel.warm_up(1) === nothing
         @test CallFromExcel.last_question == "40+2"
     end
 
@@ -672,6 +676,13 @@ if Sys.iswindows()
         startupscript(packages) = read(`powershell -NoProfile -NonInteractive -Command
             "[void][Reflection.Assembly]::LoadFrom('$dll'); [CallFromExcel.AddIn.JuliaLaunch]::BuildStartupScript('$packages', 1234, '$(jl(dir))', '$(jl(errorfile))', '$(jl(flagfile))', 'cmd', 2700)"`, String)
         startup = startupscript("")
+        # Empty entries in Packages (a trailing or doubled comma) are skipped: a bare `using`
+        # would make the whole script unparseable.
+        @test !occursin(r"using *\n", startupscript("Example,, "))
+        # JULIA_PROJECT=@temp, without --project, is a temporary environment too, as for Julia.
+        # In a new Julia, since this one was started with --project, which takes precedence.
+        @test readchomp(addenv(`$(Base.julia_cmd()) --startup-file=no -e "using CallFromExcel; print(CallFromExcel.temporary_project())"`,
+                               "JULIA_PROJECT" => "@temp", "JULIA_LOAD_PATH" => "$(dirname(Base.active_project()));@stdlib")) == "true"
         addinversion = "\"$(pkgversion(CallFromExcel))\""
         @test occursin(addinversion, startup)
         scriptfile = joinpath(dir, "StartUp.jl")
@@ -732,8 +743,11 @@ if Sys.iswindows()
         # With --project=@temp (Julia 1.11 on), a missing one is installed into the temporary
         # environment instead: Example (the Julia org's tiny example package), which isn't on
         # this load path. The script then gets as far as the version check (made to fail, as
-        # above), so it installed and loaded Example. Needs the network, so skipped without it.
-        if VERSION >= v"1.11" && (try success(`ping -n 1 -w 2000 github.com`) catch; false end)
+        # above), so it installed and loaded Example. Needs the network, so skipped without it
+        # (checked with an HTTPS connection to github.com, which networks that block ping allow).
+        online = try close(CallFromExcel.Sockets.connect("github.com", 443)); true catch; false end
+        online || @info "No network: skipping the test of installing Packages into @temp"
+        if VERSION >= v"1.11" && online
             rm(errorfile); touch(flagfile)
             write(scriptfile, replace(startupscript("Example"), addinversion => "\"0.0.1\""))
             run(addenv(`$(Base.julia_cmd()) --project=@temp --startup-file=no $scriptfile`,

@@ -404,7 +404,12 @@ namespace CallFromExcel.AddIn
 
             // Under WSL the port can take a while to become reachable from Windows after Julia
             // starts listening (WSL2 port forwarding), so wait for it within the same timeout.
-            while (port > 0 && !JuliaHttpClient.IsListening(port))
+            // Each ping may take up to the time remaining (at least 2 seconds): a first request
+            // compiles Julia's request handling, and giving up on it sooner only made Julia print
+            // an error when its late answer found the connection closed. (Julia now answers a
+            // ping itself before saying it's ready - CallFromExcel.warm_up - so it's quick anyway.)
+            while (port > 0 && !JuliaHttpClient.IsListening(port,
+                       (int)Math.Max(2000, timeoutSeconds * 1000 - stopwatch.ElapsedMilliseconds)))
             {
                 if (stopwatch.Elapsed.TotalSeconds > timeoutSeconds)
                 {
@@ -499,22 +504,25 @@ namespace CallFromExcel.AddIn
 
         // The error when Julia's process exits before start-up finishes. An invalid command line
         // option is the usual cause, so with options of the user's own the message shows them,
-        // with a link to Julia's documentation of them; without, it doesn't suggest them.
-        // No exit code: the process watched is conhost (see LaunchCore), which exits with 0
-        // whatever Julia's own exit code was.
+        // with a link to Julia's documentation of them - but not as the only possible cause, as
+        // a ribbon launch with a Project folder always has one. Without options, it doesn't
+        // suggest them. No exit code: the process watched is conhost (see LaunchCore), which
+        // exits with 0 whatever Julia's own exit code was.
         private static Exception ProcessExitedError(string options, bool useLinux, string bashStatements)
         {
             const string exited = "Julia's process exited before start-up finished. ";
+            string where = useLinux ? " under WSL" : "";
+            string bash = useLinux && !string.IsNullOrEmpty(bashStatements) ? ", and that the Bash statements are valid" : "";
+            string otherwise = "Julia may have failed to start, or its window may have been closed. " +
+                "Check that Julia starts from a command prompt" + where + bash + ".";
             if (options != "")
             {
                 return new HelpLinkException(exited + "Julia stops straight away if a command line option isn't valid, " +
                     "so check the options it was given: " + options + ". Julia's command line options are described at " +
-                    CommandLineDocsUrl, CommandLineDocsUrl, options);
+                    CommandLineDocsUrl + ". Otherwise, " + otherwise,
+                    CommandLineDocsUrl, options);
             }
-            string where = useLinux ? " under WSL" : "";
-            string bash = useLinux && !string.IsNullOrEmpty(bashStatements) ? ", and that the Bash statements are valid" : "";
-            return new InvalidOperationException(exited + "Julia may have failed to start, or its window may have been closed. " +
-                "Check that Julia starts from a command prompt" + where + bash + ".");
+            return new InvalidOperationException(exited + otherwise);
         }
 
         // The first port from `start` that nothing on Windows is listening on, where Julia then
@@ -555,6 +563,10 @@ namespace CallFromExcel.AddIn
             foreach (string pkg in allPackages.Split(','))
             {
                 string trimmed = pkg.Trim();
+                // A trailing or doubled comma ("DataFrames,") would otherwise give a bare "using",
+                // which Julia can't parse - so the script never ran, and Excel waited out the
+                // time-out with no error.
+                if (trimmed == "") continue;
                 usingStatements.Append("        println(\"using " + trimmed + "\")\n");
                 usingStatements.Append("        using " + trimmed + "\n");
             }
@@ -603,7 +615,8 @@ namespace CallFromExcel.AddIn
             // projectfile and temporary are set before the try, so the catch can see them: in a
             // file, a variable first assigned inside a try block is local to it.
             return "projectfile = Base.active_project()\n" +
-                   "temporary = Base.JLOptions().project != C_NULL && unsafe_string(Base.JLOptions().project) == \"@temp\"\n" +
+                   // As comms.jl's temporary_project: --project, else the JULIA_PROJECT variable.
+                   "temporary = (Base.JLOptions().project != C_NULL ? unsafe_string(Base.JLOptions().project) : get(ENV, \"JULIA_PROJECT\", \"\")) == \"@temp\"\n" +
                    "try\n" +
                    "    if temporary && VERSION < v\"1.11\"\n" +
                    "        theerror = \"" + TemporaryNeedsJuliaStart + " or later, but this is Julia $VERSION. " +

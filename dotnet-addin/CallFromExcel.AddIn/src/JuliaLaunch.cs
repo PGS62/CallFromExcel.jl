@@ -388,9 +388,10 @@ namespace CallFromExcel.AddIn
                         error.Length > 1 ? error[1].Trim() : "", error.Length > 2 ? error[2].Trim() : null, useLinux);
                 }
                 string text = string.Join("\n", error).Trim();
-                if (text.StartsWith(NotInstalledStart, StringComparison.Ordinal))
+                System.Text.RegularExpressions.Match notInstalled = NotInstalled.Match(text);
+                if (notInstalled.Success)
                 {
-                    throw new JuliaCommandException(text, AddPackageCommand);
+                    throw new JuliaCommandException(text, "import Pkg; Pkg.add(\"" + notInstalled.Groups[1].Value + "\")");
                 }
                 if (text.StartsWith(ProjectMissingStart, StringComparison.Ordinal) ||
                     text.StartsWith(TemporaryNeedsJuliaStart, StringComparison.Ordinal))
@@ -481,10 +482,11 @@ namespace CallFromExcel.AddIn
         // test/runtests.jl can check the generated script parses.
         public const string VersionMismatchMarker = "CallFromExcelVersionMismatch";
 
-        // The start-up script's message when the package isn't installed, which LaunchCore
-        // recognises by its start, so the ribbon can offer to copy the command that fixes it.
-        public const string NotInstalledStart = "The " + PackageName + " package is not installed in Julia's active environment";
-        public const string AddPackageCommand = "import Pkg; Pkg.add(\"" + PackageName + "\")";
+        // The start of the start-up script's message when a package - CallFromExcel, or one of
+        // the user's Packages - isn't installed, which LaunchCore recognises, so the ribbon can
+        // offer to copy the command that installs it.
+        private static readonly System.Text.RegularExpressions.Regex NotInstalled =
+            new System.Text.RegularExpressions.Regex(@"^The (\S+) package is not installed in ");
 
         // The start of the start-up script's message when the --project folder doesn't exist.
         public const string ProjectMissingStart = "The project folder";
@@ -557,6 +559,15 @@ namespace CallFromExcel.AddIn
                 usingStatements.Append("        using " + trimmed + "\n");
             }
 
+            // The user's own Packages, as a Julia vector of names, for installing in a temporary
+            // environment (below).
+            var userPackages = new List<string>();
+            foreach (string pkg in packages.Split(','))
+            {
+                if (pkg.Trim() != "") userPackages.Add(JuliaLiteral.MakeJuliaLiteral(pkg.Trim()));
+            }
+            string userPackagesVector = "String[" + string.Join(", ", userPackages) + "]";
+
             // First, that the project folder exists: Julia accepts --project naming a folder that
             // doesn't, as a new empty project, and still finds CallFromExcel in the default
             // environment - so a mistyped folder would otherwise go unnoticed. Reported through the
@@ -577,9 +588,23 @@ namespace CallFromExcel.AddIn
             // the permanent shared environment named "temp" instead, so it's refused there. With a
             // temporary environment, packages come from the default environment, so a mismatch
             // message names that ("" as the folder), not the temporary folder, gone by then.
-            return "try\n" +
-                   "    projectfile = Base.active_project()\n" +
-                   "    temporary = Base.JLOptions().project != C_NULL && unsafe_string(Base.JLOptions().project) == \"@temp\"\n" +
+            //
+            // In a temporary environment, any of the user's Packages that can't be found (in it or
+            // the default environment) are installed into it - harmless, as it's deleted when
+            // Julia exits. PRESERVE_TIERED_INSTALLED makes Pkg try versions already installed
+            // first (only falling back to others if they won't do), so a launch with the same
+            // Packages as before gets the same versions, already precompiled, rather than
+            // whatever is newest. (PRESERVE_ALL_INSTALLED would allow only installed versions,
+            // so couldn't install a package for the first time.) Elsewhere, a missing package is an
+            // error naming it and its environment, whose fix (import Pkg; Pkg.add(...)) the
+            // ribbon's error dialog offers to copy; nothing is installed into a project or the
+            // default environment without the user's say-so. CallFromExcel itself is never
+            // installed here: it must match the add-in, which installme() keeps in step.
+            // projectfile and temporary are set before the try, so the catch can see them: in a
+            // file, a variable first assigned inside a try block is local to it.
+            return "projectfile = Base.active_project()\n" +
+                   "temporary = Base.JLOptions().project != C_NULL && unsafe_string(Base.JLOptions().project) == \"@temp\"\n" +
+                   "try\n" +
                    "    if temporary && VERSION < v\"1.11\"\n" +
                    "        theerror = \"" + TemporaryNeedsJuliaStart + " or later, but this is Julia $VERSION. " +
                    "Choose a different Project folder in Launch Settings, or change the --project option in JuliaLaunch's CommandLineOptions.\"\n" +
@@ -591,6 +616,14 @@ namespace CallFromExcel.AddIn
                    "        @error theerror\n" +
                    "        write(" + errorFile + ", theerror)\n" +
                    "    else\n" +
+                   "        if temporary\n" +
+                   "            toinstall = filter(p -> Base.find_package(p) === nothing, " + userPackagesVector + ")\n" +
+                   "            if !isempty(toinstall)\n" +
+                   "                println(\"Installing $(join(toinstall, \", \")) in the temporary environment...\")\n" +
+                   "                import Pkg\n" +
+                   "                Pkg.add(toinstall; preserve=Pkg.PRESERVE_TIERED_INSTALLED)\n" +
+                   "            end\n" +
+                   "        end\n" +
                    usingStatements +
                    "        juliaversion = string(pkgversion(CallFromExcel))\n" +
                    "        if juliaversion != " + addInVersion + "\n" +
@@ -607,13 +640,28 @@ namespace CallFromExcel.AddIn
                    "    end\n" +
                    "    rm(" + JuliaLiteral.MakeJuliaLiteral(flagFileX) + ")\n" +
                    "catch e\n" +
-                   // Clearer than Julia's own message: names the environment, and mentions --project.
-                   "    theerror = if e isa ArgumentError && startswith(e.msg, \"Package " + PackageName + " not found\")\n" +
-                   "        \"" + NotInstalledStart + " ($(Base.active_project())). " +
-                   "Install it with: " + AddPackageCommand.Replace("\"", "\\\"") + " " +
-                   "- or, if it is installed in a different environment, add --project=<that environment's folder> to JuliaLaunch's CommandLineOptions.\"\n" +
+                   // A package that isn't installed - CallFromExcel or one of the user's Packages:
+                   // clearer than Julia's own message, as it names the environment, and mentions
+                   // --project. Under @temp only CallFromExcel can be missing (the others were
+                   // installed above), and it's the default environment that needs it. Other
+                   // errors as Julia's own showerror text.
+                   "    notfound = e isa ArgumentError ? match(r\"^Package (\\S+) not found\", e.msg) : nothing\n" +
+                   "    theerror = if notfound !== nothing && temporary\n" +
+                   "        pkg = notfound.captures[1]\n" +
+                   "        \"The $pkg package is not installed in your default environment, which a temporary environment (--project=@temp) takes its packages from. " +
+                   "Install it there, in Julia started without --project, with: import Pkg; Pkg.add(\\\"$pkg\\\")\"\n" +
+                   "    elseif notfound !== nothing\n" +
+                   "        pkg = notfound.captures[1]\n" +
+                   "        \"The $pkg package is not installed in Julia's active environment ($(Base.active_project())). " +
+                   "Install it with: import Pkg; Pkg.add(\\\"$pkg\\\") " +
+                   "- or, if it is installed in a different environment, choose that as the Project folder in Launch Settings, " +
+                   "or add --project=<its folder> to JuliaLaunch's CommandLineOptions.\"\n" +
+                   // Some errors, e.g. Pkg's ResolverError, have no showerror method of their own, so
+                   // would print as ResolverError("..."): their message is clearer.
+                   "    elseif hasproperty(e, :msg) && e.msg isa AbstractString\n" +
+                   "        e.msg\n" +
                    "    else\n" +
-                   "        \"$e\"\n" +
+                   "        sprint(showerror, e)\n" +
                    "    end\n" +
                    "    @error theerror \n" +
                    "    errorfile = " + JuliaLiteral.MakeJuliaLiteral(errorFileX) + "\n" +

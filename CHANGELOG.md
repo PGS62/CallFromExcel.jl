@@ -12,6 +12,7 @@ CallFromExcel is the successor to [JuliaExcel](https://github.com/PGS62/JuliaExc
 - `JuliaLaunch` reports a project folder (`--project`) that doesn't exist. Julia accepts one, as a new empty project, so the mistake went unnoticed.
 - In Launch Settings, the project folder remembers recent folders, with "(No folder)" and "Clear history" in its list, as the ribbon's File box does; and "command line options" links to Julia's documentation of them.
 - Launch Settings' project folder list has "(Default environment)", replacing "(No folder)", and "(Temporary environment)", which uses `--project=@temp`: a new, empty environment that Julia deletes when it exits. `@temp` needs Julia 1.11 or later; with Julia 1.10, `JuliaLaunch` says so, rather than Julia quietly using a permanent environment named "temp".
+- With `--project=@temp`, any of `JuliaLaunch`'s `Packages` that aren't installed are installed into the temporary environment, preferring versions already installed, so they're already precompiled. Otherwise, a package in `Packages` that isn't installed gives a message naming it and its environment, and Launch Julia's error dialog offers to copy the `Pkg.add` command for it.
 - The ribbon's File box and the project folder each remember up to 10 recent items (the File box remembered 5).
 - Shorter tooltips for the ribbon's Help and About buttons.
 

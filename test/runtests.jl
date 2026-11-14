@@ -669,10 +669,9 @@ if Sys.iswindows()
         errorfile, flagfile = joinpath(dir, "LoadError.txt"), joinpath(dir, "Flag.txt")
         touch(flagfile)
         jl(path) = replace(path, "\\" => "/")
-        script = "[void][Reflection.Assembly]::LoadFrom('$dll'); " *
-                 "[CallFromExcel.AddIn.JuliaLaunch]::BuildStartupScript('', 1234, '$(jl(dir))', " *
-                 "'$(jl(errorfile))', '$(jl(flagfile))', 'cmd', 2700)"
-        startup = read(`powershell -NoProfile -NonInteractive -Command $script`, String)
+        startupscript(packages) = read(`powershell -NoProfile -NonInteractive -Command
+            "[void][Reflection.Assembly]::LoadFrom('$dll'); [CallFromExcel.AddIn.JuliaLaunch]::BuildStartupScript('$packages', 1234, '$(jl(dir))', '$(jl(errorfile))', '$(jl(flagfile))', 'cmd', 2700)"`, String)
+        startup = startupscript("")
         addinversion = "\"$(pkgversion(CallFromExcel))\""
         @test occursin(addinversion, startup)
         scriptfile = joinpath(dir, "StartUp.jl")
@@ -682,7 +681,7 @@ if Sys.iswindows()
                                        dirname(Base.active_project())]
         @test !isfile(flagfile)
 
-        # Without the package: the message starts as the add-in expects (NotInstalledStart), so
+        # Without the package: the message starts as the add-in expects (NotInstalled), so
         # its error dialog can offer to copy the Pkg.add command it contains. An empty project,
         # and a load path without the default environment, which may have the package.
         rm(errorfile); touch(flagfile)
@@ -719,6 +718,29 @@ if Sys.iswindows()
             @test split(read(errorfile, String), "\n") == ["CallFromExcelVersionMismatch", string(pkgversion(CallFromExcel)), ""]
         end
         @test !isfile(flagfile)
+
+        # One of the user's Packages that isn't installed: a message naming it and its
+        # environment, starting as the add-in expects, with the Pkg.add command it can copy.
+        rm(errorfile); touch(flagfile)
+        write(scriptfile, startupscript("NoSuchPackageXyz"))
+        run(`$(Base.julia_cmd()) --project=$(dirname(Base.active_project())) --startup-file=no $scriptfile`)
+        nosuch = read(errorfile, String)
+        @test startswith(nosuch, "The NoSuchPackageXyz package is not installed in Julia's active environment")
+        @test occursin("import Pkg; Pkg.add(\"NoSuchPackageXyz\")", nosuch)
+        @test !isfile(flagfile)
+
+        # With --project=@temp (Julia 1.11 on), a missing one is installed into the temporary
+        # environment instead: Example (the Julia org's tiny example package), which isn't on
+        # this load path. The script then gets as far as the version check (made to fail, as
+        # above), so it installed and loaded Example. Needs the network, so skipped without it.
+        if VERSION >= v"1.11" && (try success(`ping -n 1 -w 2000 github.com`) catch; false end)
+            rm(errorfile); touch(flagfile)
+            write(scriptfile, replace(startupscript("Example"), addinversion => "\"0.0.1\""))
+            run(addenv(`$(Base.julia_cmd()) --project=@temp --startup-file=no $scriptfile`,
+                       "JULIA_LOAD_PATH" => "@;$(dirname(Base.active_project()));@stdlib"))
+            @test split(read(errorfile, String), "\n") == ["CallFromExcelVersionMismatch", string(pkgversion(CallFromExcel)), ""]
+            @test !isfile(flagfile)
+        end
     end
 
     # The four version-mismatch messages: the package or the add-in older, natively or under

@@ -52,14 +52,17 @@ namespace CallFromExcel.AddIn
             "CallFromExcel can be installed either there or in the project.\n\n" +
             "@temp, (Temporary environment) in the list, starts Julia in a new,\n" +
             "empty environment, deleted when Julia exits - for trying out packages\n" +
-            "without adding them to a project. Needs Julia 1.11 or later.";
+            "without adding them to a project: Packages to load that aren't\n" +
+            "installed are installed into it. Needs Julia 1.11 or later.";
         private const string OtherOptionsTip =
             "Any other Julia command line options, separated by spaces,\n" +
             "e.g. --banner=no or --threads=4. -L and --load aren't allowed.";
         private const string PackagesTip =
             "Packages to load when Julia starts, separated by commas,\n" +
             "e.g. DataFrames, CSV. They must be installed in the project\n" +
-            "or in your default environment.";
+            "or in your default environment - except with (Temporary environment),\n" +
+            "when any that aren't are installed into it, preferring versions\n" +
+            "you already have, so they're already precompiled.";
         private const string BashTip =
             "Only when running Julia under WSL: bash statements run before Julia\n" +
             "starts, one per line, e.g. export JULIA_NUM_THREADS=4.";

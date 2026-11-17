@@ -707,17 +707,38 @@ if Sys.iswindows()
                                        dirname(Base.active_project())]
         @test !isfile(flagfile)
 
-        # Without the package: the message starts as the add-in expects (NotInstalled), so
-        # its error dialog can offer to copy the Pkg.add command it contains. An empty project,
-        # and a load path without the default environment, which may have the package.
+        # Without the package: found before any `using`, and reported by a marker and the
+        # project folder, for the add-in's own message (JuliaPort.NotInstalledError). An empty
+        # project, and a load path without the default environment, which may have the package.
         rm(errorfile); touch(flagfile)
         empty = mktempdir()
         write(scriptfile, startup)
         run(addenv(`$(Base.julia_cmd()) --project=$empty --startup-file=no $scriptfile`, "JULIA_LOAD_PATH" => "@;@stdlib");
             wait=true)
-        notinstalled = read(errorfile, String)
-        @test startswith(notinstalled, "The CallFromExcel package is not installed in Julia's active environment")
-        @test occursin("import Pkg; Pkg.add(\"CallFromExcel\")", notinstalled)
+        @test split(read(errorfile, String), "\n") == ["CallFromExcelNotInstalled", empty]
+        @test !isfile(flagfile)
+
+        # A project whose Manifest names a package that isn't installed for this Julia (as when
+        # a project used from Julia on Windows is first used from Julia under WSL): the script
+        # says so and runs Pkg.instantiate. Here the package doesn't exist, so instantiate fails
+        # - which shows it was tried, without needing the network to install anything.
+        rm(errorfile); touch(flagfile)
+        uninstantiated = mktempdir()
+        uuid = "5b3c9a5e-1d2f-4e6a-9b7c-0d1e2f3a4b5c"
+        write(joinpath(uninstantiated, "Project.toml"), "[deps]\nNoSuchPackageXyz = \"$uuid\"\n")
+        write(joinpath(uninstantiated, "Manifest.toml"), """
+            julia_version = "$VERSION"
+            manifest_format = "2.0"
+
+            [[deps.NoSuchPackageXyz]]
+            git-tree-sha1 = "0123456789abcdef0123456789abcdef01234567"
+            uuid = "$uuid"
+            version = "1.0.0"
+            """)
+        output = read(addenv(`$(Base.julia_cmd()) --project=$uninstantiated --startup-file=no $scriptfile`,
+                             "JULIA_LOAD_PATH" => "@;$(dirname(Base.active_project()));@stdlib"), String)
+        @test occursin("which aren't installed for this Julia: NoSuchPackageXyz", output)
+        @test occursin("NoSuchPackageXyz", read(errorfile, String))
         @test !isfile(flagfile)
 
         # A --project folder that doesn't exist: Julia would accept it as a new, empty project
@@ -791,8 +812,36 @@ if Sys.iswindows()
         @test occursin("then start Julia and run: $update; $install", m[1]) && cmd[1] == "$update; $install"
         @test occursin("start Julia with julia --project=\"C:\\p\" and run: using Pkg", m[2]) && cmd[2] == "$update; $install"
         @test occursin("Close Excel, then start Julia and run: $install", m[3]) && cmd[3] == install
-        @test occursin("start Julia under WSL with julia --project=\"/home/p\" and run: $update - then", m[4]) && cmd[4] == update
-        @test occursin("start Julia on Windows and run: $update; $install", m[5]) && cmd[5] == "$update; $install"
+        # Under WSL, whichever is older, the package is changed to the add-in's version.
+        addmatching = "import Pkg; Pkg.add(name=\"CallFromExcel\", version=\"$(pkgversion(CallFromExcel))\")"
+        @test occursin("start Julia by typing julia --project=\"/home/p\", and run: $addmatching - then", m[4]) && cmd[4] == addmatching
+        @test occursin("start Julia by typing julia, and run: $addmatching - then", m[5]) && cmd[5] == addmatching
+    end
+
+    # The messages for a launch that fails for want of something: WSL not set up, Julia not
+    # installed under WSL, or the CallFromExcel package not installed - each with the command
+    # the ribbon's error dialog offers to copy.
+    @testset "Messages for what a launch needs" begin
+        dll = joinpath(@__DIR__, "..", "dotnet-addin", "dist", "CallFromExcel.AddIn.dll")
+        show(e) = "\$e = $e; \$e.Message; \$e.JuliaCommand"
+        script = "[void][Reflection.Assembly]::LoadFrom('$dll')\n" * join([
+            show("[CallFromExcel.AddIn.JuliaLaunch]::WslProblemError(\$false, \$false)"),
+            show("[CallFromExcel.AddIn.JuliaLaunch]::WslProblemError(\$true, \$false)"),
+            show("[CallFromExcel.AddIn.JuliaPort]::NotInstalledError('', \$true)"),
+            show("[CallFromExcel.AddIn.JuliaPort]::NotInstalledError('C:\\p', \$false)"),
+            "[CallFromExcel.AddIn.JuliaLaunch]::WslProblemError(\$true, \$true) -eq \$null"], "\n")
+        ps1 = tempname() * ".ps1"
+        write(ps1, script)
+        out = readlines(`powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $ps1`)
+        rm(ps1)
+        addmatching = "import Pkg; Pkg.add(name=\"CallFromExcel\", version=\"$(pkgversion(CallFromExcel))\")"
+        @test occursin("WSL (Windows Subsystem for Linux) isn't set up", out[1]) && occursin("run: wsl --install - then", out[1])
+        @test out[2] == "wsl --install"
+        @test occursin("Julia isn't installed in it", out[3]) && out[4] == "curl -fsSL https://install.julialang.org | sh"
+        @test occursin("Julia under WSL doesn't have the CallFromExcel package", out[5]) &&
+              occursin("start Julia by typing julia, and run: $addmatching", out[5]) && out[6] == addmatching
+        @test occursin("start Julia with julia --project=\"C:\\p\", and run: $addmatching", out[7]) && out[8] == addmatching
+        @test out[9] == "True"
     end
 
     # Under WSL, JuliaLaunch passes the startup file's path to Julia through wsl.exe and bash. An

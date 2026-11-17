@@ -112,12 +112,36 @@ namespace CallFromExcel.AddIn
         // environment (folder ""), with --project for a project folder. A Julia package older
         // than 0.1.2 records no folder (null), so the environment is then described rather than
         // named.
+        // Under WSL, says how - someone used to Excel may never have opened a Linux window.
         private static string StartJulia(string folder, bool wsl)
         {
-            string julia = wsl ? "start Julia under WSL" : "start Julia";
-            if (folder == null) return julia + " in the environment you use with Excel";
-            if (folder == "") return julia;
-            return julia + " with julia --project=\"" + folder + "\"";
+            if (wsl)
+            {
+                const string open = "open your Linux distribution (e.g. Ubuntu) from the Start menu, start Julia by typing ";
+                if (folder == null) return open + "julia (in the environment you use with Excel)";
+                if (folder == "") return open + "julia";
+                return open + "julia --project=\"" + folder + "\"";
+            }
+            if (folder == null) return "start Julia in the environment you use with Excel";
+            if (folder == "") return "start Julia";
+            return "start Julia with julia --project=\"" + folder + "\"";
+        }
+
+        // Installs the CallFromExcel package at exactly the add-in's version. Under WSL the
+        // simplest fix whichever is older, as only the package needs to change - the add-in is
+        // updated from Julia on Windows (installme()).
+        internal static string AddMatchingPackage =>
+            "import Pkg; Pkg.add(name=\"CallFromExcel\", version=\"" + AddInVersion + "\")";
+
+        // The error when the Julia that JuliaLaunch started doesn't have the CallFromExcel package
+        // at all - most likely Julia under WSL, newly installed - in project `folder` (as for
+        // StartJulia; "" for the default environment).
+        public static JuliaCommandException NotInstalledError(string folder, bool wsl)
+        {
+            string julia = wsl ? "Julia under WSL" : "Julia";
+            return new JuliaCommandException(julia + " doesn't have the CallFromExcel package, which it needs to work with Excel. " +
+                "To install it, close Julia's window, then " + StartJulia(folder, wsl) + ", and run: " + AddMatchingPackage +
+                " - then launch Julia from Excel again.", AddMatchingPackage);
         }
 
         // This add-in's version, the AssemblyInformationalVersion that test/runtests.jl keeps
@@ -152,26 +176,23 @@ namespace CallFromExcel.AddIn
         // add-in - and then installme() is run too, since the update may go past the add-in's
         // version. That needs a new Julia session: in one that has already loaded the package,
         // using CallFromExcel after Pkg.update keeps the old version, and installme() with it.
-        // installme() only works in Julia on Windows, so under WSL an older package is just
-        // updated (if that goes past the add-in, the next launch says so), and an older add-in
-        // is updated from Julia on Windows.
+        // installme() only works in Julia on Windows, so under WSL the package is changed to the
+        // add-in's version instead, whichever is older (AddMatchingPackage).
         public static JuliaCommandException MismatchError(string juliaVersion, string folder, bool wsl)
         {
             string message = "CallFromExcel's Excel add-in (version " + AddInVersion + ") doesn't match the CallFromExcel " +
-                "package Julia has loaded (" + (juliaVersion == "" ? "an older version" : "version " + juliaVersion) + "). ";
+                "package Julia " + (wsl ? "under WSL " : "") + "has loaded (" +
+                (juliaVersion == "" ? "an older version" : "version " + juliaVersion) + "). ";
             const string Update = "using Pkg; Pkg.update(\"CallFromExcel\")";
             const string Install = "using CallFromExcel; CallFromExcel.installme()";
             const string UpdateAndInstall = Update + "; " + Install;
             bool packageOlder = juliaVersion == "" || IsOlder(juliaVersion, AddInVersion);
-            if (packageOlder && wsl)
-                return new JuliaCommandException(message + "Close Julia, then " + StartJulia(folder, true) + " and run: " + Update +
-                    " - then launch Julia from Excel again.", Update);
+            if (wsl)
+                return new JuliaCommandException(message + "Close Julia's window, then " + StartJulia(folder, true) + ", and run: " +
+                    AddMatchingPackage + " - then launch Julia from Excel again.", AddMatchingPackage);
             if (packageOlder)
                 return new JuliaCommandException(message + "Close Excel and Julia, then " + StartJulia(folder, false) +
                     " and run: " + UpdateAndInstall, UpdateAndInstall);
-            if (wsl)
-                return new JuliaCommandException(message + "Close Excel, then start Julia on Windows and run: " + UpdateAndInstall,
-                    UpdateAndInstall);
             return new JuliaCommandException(message + "Close Excel, then " + StartJulia(folder, false) + " and run: " + Install,
                 Install);
         }

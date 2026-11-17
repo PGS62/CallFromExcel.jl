@@ -367,7 +367,8 @@ namespace CallFromExcel.AddIn
                 }
                 if (juliaProcess.HasExited)
                 {
-                    throw ProcessExitedError(userSuppliedCommandLineOptions.Trim(), useLinux, bashStatements);
+                    throw (useLinux ? WslProblem(bashStatements) : null) ??
+                        ProcessExitedError(userSuppliedCommandLineOptions.Trim(), useLinux, bashStatements);
                 }
                 if (stopwatch.Elapsed.TotalSeconds > timeoutSeconds)
                 {
@@ -386,6 +387,10 @@ namespace CallFromExcel.AddIn
                 {
                     throw JuliaPort.MismatchError(
                         error.Length > 1 ? error[1].Trim() : "", error.Length > 2 ? error[2].Trim() : null, useLinux);
+                }
+                if (error[0].Trim() == NotInstalledMarker)
+                {
+                    throw JuliaPort.NotInstalledError(error.Length > 1 ? error[1].Trim() : "", useLinux);
                 }
                 string text = string.Join("\n", error).Trim();
                 System.Text.RegularExpressions.Match notInstalled = NotInstalled.Match(text);
@@ -487,9 +492,13 @@ namespace CallFromExcel.AddIn
         // test/runtests.jl can check the generated script parses.
         public const string VersionMismatchMarker = "CallFromExcelVersionMismatch";
 
-        // The start of the start-up script's message when a package - CallFromExcel, or one of
-        // the user's Packages - isn't installed, which LaunchCore recognises, so the ribbon can
-        // offer to copy the command that installs it.
+        // The first line of the error file when CallFromExcel itself isn't installed, followed by
+        // the project folder (as for VersionMismatchMarker), for JuliaPort.NotInstalledError.
+        public const string NotInstalledMarker = "CallFromExcelNotInstalled";
+
+        // The start of the start-up script's message when one of the user's Packages isn't
+        // installed, which LaunchCore recognises, so the ribbon can offer to copy the command
+        // that installs it. Written by the script itself (not Julia's own error message).
         private static readonly System.Text.RegularExpressions.Regex NotInstalled =
             new System.Text.RegularExpressions.Regex(@"^The (\S+) package is not installed in ");
 
@@ -501,6 +510,88 @@ namespace CallFromExcel.AddIn
 
         // Julia's documentation of its command line options.
         public const string CommandLineDocsUrl = "https://docs.julialang.org/en/v1/manual/command-line-interface/#command-line-switches-for-julia";
+
+        // Why Julia's process under WSL may have exited at once, for someone who has used
+        // CallFromExcel with Julia on Windows and is trying WSL: WSL isn't set up (no Linux
+        // distribution), or Julia isn't installed in it (no julia on a login shell's PATH, after
+        // any Bash statements, which may be what puts it there). Found by asking wsl.exe, only
+        // after a failure, so a successful launch isn't slowed. Null if neither, or the checks
+        // themselves fail - the general ProcessExitedError then applies.
+        private static Exception WslProblem(string bashStatements)
+        {
+            string distributions = RunHidden(WSLExecutable, "--list --quiet", Encoding.Unicode, out int listExit);
+            if (distributions == null) return null;
+            string check = "command -v julia";
+            if (!string.IsNullOrEmpty(bashStatements))
+            {
+                // As LaunchCore runs Bash statements: from a file, as they may contain quotes.
+                string checkFile = Path.Combine(FileUtils.LocalTemp(), "checkjulia.sh");
+                FileUtils.SaveTextFile(checkFile, "#!/bin/bash\n" + bashStatements.TrimEnd('\n') + "\n" + check + "\n");
+                check = "bash " + BashQuote(WSLAddress(checkFile));
+            }
+            bool wslSetUp = listExit == 0 && distributions.Trim() != "";
+            int juliaExit = 0;
+            if (wslSetUp && RunHidden(WSLExecutable, WslArguments(check), Encoding.UTF8, out juliaExit) == null) return null;
+            return WslProblemError(wslSetUp, juliaExit == 0);
+        }
+
+        // The message for WslProblem's findings: null when WSL is set up and has Julia. Public, so
+        // test/runtests.jl can check the messages without a PC lacking WSL.
+        public static JuliaCommandException WslProblemError(bool wslSetUp, bool juliaFound)
+        {
+            const string RunJuliaOnWindows = "Or, to run Julia on Windows instead, untick \"Run Julia under Linux (WSL)\" " +
+                "in Launch Settings (in a JuliaLaunch formula, set UseLinux to FALSE).";
+            if (!wslSetUp)
+            {
+                const string install = "wsl --install";
+                return new JuliaCommandException("Julia can't run under Linux on this PC, because WSL (Windows Subsystem for " +
+                    "Linux) isn't set up. To set it up, open Command Prompt and run: " + install + " - then restart Windows. " +
+                    "Microsoft's instructions are at " + WslInstallUrl + ". " + RunJuliaOnWindows, install, WslInstallUrl);
+            }
+            if (!juliaFound)
+            {
+                const string install = "curl -fsSL https://install.julialang.org | sh";
+                return new JuliaCommandException("WSL is set up, but Julia isn't installed in it. To install Julia, open your " +
+                    "Linux distribution (e.g. Ubuntu) from the Start menu and run: " + install + " - then close and reopen it, " +
+                    "and launch Julia from Excel again: if anything else is needed, Excel will say so. " + RunJuliaOnWindows,
+                    install);
+            }
+            return null;
+        }
+
+        public const string WslInstallUrl = "https://learn.microsoft.com/windows/wsl/install";
+
+        // Runs a program with no window and returns what it writes, or null if it can't be run
+        // or takes over 30 seconds (WSL's first start after a reboot takes a few).
+        private static string RunHidden(string fileName, string arguments, Encoding encoding, out int exitCode)
+        {
+            exitCode = -1;
+            try
+            {
+                var info = new ProcessStartInfo(fileName, arguments)
+                {
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    StandardOutputEncoding = encoding
+                };
+                using (Process process = Process.Start(info))
+                {
+                    var output = process.StandardOutput.ReadToEndAsync();
+                    process.StandardError.ReadToEndAsync();
+                    if (!process.WaitForExit(30000))
+                    {
+                        try { process.Kill(); } catch (InvalidOperationException) { }
+                        return null;
+                    }
+                    exitCode = process.ExitCode;
+                    return output.Result.Replace("\0", "");
+                }
+            }
+            catch (System.ComponentModel.Win32Exception) { return null; }
+            catch (IOException) { return null; }
+        }
 
         // The error when Julia's process exits before start-up finishes. An invalid command line
         // option is the usual cause, so with options of the user's own the message shows them,
@@ -567,8 +658,8 @@ namespace CallFromExcel.AddIn
                 // which Julia can't parse - so the script never ran, and Excel waited out the
                 // time-out with no error.
                 if (trimmed == "") continue;
-                usingStatements.Append("        println(\"using " + trimmed + "\")\n");
-                usingStatements.Append("        using " + trimmed + "\n");
+                usingStatements.Append("            println(\"using " + trimmed + "\")\n");
+                usingStatements.Append("            using " + trimmed + "\n");
             }
 
             // The user's own Packages, as a Julia vector of names, for installing in a temporary
@@ -611,7 +702,16 @@ namespace CallFromExcel.AddIn
             // error naming it and its environment, whose fix (import Pkg; Pkg.add(...)) the
             // ribbon's error dialog offers to copy; nothing is installed into a project or the
             // default environment without the user's say-so. CallFromExcel itself is never
-            // installed here: it must match the add-in, which installme() keeps in step.
+            // installed here: it must match the add-in, which installme() keeps in step. Whether
+            // a package is installed is asked of Julia (find_package) before any `using`, rather
+            // than read from Julia's error message, whose wording isn't ours. CallFromExcel
+            // missing is reported by NotInstalledMarker, for JuliaPort.NotInstalledError.
+            //
+            // A project whose Manifest names packages not installed for this Julia - typically
+            // one used from Julia on Windows, now used from Julia under WSL, which has its own
+            // package store - is instantiated first: that installs exactly the versions its
+            // Manifest records, changing nothing in the project itself. (Without it, loading the
+            // project fails with a long list of "Missing source file" precompile errors.)
             // projectfile and temporary are set before the try, so the catch can see them: in a
             // file, a variable first assigned inside a try block is local to it.
             return "projectfile = Base.active_project()\n" +
@@ -629,6 +729,24 @@ namespace CallFromExcel.AddIn
                    "        @error theerror\n" +
                    "        write(" + errorFile + ", theerror)\n" +
                    "    else\n" +
+                   "        folder = temporary || projectfile === nothing || projectfile == Base.load_path_expand(\"@v#.#\") ? \"\" : dirname(projectfile)\n" +
+                   "        uninstalled = String[]\n" +
+                   "        manifest = temporary || projectfile === nothing ? nothing : Base.project_file_manifest_path(projectfile)\n" +
+                   "        if manifest !== nothing && isfile(manifest)\n" +
+                   "            manifestdeps = Base.parsed_toml(manifest)\n" +
+                   "            for (name, entries) in get(manifestdeps, \"deps\", manifestdeps)\n" +
+                   "                entries isa Vector || continue\n" +
+                   "                for entry in entries\n" +
+                   "                    entry isa AbstractDict && haskey(entry, \"uuid\") || continue\n" +
+                   "                    Base.locate_package(Base.PkgId(Base.UUID(entry[\"uuid\"]), name)) === nothing && push!(uninstalled, name)\n" +
+                   "                end\n" +
+                   "            end\n" +
+                   "        end\n" +
+                   "        if !isempty(uninstalled)\n" +
+                   "            println(\"Installing packages that the project in $(dirname(projectfile)) needs, which aren't installed for this Julia: $(join(sort(uninstalled), \", \"))...\")\n" +
+                   "            import Pkg\n" +
+                   "            Pkg.instantiate()\n" +
+                   "        end\n" +
                    "        if temporary\n" +
                    "            toinstall = filter(p -> Base.find_package(p) === nothing, " + userPackagesVector + ")\n" +
                    "            if !isempty(toinstall)\n" +
@@ -637,41 +755,41 @@ namespace CallFromExcel.AddIn
                    "                Pkg.add(toinstall; preserve=Pkg.PRESERVE_TIERED_INSTALLED)\n" +
                    "            end\n" +
                    "        end\n" +
-                   usingStatements +
-                   "        juliaversion = string(pkgversion(CallFromExcel))\n" +
-                   "        if juliaversion != " + addInVersion + "\n" +
-                   "            @error \"CallFromExcel $juliaversion doesn't match the Excel add-in, version \" * " + addInVersion + " * \". Excel says how to fix this.\"\n" +
-                   "            folder = temporary || projectfile === nothing || projectfile == Base.load_path_expand(\"@v#.#\") ? \"\" : dirname(projectfile)\n" +
-                   "            write(" + errorFile + ", \"" + VersionMismatchMarker + "\\n$juliaversion\\n$folder\")\n" +
+                   "        notinstalled = filter(p -> Base.find_package(p) === nothing, " + userPackagesVector + ")\n" +
+                   "        if Base.find_package(\"" + PackageName + "\") === nothing\n" +
+                   "            @error \"The CallFromExcel package isn't installed for this Julia. Excel says how to fix this.\"\n" +
+                   "            write(" + errorFile + ", \"" + NotInstalledMarker + "\\n$folder\")\n" +
+                   "        elseif !isempty(notinstalled)\n" +
+                   "            pkg = first(notinstalled)\n" +
+                   "            theerror = \"The $pkg package is not installed in Julia's active environment ($(Base.active_project())). " +
+                   "Install it with: import Pkg; Pkg.add(\\\"$pkg\\\") " +
+                   "- or, if it is installed in a different environment, choose that as the Project folder in Launch Settings, " +
+                   "or add --project=<its folder> to JuliaLaunch's CommandLineOptions.\"\n" +
+                   "            @error theerror\n" +
+                   "            write(" + errorFile + ", theerror)\n" +
                    "        else\n" +
-                   "            CallFromExcel.setxlpid(" + pid + ")\n" +
-                   "            CallFromExcel.comms_folder(" + JuliaLiteral.MakeJuliaLiteral(commsFolderX) + ")\n" +
-                   "            println(\"Julia $VERSION, using " + PackageName + " to serve Excel running as process ID " + pid + ".\")\n" +
-                   "            println(\"Julia launched with command: " + literalCommand + " \")\n" +
-                   "            CallFromExcel.start_server(" + port + ")\n" +
+                   usingStatements +
+                   "            juliaversion = string(pkgversion(CallFromExcel))\n" +
+                   "            if juliaversion != " + addInVersion + "\n" +
+                   "                @error \"CallFromExcel $juliaversion doesn't match the Excel add-in, version \" * " + addInVersion + " * \". Excel says how to fix this.\"\n" +
+                   "                write(" + errorFile + ", \"" + VersionMismatchMarker + "\\n$juliaversion\\n$folder\")\n" +
+                   "            else\n" +
+                   "                CallFromExcel.setxlpid(" + pid + ")\n" +
+                   "                CallFromExcel.comms_folder(" + JuliaLiteral.MakeJuliaLiteral(commsFolderX) + ")\n" +
+                   "                println(\"Julia $VERSION, using " + PackageName + " to serve Excel running as process ID " + pid + ".\")\n" +
+                   "                println(\"Julia launched with command: " + literalCommand + " \")\n" +
+                   "                CallFromExcel.start_server(" + port + ")\n" +
+                   "            end\n" +
                    "        end\n" +
                    "    end\n" +
                    "    rm(" + JuliaLiteral.MakeJuliaLiteral(flagFileX) + ")\n" +
                    "catch e\n" +
-                   // A package that isn't installed - CallFromExcel or one of the user's Packages:
-                   // clearer than Julia's own message, as it names the environment, and mentions
-                   // --project. Under @temp only CallFromExcel can be missing (the others were
-                   // installed above), and it's the default environment that needs it. Other
-                   // errors as Julia's own showerror text.
-                   "    notfound = e isa ArgumentError ? match(r\"^Package (\\S+) not found\", e.msg) : nothing\n" +
-                   "    theerror = if notfound !== nothing && temporary\n" +
-                   "        pkg = notfound.captures[1]\n" +
-                   "        \"The $pkg package is not installed in your default environment, which a temporary environment (--project=@temp) takes its packages from. " +
-                   "Install it there, in Julia started without --project, with: import Pkg; Pkg.add(\\\"$pkg\\\")\"\n" +
-                   "    elseif notfound !== nothing\n" +
-                   "        pkg = notfound.captures[1]\n" +
-                   "        \"The $pkg package is not installed in Julia's active environment ($(Base.active_project())). " +
-                   "Install it with: import Pkg; Pkg.add(\\\"$pkg\\\") " +
-                   "- or, if it is installed in a different environment, choose that as the Project folder in Launch Settings, " +
-                   "or add --project=<its folder> to JuliaLaunch's CommandLineOptions.\"\n" +
-                   // Some errors, e.g. Pkg's ResolverError, have no showerror method of their own, so
-                   // would print as ResolverError("..."): their message is clearer.
-                   "    elseif hasproperty(e, :msg) && e.msg isa AbstractString\n" +
+                   // Packages that aren't installed are found before this, by asking Julia
+                   // (find_package), not by reading its error messages. Other errors as Julia's
+                   // own showerror text - but some, e.g. Pkg's ResolverError, have no showerror
+                   // method of their own, so would print as ResolverError("..."): their message
+                   // is clearer.
+                   "    theerror = if hasproperty(e, :msg) && e.msg isa AbstractString\n" +
                    "        e.msg\n" +
                    "    else\n" +
                    "        sprint(showerror, e)\n" +

@@ -17,7 +17,9 @@ namespace CallFromExcel.AddIn
         private enum Kind { Command, Code, Link }
 
         public static ErrorForm For(JuliaCommandException error) =>
-            new ErrorForm(error.Message, new[] { Tuple.Create(error.JuliaCommand, Kind.Command) });
+            new ErrorForm(error.Message, error.Url == null
+                ? new[] { Tuple.Create(error.JuliaCommand, Kind.Command) }
+                : new[] { Tuple.Create(error.JuliaCommand, Kind.Command), Tuple.Create(error.Url, Kind.Link) });
 
         public static ErrorForm For(HelpLinkException error) =>
             new ErrorForm(error.Message, error.Code == null
@@ -101,7 +103,7 @@ namespace CallFromExcel.AddIn
 
         private Button CopyButton(string command, int em)
         {
-            var copy = new Button { Text = "Copy Julia Command", AutoSize = true };
+            var copy = new Button { Text = "Copy Command", AutoSize = true };
             // Keeps its width when its text changes to "Copied".
             copy.MinimumSize = new Size(TextRenderer.MeasureText(copy.Text, Font).Width + em, 0);
             copy.Click += (sender, e) =>

@@ -9,6 +9,9 @@ CallFromExcel is the successor to [JuliaExcel](https://github.com/PGS62/JuliaExc
 - Launch Settings... is now its own large button on the ribbon, with a gear icon, rather than on Launch Julia's drop-down menu.
 - The ribbon's File list, and the project folder list in Launch Settings, have a Browse... item, and choosing a recent file or folder that no longer exists offers to remove it from the list.
 - The About dialog also shows the version of Julia, and its wording is clearer.
+- Trying Julia under WSL is better guided. When a launch fails because WSL isn't set up, or Julia isn't installed under it, or Julia there doesn't have the CallFromExcel package, the message says what to do and offers to copy the command that does it. The package is installed at exactly the add-in's version, which is also what a version mismatch under WSL now suggests.
+- A project whose packages aren't installed for the Julia being launched - for example one used from Julia on Windows, then from Julia under WSL, which has its own package store - is now instantiated (`Pkg.instantiate()`) at launch, rather than failing with a long list of precompilation errors.
+- Whether a package is installed is now checked before loading it, rather than worked out from Julia's error message.
 - The Excel add-in is listed in Windows' Settings > Apps, from where it can be uninstalled. Uninstalling removes its files, its registry entries and the ribbon's saved settings.
 
 ## [0.1.6] - 2026-11-14

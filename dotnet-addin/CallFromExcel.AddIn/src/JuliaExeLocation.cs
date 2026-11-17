@@ -3,7 +3,7 @@ using System.IO;
 
 namespace CallFromExcel.AddIn
 {
-    // C# port of JuliaExeLocation (modMain.bas).
+    // C# port of JuliaExeLocation (modMain.bas), plus juliaup's location.
     public static class JuliaExeLocation
     {
         public static string Find(bool useLinux = false)
@@ -22,6 +22,13 @@ namespace CallFromExcel.AddIn
                 string folder = entry.Trim().Trim('"');
                 if (folder.Length > 0 && File.Exists(folder + "\\julia.exe")) return folder + "\\julia.exe";
             }
+
+            // juliaup's julia.exe (an app execution alias), which a Julia installed with winget or
+            // from the Microsoft Store puts on PATH - but Excel's copy of PATH is fixed when Excel
+            // starts, so a Julia installed since then (e.g. after NotFoundError's advice) is found
+            // here without restarting Excel.
+            string windowsApps = Path.Combine(Environment.GetEnvironmentVariable("LOCALAPPDATA") ?? "", "Microsoft", "WindowsApps", "julia.exe");
+            if (File.Exists(windowsApps)) return windowsApps;
 
             // If not found on PATH, search the locations the Windows installer uses by
             // default (if the user accepted defaults), choosing the most recently
@@ -52,13 +59,22 @@ namespace CallFromExcel.AddIn
                 }
             }
 
-            if (chosenExe == null)
-            {
-                throw new InvalidOperationException(
-                    "Julia executable not found, after looking on the path and in folders to which Julia " +
-                    "is typically installed on Windows. When installing Julia check the \"Add Julia to Path\" option.");
-            }
+            if (chosenExe == null) throw NotFoundError();
             return chosenExe;
+        }
+
+        // The command julialang.org/downloads gives for installing Julia on Windows (with juliaup,
+        // from the Microsoft Store).
+        public const string InstallCommand = "winget install --name Julia --id 9NJNWW8PVKMN -e -s msstore";
+        public const string DownloadsUrl = "https://julialang.org/downloads/";
+
+        // Public, so test/runtests.jl can check the message on a PC that has Julia.
+        public static JuliaCommandException NotFoundError()
+        {
+            return new JuliaCommandException("Julia isn't installed on this PC, or Excel can't find it: it isn't on the " +
+                "path, or in the folders Julia is usually installed to. To install Julia, open Command Prompt and run: " +
+                InstallCommand + " - then launch Julia from Excel again: if anything else is needed, Excel will say so. " +
+                "Other ways to install Julia are described at " + DownloadsUrl + ".", InstallCommand, DownloadsUrl);
         }
     }
 }

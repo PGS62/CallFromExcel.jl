@@ -398,6 +398,10 @@ namespace CallFromExcel.AddIn
                 {
                     throw new JuliaCommandException(text, "import Pkg; Pkg.add(\"" + notInstalled.Groups[1].Value + "\")");
                 }
+                if (text.StartsWith(JuliaTooOldStart, StringComparison.Ordinal))
+                {
+                    throw new JuliaCommandException(text, UpdateJulia, JuliaExeLocation.DownloadsUrl);
+                }
                 if (text.StartsWith(ProjectMissingStart, StringComparison.Ordinal) ||
                     text.StartsWith(TemporaryNeedsJuliaStart, StringComparison.Ordinal))
                 {
@@ -504,6 +508,15 @@ namespace CallFromExcel.AddIn
 
         // The start of the start-up script's message when the --project folder doesn't exist.
         public const string ProjectMissingStart = "The project folder";
+
+        // The oldest Julia CallFromExcel supports - keep in step with Project.toml's [compat]
+        // julia, as test/runtests.jl checks. An older Julia can't load the package (and can't
+        // install it: Pkg's error then is a confusing "unsatisfiable requirements"), so the
+        // start-up script checks first, and its message starts JuliaTooOldStart, which
+        // LaunchCore recognises, to offer to copy UpdateJulia.
+        public const string MinimumJulia = "1.10";
+        public const string JuliaTooOldStart = "CallFromExcel needs Julia " + MinimumJulia + " or later";
+        public const string UpdateJulia = "juliaup update";
 
         // The start of its message when --project=@temp is used with Julia 1.10.
         public const string TemporaryNeedsJuliaStart = "--project=@temp, a temporary environment, needs Julia 1.11";
@@ -718,7 +731,14 @@ namespace CallFromExcel.AddIn
                    // As comms.jl's temporary_project: --project, else the JULIA_PROJECT variable.
                    "temporary = (Base.JLOptions().project != C_NULL ? unsafe_string(Base.JLOptions().project) : get(ENV, \"JULIA_PROJECT\", \"\")) == \"@temp\"\n" +
                    "try\n" +
-                   "    if temporary && VERSION < v\"1.11\"\n" +
+                   "    if VERSION < v\"" + MinimumJulia + "\"\n" +
+                   "        theerror = \"" + JuliaTooOldStart + ", but this is Julia $VERSION. If you installed Julia with juliaup " +
+                   "(the usual way), update it by running: " + UpdateJulia + " - then launch Julia from Excel again. If Julia is " +
+                   "still too old after that, also run: juliaup default release. Otherwise, install a newer Julia - see " +
+                   JuliaExeLocation.DownloadsUrl + ".\"\n" +
+                   "        @error theerror\n" +
+                   "        write(" + errorFile + ", theerror)\n" +
+                   "    elseif temporary && VERSION < v\"1.11\"\n" +
                    "        theerror = \"" + TemporaryNeedsJuliaStart + " or later, but this is Julia $VERSION. " +
                    "Choose a different Project folder in Launch Settings, or change the --project option in JuliaLaunch's CommandLineOptions.\"\n" +
                    "        @error theerror\n" +

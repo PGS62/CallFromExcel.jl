@@ -741,6 +741,17 @@ if Sys.iswindows()
         @test occursin("NoSuchPackageXyz", read(errorfile, String))
         @test !isfile(flagfile)
 
+        # A Julia older than CallFromExcel supports: checked before anything else. Simulated by
+        # raising the minimum in the script. The minimum must be Project.toml's [compat] julia.
+        compat = Base.parsed_toml(joinpath(@__DIR__, "..", "Project.toml"))["compat"]["julia"]
+        @test occursin("if VERSION < v\"$compat\"", startup)
+        rm(errorfile); touch(flagfile)
+        write(scriptfile, replace(startup, "if VERSION < v\"$compat\"" => "if VERSION < v\"99.0\""))
+        run(`$(Base.julia_cmd()) --project=$(dirname(Base.active_project())) --startup-file=no $scriptfile`)
+        @test startswith(read(errorfile, String), "CallFromExcel needs Julia $compat or later, but this is Julia $VERSION.")
+        @test !isfile(flagfile)
+        write(scriptfile, startup)
+
         # A --project folder that doesn't exist: Julia would accept it as a new, empty project
         # and still find CallFromExcel in the default environment, so the script checks first.
         rm(errorfile); touch(flagfile)
@@ -829,7 +840,8 @@ if Sys.iswindows()
             show("[CallFromExcel.AddIn.JuliaLaunch]::WslProblemError(\$true, \$false)"),
             show("[CallFromExcel.AddIn.JuliaPort]::NotInstalledError('', \$true)"),
             show("[CallFromExcel.AddIn.JuliaPort]::NotInstalledError('C:\\p', \$false)"),
-            "[CallFromExcel.AddIn.JuliaLaunch]::WslProblemError(\$true, \$true) -eq \$null"], "\n")
+            "[CallFromExcel.AddIn.JuliaLaunch]::WslProblemError(\$true, \$true) -eq \$null",
+            show("[CallFromExcel.AddIn.JuliaExeLocation]::NotFoundError()")], "\n")
         ps1 = tempname() * ".ps1"
         write(ps1, script)
         out = readlines(`powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $ps1`)
@@ -842,6 +854,9 @@ if Sys.iswindows()
               occursin("start Julia by typing julia, and run: $addmatching", out[5]) && out[6] == addmatching
         @test occursin("start Julia with julia --project=\"C:\\p\", and run: $addmatching", out[7]) && out[8] == addmatching
         @test out[9] == "True"
+        winget = "winget install --name Julia --id 9NJNWW8PVKMN -e -s msstore"
+        @test occursin("Julia isn't installed on this PC, or Excel can't find it", out[10]) &&
+              occursin("run: $winget - then launch Julia from Excel again", out[10]) && out[11] == winget
     end
 
     # Under WSL, JuliaLaunch passes the startup file's path to Julia through wsl.exe and bash. An

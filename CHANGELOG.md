@@ -12,6 +12,8 @@ CallFromExcel is the successor to [JuliaExcel](https://github.com/PGS62/JuliaExc
 - Trying Julia under WSL is better guided. When a launch fails because WSL isn't set up, or Julia isn't installed under it, or Julia there doesn't have the CallFromExcel package, the message says what to do and offers to copy the command that does it. The package is installed at exactly the add-in's version, which is also what a version mismatch under WSL now suggests.
 - A project whose packages aren't installed for the Julia being launched - for example one used from Julia on Windows, then from Julia under WSL, which has its own package store - is now instantiated (`Pkg.instantiate()`) at launch, rather than failing with a long list of precompilation errors.
 - Whether a package is installed is now checked before loading it, rather than worked out from Julia's error message.
+- When Julia isn't installed on Windows, the message gives the command that installs it (from julialang.org), to copy. A Julia installed with juliaup while Excel is open is now found without restarting Excel.
+- A Julia older than 1.10, which CallFromExcel doesn't support, is reported as such, with the command that updates it, rather than as a confusing error about loading or installing the package.
 - The Excel add-in is listed in Windows' Settings > Apps, from where it can be uninstalled. Uninstalling removes its files, its registry entries and the ribbon's saved settings.
 
 ## [0.1.6] - 2026-11-14

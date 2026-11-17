@@ -463,11 +463,12 @@ end
         post(path, body; headers=["X-CallFromExcel-Token" => token]) =
             CallFromExcel.HTTP.post(url(path), headers, body; status_exception=false)
         # The port file holds the port, the session token, the package version (which the
-        # add-in checks against its own) and the project folder, for Excel to read.
+        # add-in checks against its own), the project folder, "WSL" or "", and Julia's version,
+        # for Excel to read.
         @test split(read(CallFromExcel.portfile(), String), "\n") ==
               [string(CallFromExcel.xlport[]), token, string(pkgversion(CallFromExcel)),
                dirname(Base.active_project()),   # Pkg.test's own environment, not the default
-               Sys.iswindows() ? "" : "WSL"]
+               Sys.iswindows() ? "" : "WSL", string(VERSION)]
         @test CallFromExcel.project_folder("C:\\p\\Project.toml", "C:\\d\\Project.toml") == "C:\\p"
         @test CallFromExcel.project_folder("C:\\d\\Project.toml", "C:\\d\\Project.toml") == ""
         @test CallFromExcel.project_folder(nothing, "C:\\d\\Project.toml") == ""

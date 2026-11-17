@@ -98,12 +98,14 @@ namespace CallFromExcel.AddIn
         // For the About box: whether a Julia session is listening on this Excel's port, and the
         // CallFromExcel version ("" if too old to record one) and platform its port file records.
         // A short connect timeout, so the box opens promptly when there's no session.
-        internal static void RunningSession(out bool running, out string version, out bool wsl)
+        // Also Julia's own version ("" from a package older than 0.1.7, which didn't record it).
+        internal static void RunningSession(out bool running, out string version, out bool wsl, out string juliaVersion)
         {
             int port = GetJuliaPortOrZero();
             running = port > 0 && JuliaHttpClient.IsListening(port, 300);
             version = running ? VersionFromFile(port) : "";
             wsl = running && LineFromFile(port, 4) == "WSL";
+            juliaVersion = running ? LineFromFile(port, 5) ?? "" : "";
         }
 
         // How to start Julia in a given environment: "start Julia" for Julia's default

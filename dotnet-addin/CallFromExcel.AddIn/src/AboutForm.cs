@@ -61,7 +61,8 @@ namespace CallFromExcel.AddIn
             grid.Controls.Add(Line("Excel add-in: version " + JuliaPort.AddInVersion + "\n" + JuliaSessionText(), em), 1, 2);
 
             var link = new LinkLabel { Text = RepositoryUrl, AutoSize = true, Margin = new Padding(0, em / 2, 0, 0) };
-            link.LinkClicked += (sender, e) => WebPage.Open(RepositoryUrl, this);
+            // Shows the repository's address, but opens the README at its title (as Help does).
+            link.LinkClicked += (sender, e) => WebPage.Open(Ribbon.ReadmeUrl, this);
             grid.Controls.Add(link, 1, 3);
             grid.Controls.Add(Line("Copyright (c) 2021-2026 Philip Swannell. MIT License.", em), 1, 4);
 
@@ -87,17 +88,20 @@ namespace CallFromExcel.AddIn
             return new Label { Text = text, AutoSize = true, Margin = new Padding(0, em / 2, 0, 0) };
         }
 
-        // The CallFromExcel version of the Julia session this Excel is connected to, as its port
-        // file records it - read from the file, not asked of Julia, so this can't hang on a busy
-        // Julia.
+        // The versions of the CallFromExcel package and of Julia in the session this Excel is
+        // connected to, as its port file records them - read from the file, not asked of Julia,
+        // so this can't hang on a busy Julia. Julia's line is left out when there's no session,
+        // or its package is too old to record Julia's version.
         private static string JuliaSessionText()
         {
-            JuliaPort.RunningSession(out bool running, out string version, out bool wsl);
-            if (!running) return "Julia session: none connected";
-            string where = wsl ? " (Julia under WSL)" : "";
-            if (version == "") return "Julia session" + where + ": an older CallFromExcel";
-            string match = version == JuliaPort.AddInVersion ? "" : " - doesn't match the add-in";
-            return "Julia session" + where + ": CallFromExcel version " + version + match;
+            JuliaPort.RunningSession(out bool running, out string version, out bool wsl, out string juliaVersion);
+            if (!running) return "Julia package: Julia isn't running";
+            string package = version == "" ? "an older version"
+                : "version " + version + (version == JuliaPort.AddInVersion ? "" : " - doesn't match the add-in");
+            string julia = juliaVersion == "" ? "" : "\nJulia: version " + juliaVersion + (wsl ? ", under WSL" : "");
+            // Under WSL, said on Julia's line if there is one, else on the package's.
+            if (wsl && julia == "") package += ", under WSL";
+            return "Julia package: " + package + julia;
         }
     }
 }

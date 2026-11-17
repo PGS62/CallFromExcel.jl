@@ -46,6 +46,11 @@ namespace CallFromExcel.AddIn
             if (chosen != "" && System.IO.File.Exists(chosen)) AddRecent(chosen);
         }
 
+        public static void RemoveRecent(string fileName) => RecentFiles.Remove(fileName);
+
+        public static bool IsRecent(string fileName) =>
+            Recent.Any(f => string.Equals(f, fileName, StringComparison.OrdinalIgnoreCase));
+
         public static void ClearRecent() => RecentFiles.Clear();
 
         // A typed or pasted path, trimmed, without the quotes Explorer's "Copy as path" adds.

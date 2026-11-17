@@ -7,6 +7,8 @@ CallFromExcel is the successor to [JuliaExcel](https://github.com/PGS62/JuliaExc
 ### Changes
 
 - Launch Settings... is now its own large button on the ribbon, with a gear icon, rather than on Launch Julia's drop-down menu.
+- The ribbon's File list, and the project folder list in Launch Settings, have a Browse... item, and choosing a recent file or folder that no longer exists offers to remove it from the list.
+- The About dialog also shows the version of Julia, and its wording is clearer.
 - The Excel add-in is listed in Windows' Settings > Apps, from where it can be uninstalled. Uninstalling removes its files, its registry entries and the ribbon's saved settings.
 
 ## [0.1.6] - 2026-11-14

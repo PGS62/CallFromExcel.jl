@@ -22,6 +22,7 @@ namespace CallFromExcel.AddIn
         private const string DefaultEnvironmentItem = "(Default environment)";
         private const string TemporaryEnvironmentItem = "(Temporary environment)";
         private const string TemporaryEnvironment = "@temp";
+        private const string BrowseItem = "Browse...";
         private const string ClearHistoryItem = "Clear history";
         private string _textBeforeDropDown = "";
         private readonly Button _browse = new Button { Text = "Browse...", AutoSize = false, Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left };
@@ -220,8 +221,8 @@ namespace CallFromExcel.AddIn
 
         // The project folder's list, as the ribbon's Julia File box has: "(Default environment)",
         // when there is a folder, to empty the box; "(Temporary environment)", unless that's
-        // already chosen, for @temp; the recent folders; and "Clear history" last, when there is
-        // history to clear.
+        // already chosen, for @temp; the recent folders; "Browse...", as the button beside the box
+        // does; and "Clear history" last, when there is history to clear.
         private void UpdateFolderList()
         {
             string text = _projectFolder.Text;   // clearing the items can clear the text too
@@ -231,12 +232,14 @@ namespace CallFromExcel.AddIn
             if (text.Trim() != TemporaryEnvironment) _projectFolder.Items.Add(TemporaryEnvironmentItem);
             List<string> recent = RecentFolders.Items;
             foreach (string folder in recent) _projectFolder.Items.Add(folder);
+            _projectFolder.Items.Add(BrowseItem);
             if (recent.Count > 0) _projectFolder.Items.Add(ClearHistoryItem);
         }
 
-        // Choosing "(Default environment)", "(Temporary environment)" or "Clear history" acts,
-        // rather than putting that text in the box. The box sets its text to the chosen item after
-        // this event, hence BeginInvoke.
+        // Choosing "(Default environment)", "(Temporary environment)", "Browse..." or "Clear
+        // history" acts, rather than putting that text in the box. The box sets its text to the
+        // chosen item after this event, hence BeginInvoke. A recent folder that no longer exists
+        // offers to remove it from the list.
         private void OnFolderItemChosen()
         {
             string chosen = _projectFolder.SelectedItem as string;
@@ -251,7 +254,35 @@ namespace CallFromExcel.AddIn
                 string keep = _textBeforeDropDown;
                 BeginInvoke((Action)(() => { _projectFolder.Text = keep; UpdateFolderList(); }));
             }
+            else if (chosen == BrowseItem)
+            {
+                string keep = _textBeforeDropDown;
+                BeginInvoke((Action)(() => { _projectFolder.Text = keep; Browse(); UpdateFolderList(); }));
+            }
+            else if (chosen != null && IsWindowsPath(chosen) && !System.IO.Directory.Exists(chosen))
+            {
+                string keep = _textBeforeDropDown;
+                BeginInvoke((Action)(() => OfferToRemoveMissingFolder(chosen, keep)));
+            }
         }
+
+        // A recent folder that no longer exists (moved, deleted, or on a drive not connected now).
+        // Yes removes it from the list and puts back the box's previous text (empty, if that was
+        // the same folder); No keeps it on the list and chosen. A Linux path (under WSL) can't be
+        // checked from here, so is never asked about.
+        private void OfferToRemoveMissingFolder(string folder, string previous)
+        {
+            DialogResult answer = MessageBox.Show(this,
+                "Folder not found:\n" + folder + "\n\nRemove it from the list of recent folders?",
+                Ribbon.DialogTitle, MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            if (answer != DialogResult.Yes) return;
+            RecentFolders.Remove(folder);
+            _projectFolder.Text = string.Equals(previous.Trim(), folder, StringComparison.OrdinalIgnoreCase) ? "" : previous;
+            UpdateFolderList();
+        }
+
+        private static bool IsWindowsPath(string folder) =>
+            folder.Length >= 2 && (folder[1] == ':' || folder.StartsWith(@"\\", StringComparison.Ordinal));
 
         // A label and its field, with the same tooltip on both - the label's still shows when the
         // field is disabled (Bash statements, without WSL).
@@ -307,7 +338,7 @@ namespace CallFromExcel.AddIn
             // To the history if it exists, so a mistyped folder doesn't get there. A Linux path
             // (under WSL, e.g. /home/me/proj or @myenv) can't be checked from here, so goes too.
             string folder = Settings.ProjectFolder;
-            bool windowsPath = folder.Length >= 2 && (folder[1] == ':' || folder.StartsWith(@"\\", StringComparison.Ordinal));
+            bool windowsPath = IsWindowsPath(folder);
             // @temp has its own item, so isn't added.
             if (folder != "" && folder != TemporaryEnvironment && (!windowsPath || System.IO.Directory.Exists(folder)))
                 RecentFolders.Add(folder);

@@ -61,7 +61,7 @@ namespace CallFromExcel.AddIn
                   supertip='Open the CallFromExcel.jl documentation on GitHub.' />
           <button id='CallFromExcelAbout' label='About' size='large' imageMso='Info'
                   onAction='OnAbout'
-                  supertip='Show the version of the CallFromExcel add-in, and of the CallFromExcel package in the Julia session it is connected to.' />
+                  supertip='Show the version of the CallFromExcel add-in, and of the CallFromExcel package and Julia in the Julia session it is connected to.' />
         </group>
       </tab>
     </tabs>
@@ -126,21 +126,40 @@ namespace CallFromExcel.AddIn
         // The Julia File box: its text is the file to include, its drop-down the recent files.
         public string GetIncludeText(IRibbonControl control) => IncludeFiles.Current;
 
-        // Two drop-down items that act rather than name a file: "(No file)" first, when the box
+        // Three drop-down items that act rather than name a file: "(No file)" first, when the box
         // has a file, to empty it - deleting all the text doesn't, since Office then puts the old
-        // text back without telling the add-in - and "Clear history" last, when there is history
-        // to clear. A ribbon combo box's items can only be text (no separator line, no action of
-        // their own), so choosing one arrives here as the box's text changing to its label,
-        // which no file path can equal.
+        // text back without telling the add-in - then after the recent files "Browse...", as the
+        // button beside the box does, and "Clear history", when there is history to clear. A
+        // ribbon combo box's items can only be text (no separator line, no action of their own),
+        // so choosing one arrives here as the box's text changing to its label, which no file
+        // path can equal.
         private const string NoFileLabel = "(No file)";
+        private const string BrowseLabel = "Browse...";
         private const string ClearHistoryLabel = "Clear history";
 
         public void OnIncludeTextChanged(IRibbonControl control, string text)
         {
             if (text == ClearHistoryLabel) IncludeFiles.ClearRecent();   // and keep the current file
             else if (text == NoFileLabel) IncludeFiles.Current = "";
-            else IncludeFiles.Choose(text);
+            else if (text == BrowseLabel) BrowseForIncludeFile();
+            else if (KeepMissingRecentFile(IncludeFiles.Clean(text))) IncludeFiles.Choose(text);
             RefreshFileControls();
+        }
+
+        // A recent file chosen from the list that no longer exists (moved, deleted, or on a drive
+        // not connected now): offers to remove it from the list. Returns whether to choose it
+        // anyway - true unless it is removed. A typed path that doesn't exist isn't asked about:
+        // it's just not added to the list (see IncludeFiles.Choose).
+        private static bool KeepMissingRecentFile(string path)
+        {
+            if (path == "" || File.Exists(path) || !IncludeFiles.IsRecent(path)) return true;
+            DialogResult answer = MessageBox.Show(new ExcelWindow(),
+                "File not found:\n" + path + "\n\nRemove it from the list of recent files?",
+                DialogTitle, MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            if (answer != DialogResult.Yes) return true;
+            IncludeFiles.RemoveRecent(path);
+            if (string.Equals(IncludeFiles.Current, path, StringComparison.OrdinalIgnoreCase)) IncludeFiles.Current = "";
+            return false;
         }
 
         // The box (to show the cleaned path, e.g. without quotes) and Include (enabled or not).
@@ -159,6 +178,7 @@ namespace CallFromExcel.AddIn
             if (IncludeFiles.Current != "") items.Add(NoFileLabel);
             List<string> recent = IncludeFiles.Recent;
             items.AddRange(recent);
+            items.Add(BrowseLabel);
             if (recent.Count > 0) items.Add(ClearHistoryLabel);
             return items;
         }
@@ -181,6 +201,12 @@ namespace CallFromExcel.AddIn
 
         public void OnBrowseIncludeFile(IRibbonControl control)
         {
+            BrowseForIncludeFile();
+            RefreshFileControls();
+        }
+
+        private static void BrowseForIncludeFile()
+        {
             string current = IncludeFiles.Current;
             using (var dialog = new OpenFileDialog
             {
@@ -196,7 +222,6 @@ namespace CallFromExcel.AddIn
                 if (dialog.ShowDialog(new ExcelWindow()) != DialogResult.OK) return;
                 IncludeFiles.Choose(dialog.FileName);
             }
-            RefreshFileControls();
         }
 
         public void OnIncludeFile(IRibbonControl control)
@@ -308,9 +333,13 @@ namespace CallFromExcel.AddIn
 
         public void OnHelp(IRibbonControl control)
         {
-            // The README's title - the anchor follows its wording, so keep the two in step.
-            WebPage.Open(JuliaFunctions.HelpRoot + "callfromexceljl---call-julia-from-excel", new ExcelWindow());
+            WebPage.Open(ReadmeUrl, new ExcelWindow());
         }
+
+        // The README's title, for Help and the About dialog's link: the README itself, not the
+        // repository's file list above it. The anchor follows the title's wording, so keep the
+        // two in step.
+        internal const string ReadmeUrl = JuliaFunctions.HelpRoot + "callfromexceljl---call-julia-from-excel";
 
         public void OnAbout(IRibbonControl control)
         {

@@ -42,6 +42,16 @@ namespace CallFromExcel.AddIn
             }
         }
 
+        public void Remove(string item)
+        {
+            List<string> items = Items;
+            items.RemoveAll(f => string.Equals(f, item, StringComparison.OrdinalIgnoreCase));
+            using (RegistryKey key = Registry.CurrentUser.CreateSubKey(_keyPath))
+            {
+                key.SetValue(ValueName, items.ToArray(), RegistryValueKind.MultiString);
+            }
+        }
+
         public void Clear()
         {
             using (RegistryKey key = Registry.CurrentUser.CreateSubKey(_keyPath))

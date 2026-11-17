@@ -34,16 +34,38 @@ param(
     # either) - see dotnet-addin/README.md. So the per-user Link Hell risk doesn't apply here
     # the way it did for the xlam.
     [string]$DestFolder = (Join-Path $env:APPDATA "Microsoft\AddIns\CallFromExcel"),
-    [string]$OldXlamName = "JuliaExcel.xlam"
+    [string]$OldXlamName = "JuliaExcel.xlam",
+    # Uninstall instead: undo everything an install did. Run this way, from the copy of this
+    # script in the install folder, by Windows' Settings > Apps (see Register-Uninstaller).
+    [switch]$Uninstall,
+    # Report the outcome in a message box, not just the output stream - for Settings > Apps,
+    # which runs this with no console window to read.
+    [switch]$ShowDialogs
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+$ProductName = "CallFromExcel"
+$UninstallKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\CallFromExcel"
+
+function Show-Dialog {
+    param([string]$Message, [string]$Icon)
+    if (-not $ShowDialogs) { return }
+    Add-Type -AssemblyName System.Windows.Forms
+    # powershell.exe doesn't declare itself DPI-aware, so on a scaled display Windows would
+    # stretch the dialog (blurry); and without visual styles its button looks out of date.
+    Add-Type -Namespace Win32 -Name Dpi -MemberDefinition '[DllImport("user32.dll")] public static extern bool SetProcessDPIAware();'
+    [Win32.Dpi]::SetProcessDPIAware() | Out-Null
+    [System.Windows.Forms.Application]::EnableVisualStyles()
+    [System.Windows.Forms.MessageBox]::Show($Message, $ProductName, "OK", $Icon) | Out-Null
+}
+
 # Report any failure as just its message (not PowerShell's position and category details,
 # which bury it), and exit non-zero so callers such as installme() know it failed.
 trap {
     [Console]::Error.WriteLine("ERROR: " + $_.Exception.Message)
+    Show-Dialog -Message $_.Exception.Message -Icon "Error"
     exit 1
 }
 
@@ -250,6 +272,77 @@ function Get-ExcelMachineType {
     }
 }
 
+# -----------------------------------------------------------------------------------------------
+# Function  : Register-Uninstaller
+# Purpose   : Lists CallFromExcel in Windows' Settings > Apps (and Control Panel's Programs and
+#             Features), so it can be uninstalled from there like other Windows software. A
+#             per-user (HKCU) entry needs no admin rights. No DisplayIcon, so Windows shows its
+#             generic program icon - the Julia logo would suggest this entry is Julia itself.
+#             Publisher is the project's web address rather than a person's name.
+# -----------------------------------------------------------------------------------------------
+function Register-Uninstaller {
+    param([string]$Folder, [string]$Version)
+    $script = Join-Path $Folder "Install.ps1"
+    $powershell = Join-Path $env:SystemRoot "System32\WindowsPowerShell\v1.0\powershell.exe"
+    $url = "https://github.com/PGS62/CallFromExcel.jl"
+    $sizeKb = [int][math]::Ceiling(((Get-ChildItem -Path $Folder -File | Measure-Object -Property Length -Sum).Sum) / 1KB)
+
+    if (-not (Test-Path -Path $UninstallKey)) { New-Item -Path $UninstallKey -Force | Out-Null }
+    Set-ItemProperty -Path $UninstallKey -Name "DisplayName" -Value $ProductName
+    Set-ItemProperty -Path $UninstallKey -Name "DisplayVersion" -Value $Version
+    Set-ItemProperty -Path $UninstallKey -Name "Publisher" -Value "github.com/PGS62/CallFromExcel.jl"
+    Set-ItemProperty -Path $UninstallKey -Name "Comments" -Value "Excel add-in for calling Julia from Excel"
+    Set-ItemProperty -Path $UninstallKey -Name "URLInfoAbout" -Value $url
+    Set-ItemProperty -Path $UninstallKey -Name "HelpLink" -Value $url
+    Set-ItemProperty -Path $UninstallKey -Name "InstallLocation" -Value $Folder
+    Set-ItemProperty -Path $UninstallKey -Name "InstallDate" -Value (Get-Date -Format "yyyyMMdd")
+    Set-ItemProperty -Path $UninstallKey -Name "UninstallString" `
+        -Value "`"$powershell`" -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$script`" -Uninstall -ShowDialogs"
+    Set-ItemProperty -Path $UninstallKey -Name "EstimatedSize" -Value $sizeKb -Type DWord
+    Set-ItemProperty -Path $UninstallKey -Name "NoModify" -Value 1 -Type DWord
+    Set-ItemProperty -Path $UninstallKey -Name "NoRepair" -Value 1 -Type DWord
+}
+
+# -----------------------------------------------------------------------------------------------
+# Function  : Invoke-Uninstall
+# Purpose   : Undoes an install: the add-in's auto-load entry (for every Office version, so Excel
+#             needn't be started to ask its version), the COM class and type library
+#             registrations, the add-in's saved settings (Launch Settings and recent files and
+#             folders), the Settings > Apps entry, and the install folder. The Julia package is
+#             separate and left alone.
+# -----------------------------------------------------------------------------------------------
+function Invoke-Uninstall {
+    $officeKey = "HKCU:\Software\Microsoft\Office"
+    if (Test-Path -Path $officeKey) {
+        foreach ($version in Get-ChildItem -Path $officeKey) {
+            $regPath = Join-Path $version.PSPath "Excel\Options"
+            if (Test-Path -Path $regPath) {
+                if ($null -ne (Remove-ExcelAddinFromRegistry -RegPath $regPath -AddinNameFragment $XllDestFileName)) {
+                    Write-Output "Removed the add-in from Excel's add-ins (Office $($version.PSChildName))."
+                }
+            }
+        }
+    }
+    foreach ($key in @("HKCU:\Software\Classes\CallFromExcel.ComServer",
+                       "HKCU:\Software\Classes\CLSID\{0581209a-2052-43b8-8875-83bfe419e8c5}",
+                       "HKCU:\Software\Classes\TypeLib\{f3b6c2a0-6e7a-4b7d-9c1a-2e4d8a6b1c3f}",
+                       "HKCU:\Software\CallFromExcel",
+                       $UninstallKey)) {
+        if (Test-Path -Path $key) {
+            Remove-Item -Path $key -Recurse -Force
+            Write-Output "Removed registry key $key"
+        }
+    }
+    if (Test-Path -Path $DestFolder) {
+        Remove-Item -Path $DestFolder -Recurse -Force
+        Write-Output "Deleted $DestFolder"
+    }
+    $done = "The CallFromExcel Excel add-in has been uninstalled.`n`nThe CallFromExcel Julia package is separate. To remove it, run in Julia:`n`nusing Pkg; Pkg.rm(""CallFromExcel"")"
+    Write-Output ""
+    Write-Output $done
+    Show-Dialog -Message $done -Icon "Information"
+}
+
 function Copy-RequiredFile {
     param([string]$SourcePath, [string]$DestPath)
     if (-not (Test-Path -Path $SourcePath -PathType Leaf)) {
@@ -267,6 +360,11 @@ function Copy-RequiredFile {
 
 if (Get-Process -Name "EXCEL" -ErrorAction SilentlyContinue) {
     throw "Excel is currently running. Close every Excel window (check Task Manager for a background EXCEL.EXE process too), then try again."
+}
+
+if ($Uninstall) {
+    Invoke-Uninstall
+    exit 0
 }
 
 $machineType = Get-ExcelMachineType
@@ -364,6 +462,11 @@ Write-Output "Registered its type library (VBA editor: Tools > References > Call
 # it when loaded in the REPL and suggests installme() if it's missing or a different version.
 $installedVersion = (Get-Item $dllDestPath).VersionInfo.ProductVersion
 [IO.File]::WriteAllText((Join-Path $DestFolder "version.txt"), $installedVersion)
+
+# A copy of this script, run with -Uninstall by the Settings > Apps entry.
+Copy-Item -Path $PSCommandPath -Destination (Join-Path $DestFolder "Install.ps1") -Force
+Register-Uninstaller -Folder $DestFolder -Version $installedVersion
+Write-Output "Listed in Windows' Settings > Apps, from where it can be uninstalled."
 
 Write-Output ""
 Write-Output "CallFromExcel is installed. Its functions (JuliaLaunch, JuliaCall, JuliaEval, ...) will be available the next time Excel starts."

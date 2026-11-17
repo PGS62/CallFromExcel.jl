@@ -53,6 +53,7 @@ Installation does not require admin rights on the PC.
    `Pkg.add` installs the Julia package, and `installme()` installs the Excel add-in.
  * Launch Excel. Check that it shows a Julia tab on the ribbon, and that typing `=Julia` into a worksheet cell makes the auto-complete offer `JuliaCall`, `JuliaEval`, `JuliaInclude` etc.
  * After updating CallFromExcel (e.g. with `Pkg.update()`), close Excel and run `using CallFromExcel; CallFromExcel.installme()` again: the add-in and the Julia package must be the same version, and if they aren't, Excel says so. Do the same if the functions go missing from Excel.
+ * To uninstall the Excel add-in, close Excel and find CallFromExcel in Windows' Settings > Apps > Installed apps. This also removes the ribbon's saved settings. The Julia package is separate: remove it with `using Pkg; Pkg.rm("CallFromExcel")`.
 <!--
 The process is illustrated in the GIF below. F5 to replay.
 

@@ -763,14 +763,20 @@ namespace CallFromExcel.AddIn
                    "        folder = temporary || projectfile === nothing || projectfile == Base.load_path_expand(\"@v#.#\") ? \"\" : dirname(projectfile)\n" +
                    "        uninstalled = String[]\n" +
                    "        manifest = temporary || projectfile === nothing ? nothing : Base.project_file_manifest_path(projectfile)\n" +
+                   // A Manifest this can't read is left alone, rather than its error hiding a
+                   // later, more useful message, such as the version check's.
                    "        if manifest !== nothing && isfile(manifest)\n" +
-                   "            manifestdeps = Base.parsed_toml(manifest)\n" +
-                   "            for (name, entries) in get(manifestdeps, \"deps\", manifestdeps)\n" +
-                   "                entries isa Vector || continue\n" +
-                   "                for entry in entries\n" +
-                   "                    entry isa AbstractDict && haskey(entry, \"uuid\") || continue\n" +
-                   "                    Base.locate_package(Base.PkgId(Base.UUID(entry[\"uuid\"]), name)) === nothing && push!(uninstalled, name)\n" +
+                   "            try\n" +
+                   "                manifestdeps = Base.parsed_toml(manifest)\n" +
+                   "                for (name, entries) in get(manifestdeps, \"deps\", manifestdeps)\n" +
+                   "                    entries isa Vector || continue\n" +
+                   "                    for entry in entries\n" +
+                   "                        entry isa AbstractDict && haskey(entry, \"uuid\") || continue\n" +
+                   "                        Base.locate_package(Base.PkgId(Base.UUID(entry[\"uuid\"]), name)) === nothing && push!(uninstalled, name)\n" +
+                   "                    end\n" +
                    "                end\n" +
+                   "            catch\n" +
+                   "                empty!(uninstalled)\n" +
                    "            end\n" +
                    "        end\n" +
                    "        if !isempty(uninstalled)\n" +

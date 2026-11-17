@@ -15,6 +15,7 @@ CallFromExcel is the successor to [JuliaExcel](https://github.com/PGS62/JuliaExc
 - When Julia isn't installed on Windows, the message gives the command that installs it (from julialang.org), to copy. A Julia installed with juliaup while Excel is open is now found without restarting Excel.
 - A Julia older than 1.10, which CallFromExcel doesn't support, is reported as such, with the command that updates it, rather than as a confusing error about loading or installing the package.
 - When the Excel that a Julia session is serving closes (or crashes), the session stops serving it and deletes its port file. Before, it kept listening, and since Windows reuses process ids, a later Excel given the same id could silently connect to the old session and its leftover state. Julia itself stays open. Windows only: Julia under WSL can't watch a Windows process.
+- Excel now checks that it's talking to its own Julia session, not to another program that has taken the port since that session ended - which, on a machine shared by several users, could be another user's. Each reply from Julia carries a secret from the port file, and a new connection is checked before any request is sent on it, so such a program never receives one. Julia also deletes its port file when it exits.
 - The Excel add-in is listed in Windows' Settings > Apps, from where it can be uninstalled. Uninstalling removes its files, its registry entries and the ribbon's saved settings.
 
 ## [0.1.6] - 2026-11-14

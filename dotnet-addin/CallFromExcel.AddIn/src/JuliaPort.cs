@@ -22,6 +22,7 @@ namespace CallFromExcel.AddIn
         private static int _cachedPort;
         private static string _cachedToken = "";
         private static string _cachedVersion = "";
+        private static string _cachedServerToken = "";
 
         private static string PortFilePath()
         {
@@ -37,12 +38,14 @@ namespace CallFromExcel.AddIn
                 _cachedPort = 0;
                 _cachedToken = "";
                 _cachedVersion = "";
+                _cachedServerToken = "";
                 try { File.Delete(PortFilePath()); } catch (IOException) { } catch (UnauthorizedAccessException) { }
                 return;
             }
             _cachedPort = port;
             _cachedToken = TokenFromFile(port);
             _cachedVersion = VersionFromFile(port);
+            _cachedServerToken = LineFromFile(port, 6) ?? "";
         }
 
         private static void ReadPortFile(out int port, out string token)
@@ -210,6 +213,22 @@ namespace CallFromExcel.AddIn
         {
             if (port == _cachedPort && _cachedToken.Length > 0) return _cachedToken;
             return TokenFromFile(port);
+        }
+
+        // The token the Julia on `port` must send back with every reply (header
+        // X-CallFromExcel-Server), proving the reply is from this Excel's own session - not from
+        // some other program that has taken the port since that session ended. "" if the port
+        // file has none (a package older than 0.1.7), which no reply can match.
+        public static string ServerTokenFor(int port)
+        {
+            if (port == _cachedPort && _cachedServerToken.Length > 0) return _cachedServerToken;
+            return ServerTokenFromFile(port);
+        }
+
+        // As ServerTokenFor, bypassing the cache (as TokenFromFile).
+        public static string ServerTokenFromFile(int port)
+        {
+            return LineFromFile(port, 6) ?? "";
         }
 
         // Returns the cached port, recovering from the port file on disk if the in-memory

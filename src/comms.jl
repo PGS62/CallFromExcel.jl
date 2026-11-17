@@ -551,6 +551,11 @@ function start_server(start::Int=2700)
     # A secret for this session, written to the port file (in the user's own temp folder) for
     # Excel to read and send with every request - see _reject_request.
     session_token[] = bytes2hex(rand(RandomDevice(), UInt8, 16))
+    # And one Julia sends back, so Excel knows a reply is from this session: once Julia exits,
+    # its port is free for any program on the machine - any user's, on a shared machine - to
+    # listen on, and Excel would otherwise send it calls and show its replies. The session
+    # token can't help there: it proves Excel to Julia, not Julia to Excel.
+    server_token[] = bytes2hex(rand(RandomDevice(), UInt8, 16))
     port = start
     while true
         try
@@ -572,7 +577,8 @@ function start_server(start::Int=2700)
                 result = req.target == "/eval" ? Base.invokelatest(srv_eval_inner, body) :
                          req.target == "/call" ? Base.invokelatest(srv_call_inner, body) :
                          req.target == "/callkw" ? Base.invokelatest(srv_call_inner, body; named_args=true) :
-                         return HTTP.Response(404, "Unknown CallFromExcel endpoint $(req.target)")
+                         return HTTP.Response(404, ["X-CallFromExcel-Server" => server_token[]],
+                                              "Unknown CallFromExcel endpoint $(req.target)")
                 _text_response(result)
             end
             break
@@ -588,16 +594,41 @@ function start_server(start::Int=2700)
     # doesn't install the add-in, they can drift apart. Then the project folder, and "WSL" if
     # this isn't Julia on Windows (Excel only talks to that or to Julia under WSL), which the
     # add-in's mismatch message uses to say how to start Julia to fix it. Then Julia's own
-    # version, for the add-in's About dialog.
+    # version, for the add-in's About dialog, and the server token (see above).
     open(portfile(), "w") do f
         write(f, string(port, "\n", session_token[], "\n", pkgversion(@__MODULE__), "\n",
             project_folder(Base.active_project(), Base.load_path_expand("@v#.#"), temporary_project()), "\n",
-            Sys.iswindows() ? "" : "WSL", "\n", VERSION))
+            Sys.iswindows() ? "" : "WSL", "\n", VERSION, "\n", server_token[]))
+    end
+    # When Julia exits normally, delete the port file, so Excel finds no session rather than
+    # trying the freed port. (Not after a crash or a killed process: the server token covers
+    # those.) Once per session; it deletes whichever port file is current then, if still ours.
+    if !_atexit_registered[]
+        _atexit_registered[] = true
+        atexit(_remove_portfile)
     end
     xlport[] = port
     settitle()
     println("CallFromExcel HTTP server listening on port $port")
     _watch_excel(getxlpid(), portfile())
+    nothing
+end
+
+"""
+    _remove_portfile()
+Deletes this session's port file, if it is still this session's (its token is this session's) -
+not one a later session for the same Excel has written since. Run when Julia exits (see
+`start_server`).
+"""
+function _remove_portfile()
+    try
+        (xlpid[] == 0 || commsfolder[] == "") && return nothing
+        file = portfile()
+        isfile(file) || return nothing
+        lines = readlines(file)
+        length(lines) >= 2 && lines[2] == session_token[] && rm(file; force=true)
+    catch
+    end
     nothing
 end
 
@@ -642,8 +673,11 @@ end
 
 # The explicit Content-Length matters for performance, not just correctness: without it, HTTP.jl
 # falls back to chunked transfer-encoding, which clients reassemble less efficiently.
+# X-CallFromExcel-Server proves to Excel that the reply is from this session (see start_server).
+# Only replies to requests that passed _reject_request carry it - so only to a caller that
+# already has the session token - else anyone could ask for it and later pose as this session.
 _text_response(s::String) = HTTP.Response(200, ["Content-Type" => "text/plain; charset=utf-8",
-    "Content-Length" => string(ncodeunits(s))], s)
+    "Content-Length" => string(ncodeunits(s)), "X-CallFromExcel-Server" => server_token[]], s)
 
 """
     warm_up(port)

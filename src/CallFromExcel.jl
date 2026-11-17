@@ -14,6 +14,8 @@ const global xlpid = Ref(0)
 const global commsfolder = Ref("")
 const global xlport = Ref(0)
 const global session_token = Ref("")
+const global server_token = Ref("")
+const global _atexit_registered = Ref(false)
 const global _display_results = Ref(false)
 const global _server = Ref{Any}(nothing)
 # For _watch_excel: seconds between checks that Excel is still running (shortened by the tests),

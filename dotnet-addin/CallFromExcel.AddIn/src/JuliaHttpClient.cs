@@ -33,6 +33,13 @@ namespace CallFromExcel.AddIn
         // Excel's Julia has since taken.
         private const int WrongTokenStatus = 409;
 
+        // And every reply must carry the session's server token (JuliaPort.ServerTokenFor), or
+        // it isn't from this Excel's Julia: once a session ends, its port is free for any
+        // program on the machine - any user's, on a shared one - to listen on. Such a reply is
+        // treated as Julia not running, and a new connection is checked with a /ping before any
+        // real request is sent on it (VerifiedServer), so such a program never sees one.
+        private const string ServerTokenHeader = "X-CallFromExcel-Server";
+
         private static readonly object PoolLock = new object();
         private static readonly Stack<Connection> Pool = new Stack<Connection>();
 
@@ -93,6 +100,12 @@ namespace CallFromExcel.AddIn
                 result = null;
                 return false;
             }
+            if (!VerifiedServer(fresh))
+            {
+                fresh.Dispose();
+                result = null;
+                return false;
+            }
             Response freshResponse;
             if (!fresh.TrySend(request, out freshResponse))
             {
@@ -103,9 +116,24 @@ namespace CallFromExcel.AddIn
             return Finish(fresh, freshResponse, out result);
         }
 
+        // Whether a new connection reaches this Excel's own Julia: a /ping (no side effects)
+        // answered 200 with the server token, on a connection kept open for the real request.
+        private static bool VerifiedServer(Connection connection)
+        {
+            Response response;
+            if (!connection.TrySend(BuildRequest("/ping", "", JuliaPort.TokenFor(connection.Port)), out response)) return false;
+            return response.StatusCode == 200 && response.KeepAlive && FromServer(connection.Port, response);
+        }
+
+        private static bool FromServer(int port, Response response)
+        {
+            string expected = JuliaPort.ServerTokenFor(port);
+            return expected.Length > 0 && response.ServerToken == expected;
+        }
+
         private static bool Finish(Connection connection, Response response, out string result)
         {
-            if (response.StatusCode == WrongTokenStatus)
+            if (response.StatusCode == WrongTokenStatus || !FromServer(connection.Port, response))
             {
                 // Whatever holds this port is not this Excel's Julia session: as far as this
                 // Excel is concerned, its own Julia is not reachable.
@@ -160,6 +188,7 @@ namespace CallFromExcel.AddIn
             public string ReasonPhrase;
             public string Body;
             public bool KeepAlive;
+            public string ServerToken = "";
         }
 
         private sealed class Connection : IDisposable
@@ -264,6 +293,8 @@ namespace CallFromExcel.AddIn
                         chunked = true;
                     else if (name.Equals("Connection", StringComparison.OrdinalIgnoreCase) && value.Equals("close", StringComparison.OrdinalIgnoreCase))
                         response.KeepAlive = false;
+                    else if (name.Equals(ServerTokenHeader, StringComparison.OrdinalIgnoreCase))
+                        response.ServerToken = value;
                 }
 
                 var leftover = new MemoryStream(_buffer, headerEnd + 4, filled - headerEnd - 4, false);
@@ -354,7 +385,8 @@ namespace CallFromExcel.AddIn
         // JuliaLaunch to decide whether a new session is needed, and by JuliaIsRunning.
         // Uses /ping, which has no side effects in Julia (unlike evaluating code, which
         // would overwrite last_question/last_answer), and which, like every endpoint, answers
-        // 200 only to a request carrying this Excel's session token.
+        // 200 only to a request carrying this Excel's session token - and only Julia itself can
+        // send back the session's server token.
         public static bool IsListening(int port, int timeoutMs = 2000)
         {
             string token = JuliaPort.TokenFromFile(port);
@@ -368,7 +400,13 @@ namespace CallFromExcel.AddIn
                     connection.SetReadTimeout(timeoutMs);
                     Response response;
                     if (!connection.TrySend(BuildRequest("/ping", "", token), out response)) return false;
-                    return response.StatusCode == 200;
+                    // A port file without a server token is from a CallFromExcel package older
+                    // than this add-in, which doesn't send one: the session counts as running,
+                    // so that JuliaLaunch, the About dialog and the ribbon report the version
+                    // mismatch rather than "not running" or "not responding". Safe, as only the
+                    // /ping is sent here, and every real request first fails JuliaPort.CheckVersion.
+                    string expected = JuliaPort.ServerTokenFromFile(port);
+                    return response.StatusCode == 200 && (expected.Length == 0 || response.ServerToken == expected);
                 }
                 catch (Exception ex) when (ex is IOException || ex is SocketException || ex is ObjectDisposedException)
                 {

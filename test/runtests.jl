@@ -468,7 +468,12 @@ end
         @test split(read(CallFromExcel.portfile(), String), "\n") ==
               [string(CallFromExcel.xlport[]), token, string(pkgversion(CallFromExcel)),
                dirname(Base.active_project()),   # Pkg.test's own environment, not the default
-               Sys.iswindows() ? "" : "WSL", string(VERSION)]
+               Sys.iswindows() ? "" : "WSL", string(VERSION), CallFromExcel.server_token[]]
+        # Replies carry the server token, proving to Excel that they're from this session; a
+        # refused request's reply doesn't, so the token can't be fished for.
+        @test CallFromExcel.HTTP.header(post("/ping", ""), "X-CallFromExcel-Server") == CallFromExcel.server_token[]
+        @test CallFromExcel.HTTP.header(post("/eval", "1+1"), "X-CallFromExcel-Server") == CallFromExcel.server_token[]
+        @test CallFromExcel.HTTP.header(post("/ping", ""; headers=["X-CallFromExcel-Token" => "wrong"]), "X-CallFromExcel-Server") == ""
         @test CallFromExcel.project_folder("C:\\p\\Project.toml", "C:\\d\\Project.toml") == "C:\\p"
         @test CallFromExcel.project_folder("C:\\d\\Project.toml", "C:\\d\\Project.toml") == ""
         @test CallFromExcel.project_folder(nothing, "C:\\d\\Project.toml") == ""
@@ -514,6 +519,79 @@ end
     # same pid - starting a fresh session again for 4321 without stopping the previous one first.
     @test_throws String CallFromExcel._attach_to_excel(true, 4321)
     CallFromExcel.stop_server()
+
+    # Another program on the port of a session that has ended (e.g. another user's, on a shared
+    # machine) isn't taken for Julia: the add-in's own client, given a port file pointing at
+    # such a program - an HTTP server that answers anything with 200 - reports no connection,
+    # and the program never receives the real request, only the /ping that checks it first.
+    # Given the real session's port file, the same client gets its answer.
+    if Sys.iswindows()
+        @testset "Only this Excel's Julia is believed" begin
+            dll = joinpath(@__DIR__, "..", "dotnet-addin", "dist", "CallFromExcel.AddIn.dll")
+            CallFromExcel.setxlpid(4321)
+            CallFromExcel.comms_folder(CallFromExcel._default_commsfolder())
+            CallFromExcel.start_server()
+            real = read(CallFromExcel.portfile(), String)
+            seen = String[]
+            fakeport = CallFromExcel.xlport[] + 50
+            fake = CallFromExcel.HTTP.serve!("127.0.0.1", fakeport) do req
+                push!(seen, req.target)
+                CallFromExcel.HTTP.Response(200, "Not Julia")
+            end
+            try
+                realfile, impostorfile = tempname(), tempname()
+                write(realfile, real)
+                write(impostorfile, replace(real, r"^\d+" => string(fakeport)))
+                oldfile = tempname()   # as written by an older package: no server token
+                write(oldfile, join(split(read(impostorfile, String), "\n")[1:6], "\n"))
+                ps1 = tempname() * ".ps1"
+                write(ps1, """
+                    [void][Reflection.Assembly]::LoadFrom('$dll')
+                    \$file = Join-Path ([CallFromExcel.AddIn.FileUtils]::LocalTemp()) ("Port_" + \$PID + ".txt")
+                    function Ask(\$portfile) {
+                        [CallFromExcel.AddIn.JuliaPort]::SetJuliaPort(0)
+                        Copy-Item \$portfile \$file
+                        try { [CallFromExcel.AddIn.JuliaHttpClient]::Post('1+1', '/eval') }
+                        catch { 'ERROR: ' + \$_.Exception.GetBaseException().Message }
+                    }
+                    function Listening(\$portfile) {
+                        [CallFromExcel.AddIn.JuliaPort]::SetJuliaPort(0)
+                        Copy-Item \$portfile \$file
+                        [CallFromExcel.AddIn.JuliaHttpClient]::IsListening([CallFromExcel.AddIn.JuliaPort]::ReadJuliaPortFromFile())
+                    }
+                    Ask('$realfile')
+                    Ask('$impostorfile')
+                    Listening('$impostorfile')
+                    Listening('$oldfile')
+                    [CallFromExcel.AddIn.JuliaPort]::SetJuliaPort(0)
+                    """)
+                out = readlines(`powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $ps1`)
+                rm(ps1)
+                @test length(out) == 4
+                @test !startswith(out[1], "ERROR") && occursin("2", out[1])
+                @test startswith(out[2], "ERROR: There is no connection between Excel and Julia")
+                @test all(==("/ping"), seen)   # never a real request
+                # IsListening, the "is my Julia there?" check: not the impostor - unless the port
+                # file has no server token, as from a CallFromExcel package older than the add-in,
+                # whose session counts as running, so that its version mismatch is what's reported.
+                @test out[3] == "False"
+                @test out[4] == "True"
+            finally
+                close(fake)
+                CallFromExcel.stop_server()
+            end
+            # When Julia exits, its port file is deleted (atexit), so Excel finds no session
+            # rather than trying the freed port - but only if it's still this session's.
+            portfile = CallFromExcel.portfile()
+            @test isfile(portfile)   # stop_server leaves it
+            CallFromExcel._remove_portfile()
+            @test !isfile(portfile)
+            write(portfile, "2700\nanothersessionstoken\n")
+            CallFromExcel._remove_portfile()
+            @test isfile(portfile)
+            rm(portfile)
+        end
+    end
 
     # When the Excel being served exits, the server stops and its port file goes, so a later
     # Excel given the same process id can't connect to this session. A short-lived Julia stands

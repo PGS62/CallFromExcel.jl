@@ -453,7 +453,7 @@ namespace CallFromExcel.AddIn
         {
             return "Julia is still starting after " + timeoutSeconds + " seconds - it may be precompiling " +
                    "packages. Wait until its window shows \"CallFromExcel HTTP server listening\"; JuliaEval " +
-                   "and JuliaCall will then connect to it.";
+                   "and JuliaCall will then connect to it. If it shows an error instead, that explains what went wrong.";
         }
 
         // "C:\foo\bar" -> "/mnt/c/foo/bar". Port of WSLAddress (modUtils.bas).

@@ -41,7 +41,7 @@ namespace CallFromExcel.AddIn
             "installed under WSL.";
         private const string MinimiseTip =
             "Start Julia's window minimised, so it doesn't appear over Excel.\n" +
-            "Click its taskbar button to see it.";
+            "To see it, click Show Julia on the ribbon, or its taskbar button.";
         private const string ProjectFolderTip =
             "The Julia project to start in, given to Julia as its --project option.\n" +
             "A project is a folder with a Project.toml file, listing the packages\n" +

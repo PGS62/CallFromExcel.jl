@@ -71,12 +71,12 @@ As an alternative to calling Julia running in a Windows process, CallFromExcel c
 ## The Julia ribbon tab
 The add-in adds a Julia tab to Excel's ribbon:
 
-<img src="images/ribbon.png" alt="The Julia tab on Excel's ribbon, with one group, CallFromExcel.jl: Launch Julia, Show Julia, Close Julia, Display Results, a Julia File box with Browse and Include, Help and About" />
+<img src="images/ribbon.png" alt="The Julia tab on Excel's ribbon, with one group, CallFromExcel.jl: Launch Julia, Launch Settings, Show Julia, Close Julia, Display Results, a Julia File box with Browse and Include, Help and About" />
 
 |Control|What it does|
 |:------|:-----------|
 |**Launch Julia**|Starts Julia for this Excel session, using the Launch Settings.|
-|**Launch Settings...**|On Launch Julia's drop-down menu. Sets the project folder, other command line options, packages to load, whether to run under WSL, and so on. The settings are saved for you on this PC.|
+|**Launch Settings...**|Sets the project folder, other command line options, packages to load, whether to run under WSL, and so on. The settings are saved for you on this PC.|
 |**Show Julia**|Brings Julia's window to the front.|
 |**Close Julia**|Closes Julia, after asking for confirmation.|
 |**Display Results**|Shows each call from Excel, and its result, in Julia's window - as `CallFromExcel.display_results(true)` does.|

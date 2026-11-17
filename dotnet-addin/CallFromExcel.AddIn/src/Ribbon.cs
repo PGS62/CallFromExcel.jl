@@ -26,17 +26,13 @@ namespace CallFromExcel.AddIn
     <tabs>
       <tab id='CallFromExcelTab' label='Julia'>
         <group id='CallFromExcelGroup' label='CallFromExcel.jl'>
-          <splitButton id='LaunchSplit' size='large'>
-            <button id='LaunchJulia' label='Launch Julia' image='JuliaLogo'
-                    onAction='OnLaunchJulia'
-                    screentip='Launch Julia'
-                    supertip='Launch a local Julia session for this Excel session, using the Launch Settings.' />
-            <menu id='LaunchMenu'>
-              <button id='LaunchSettings' label='Launch Settings...' imageMso='PropertySheet'
-                      onAction='OnLaunchSettings'
-                      supertip='Choose the project folder, packages and other options the Launch Julia button uses. JuliaLaunch() formulas use their own arguments instead.' />
-            </menu>
-          </splitButton>
+          <button id='LaunchJulia' label='Launch Julia' image='JuliaLogo' size='large'
+                  onAction='OnLaunchJulia'
+                  screentip='Launch Julia'
+                  supertip='Launch a local Julia session for this Excel session, using the Launch Settings.' />
+          <button id='LaunchSettings' label='Launch Settings...' imageMso='AddInManager' size='large'
+                  onAction='OnLaunchSettings'
+                  supertip='Choose the project folder, packages and other options the Launch Julia button uses. JuliaLaunch() formulas use their own arguments instead.' />
           <button id='ShowJuliaWindow' label='Show Julia' imageMso='WindowUnhide'
                   onAction='OnShowJuliaWindow'
                   supertip='Bring the Julia window serving this Excel session to the front, restoring it if it is minimised.' />

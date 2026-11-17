@@ -2,6 +2,12 @@
 
 CallFromExcel is the successor to [JuliaExcel](https://github.com/PGS62/JuliaExcel.jl), and its version numbers start again at 0.1.0. The entries from JuliaExcel 2.4.1 down are JuliaExcel's, kept for the record of how it evolved, including its performance.
 
+## [Unreleased]
+
+### Changes
+
+- Launch Settings... is now its own large button on the ribbon, with a gear icon, rather than on Launch Julia's drop-down menu.
+
 ## [0.1.6] - 2026-11-14
 
 ### Changes

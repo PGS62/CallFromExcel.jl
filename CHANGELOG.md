@@ -4,19 +4,29 @@ CallFromExcel is the successor to [JuliaExcel](https://github.com/PGS62/JuliaExc
 
 ## [Unreleased]
 
-### Changes
+### Clearer guidance when Julia can't start
 
-- Launch Settings... is now its own large button on the ribbon, with a gear icon, rather than on Launch Julia's drop-down menu.
+When launching Julia from Excel fails because something it needs is missing, the message says what to do, and the ribbon's error dialog offers to copy the command that does it.
+
+- Julia isn't installed on Windows: the command that installs it, from julialang.org. A Julia installed with juliaup while Excel is open is then found without restarting Excel.
+- Julia is older than 1.10, which CallFromExcel doesn't support: the command that updates it, rather than a confusing error about loading or installing the package.
+- Trying Julia under WSL: when WSL isn't set up, Julia isn't installed under it, or Julia there doesn't have the CallFromExcel package. The package is installed at exactly the add-in's version, which is also what a version mismatch under WSL now suggests.
+- A project whose packages aren't installed for the Julia being launched - for example one used from Julia on Windows, then from Julia under WSL, which has its own package store - is now instantiated (`Pkg.instantiate()`) at launch, rather than failing with a long list of precompilation errors.
+- Whether CallFromExcel and the `Packages` are installed is checked before loading them, rather than worked out from Julia's error messages.
+- When Excel stops waiting for a slow start, its message says that any error will be shown in Julia's window.
+
+### Sessions end cleanly and can't be impersonated
+
+- When the Excel that a Julia session is serving closes (or crashes), the session stops serving it, deletes its port file and says so in its window and title. Before, it kept listening, and since Windows reuses process ids, a later Excel given the same id could silently connect to the old session and its leftover state. Julia itself stays open. Windows only: Julia under WSL can't watch a Windows process.
+- Excel now checks that it's talking to its own Julia session, not to another program that has taken the port since that session ended - which, on a machine shared by several users, could be another user's. Each reply from Julia carries a secret from the port file, and a new connection is checked before any request is sent on it, so such a program never receives one. Julia also deletes its port file when it exits.
+
+### Ribbon and installation
+
+- Launch Settings is now its own large button on the ribbon, with a gear icon, rather than on Launch Julia's drop-down menu.
 - The ribbon's File list, and the project folder list in Launch Settings, have a Browse... item, and choosing a recent file or folder that no longer exists offers to remove it from the list.
 - The About dialog also shows the version of Julia, and its wording is clearer.
-- Trying Julia under WSL is better guided. When a launch fails because WSL isn't set up, or Julia isn't installed under it, or Julia there doesn't have the CallFromExcel package, the message says what to do and offers to copy the command that does it. The package is installed at exactly the add-in's version, which is also what a version mismatch under WSL now suggests.
-- A project whose packages aren't installed for the Julia being launched - for example one used from Julia on Windows, then from Julia under WSL, which has its own package store - is now instantiated (`Pkg.instantiate()`) at launch, rather than failing with a long list of precompilation errors.
-- Whether a package is installed is now checked before loading it, rather than worked out from Julia's error message.
-- When Julia isn't installed on Windows, the message gives the command that installs it (from julialang.org), to copy. A Julia installed with juliaup while Excel is open is now found without restarting Excel.
-- A Julia older than 1.10, which CallFromExcel doesn't support, is reported as such, with the command that updates it, rather than as a confusing error about loading or installing the package.
-- When the Excel that a Julia session is serving closes (or crashes), the session stops serving it and deletes its port file. Before, it kept listening, and since Windows reuses process ids, a later Excel given the same id could silently connect to the old session and its leftover state. Julia itself stays open. Windows only: Julia under WSL can't watch a Windows process.
-- Excel now checks that it's talking to its own Julia session, not to another program that has taken the port since that session ended - which, on a machine shared by several users, could be another user's. Each reply from Julia carries a secret from the port file, and a new connection is checked before any request is sent on it, so such a program never receives one. Julia also deletes its port file when it exits.
 - The Excel add-in is listed in Windows' Settings > Apps, from where it can be uninstalled. Uninstalling removes its files, its registry entries and the ribbon's saved settings.
+- UI tweaks: the error dialog's button is now "Copy Command", as some commands aren't Julia's; the tooltip for "Minimise Julia's window" mentions Show Julia.
 
 ## [0.1.6] - 2026-11-14
 

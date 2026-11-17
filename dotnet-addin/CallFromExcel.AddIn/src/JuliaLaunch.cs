@@ -752,12 +752,14 @@ namespace CallFromExcel.AddIn
                    "    else\n" +
                    "        folder = temporary || projectfile === nothing || projectfile == Base.load_path_expand(\"@v#.#\") ? \"\" : dirname(projectfile)\n" +
                    "        uninstalled = String[]\n" +
-                   "        manifest = temporary || projectfile === nothing ? nothing : Base.project_file_manifest_path(projectfile)\n" +
                    // A Manifest this can't read is left alone, rather than its error hiding a
-                   // later, more useful message, such as the version check's.
-                   "        if manifest !== nothing && isfile(manifest)\n" +
+                   // later, more useful message, such as the version check's. Only for a project
+                   // that has a Project.toml: Julia 1.10's project_file_manifest_path throws when
+                   // it doesn't (later versions return nothing).
+                   "        if !temporary && projectfile !== nothing && isfile(projectfile)\n" +
                    "            try\n" +
-                   "                manifestdeps = Base.parsed_toml(manifest)\n" +
+                   "                manifest = Base.project_file_manifest_path(projectfile)\n" +
+                   "                manifestdeps = manifest !== nothing && isfile(manifest) ? Base.parsed_toml(manifest) : Dict{String,Any}()\n" +
                    "                for (name, entries) in get(manifestdeps, \"deps\", manifestdeps)\n" +
                    "                    entries isa Vector || continue\n" +
                    "                    for entry in entries\n" +

@@ -45,17 +45,6 @@ Ideas considered but not yet scheduled, each with a sketch of how it might be im
 
 **Test.** Start a plain HTTP server on a port, write a port file pointing at it, and check that `JuliaEval` reports Julia isn't running rather than returning that server's reply.
 
-## WSL Julia choosing a port already used on Windows
-
-**Problem.** `start_server` tries ports 2700, 2701, ... until a bind succeeds - but a Julia under WSL2 binds inside the Linux VM, which can't see ports in use on the Windows side. With two Excels, one served by a native Windows Julia on 2700 and one launching a WSL Julia, the WSL Julia also gets 2700 (free in Linux), and Excel's requests to `localhost:2700` reach the Windows Julia instead. Since the session token, that Julia rejects them (409), so the second Excel sees Julia as not running and `JuliaLaunch` times out; before the token, calls silently ran in the wrong session. Two WSL Julias don't clash (they share Linux's ports). Judged too contrived to fix for now: it needs native and WSL sessions running at once. Note, though, that the native session needn't still be serving an Excel: since Julia outlives its Excel (see "Stop serving when Excel closes"), a leftover Windows Julia window is enough - this happened on the developer's machine on 2026-11-09, with leftover Julias from test runs on ports 2700-2704 making a WSL `JuliaLaunch` fail.
-
-**Sketches:**
-
-- **Julia checks it's reachable.** After binding under WSL, Julia checks from the Windows side that `localhost:<port>` reaches itself - e.g. a `/ping` with its own token via `curl.exe`/`powershell.exe` - and moves on to the next port if not.
-- **Excel chooses the port.** The add-in picks a port free on Windows and passes it to Julia in the startup script; Julia binds that port (or fails clearly). Changes the startup handshake for every launch, not just WSL.
-
-**Test.** Hard to automate: needs a native Julia listening on a port and a WSL Julia launched at the same time.
-
 ## Document running as administrator and Constrained Language Mode
 
 **Excel run as administrator.** Not tested; from Windows' documented behaviour:
@@ -75,55 +64,48 @@ Ideas considered but not yet scheduled, each with a sketch of how it might be im
 - **README section** "Corporate and locked-down machines": worksheet functions work in an elevated Excel but VBA's `CreateObject` doesn't (don't run Excel elevated, or install as that account); and, for when the installer fails under CLM, what it does - copy the add-in files to `%APPDATA%\Microsoft\AddIns\CallFromExcel` and set the listed registry values - so IT can apply it by hand.
 - **Make Install.ps1 CLM-safe:** use only cmdlets - read Office's version and Excel's bitness from the registry rather than via COM and the executable's header. A moderate rewrite of the installer; testing needs CLM enabled on a machine (e.g. `__PSLockdownPolicy` or a WDAC policy in a VM).
 
-## Complex numbers with a comma decimal separator
+## Named worksheet functions
 
-**Problem.** Complex results are returned as text in the format of Excel's `COMPLEX` function (`encode_for_xl(::Complex)` in `src/encode.jl`), always with a point: `"1.5+2i"`. Excel's IM functions read such text using Excel's own decimal separator, so where that is a comma (most of continental Europe) any complex result with a fractional part is #NUM! to them. Verified on 2026-11-09 by switching a hidden Excel's separator to a comma:
+**Problem.** Every Julia function is called through `=JuliaCall("price_swap", A1, B1)`. A demanding user wants `=PRICE_SWAP(A1, B1)`: a real worksheet function with its own name, argument names in the Function Wizard and IntelliSense, and help text. In-house bank add-ins are typically built this way. Probably the feature such users would notice most.
 
-| Formula | Point separator | Comma separator |
-|---|---|---|
-| `=COMPLEX(1.5,2)` | `1.5+2i` | `1,5+2i` |
-| `=IMREAL("1.5+2i")` (Julia's text) | 1.5 | #NUM! |
-| `=IMREAL("3+4i")` | 3 | 3 |
+**Sketch.** The calling path is unchanged: a named function forwards to the same code as `JuliaCall`, with the same wire format. What's new is registration.
 
-Workaround meanwhile: `=IMREAL(SUBSTITUTE(JuliaEval(...),".",","))`.
-
-**Why not in Julia.** Only Excel knows the separator in effect: File > Options > Advanced > "Use system separators" can override Windows' setting, it can change during a session, and Julia under WSL or attached with `serve_xl` can't easily find out.
-
-**Sketch.** About 5 lines changed in Julia and 25 in C#.
-
-- Julia sends complex numbers as numbers: a new wire tag, e.g. `X` followed by the real and imaginary parts as 16-character hex each. Infinite or NaN parts still give `!2036` (#NUM!).
-- The add-in's decoder formats them as text in `COMPLEX`'s format - 15 significant digits, `i` rather than `1i`, no imaginary part when it's zero - using `Application.DecimalSeparator` when `Application.UseSystemSeparators` is False, and Windows' own separator (`CultureInfo.CurrentCulture`) otherwise. The same for worksheet and VBA results.
-- Ordinary strings are never touched, so a Julia string `"1.5+2i"` still comes back unchanged.
-
-**Test.** A VBA test sets `Application.UseSystemSeparators = False` and `Application.DecimalSeparator = ","`, checks that `=JuliaEval("1.5+2im")` gives `"1,5+2i"` and that `IMREAL` of it gives 1.5, and restores both settings even if it fails (they're application settings and may persist). Existing tests cover the point-separator case.
-
-## A ribbon tab
-
-**Status (in progress on the `ribbon` branch).**
-
-- Done: the Julia tab; a Launch Julia split button, launching with saved settings; the Launch Settings dialog (project folder with Browse, other options, packages, bash statements, time-out, saved in the registry, resizable, tooltips); Show Julia Window; Close Julia (with confirmation); a Julia File group (file box with Browse, a recent-files drop-down ending in Clear history, and Include, which doesn't recalculate); Help; the Julia logo on Launch Julia and the dialog, read at run time from the user's own julia.exe (see Icons below).
-- To do: README documentation of the ribbon. In particular, `JuliaLaunch`'s documentation (README and its `[ExcelFunction]` description) should say that it ignores the Launch Settings dialog, which applies only to the ribbon's Launch Julia button.
-
-**Problem.** Julia can only be started by a `JuliaLaunch` formula, and nothing in Excel's own interface says where to find help: the Add-ins dialog shows no description for any third-party XLL. (Only "Help on this function" in the Insert Function dialog and the function name in the IntelliSense pop-up link to the README.) JuliaInXL, Julia Computing's earlier Excel add-in, had a JULIA ribbon tab with "Launch Local Julia", "Select Julia File", "Include Julia File", a `tcp://localhost:9999` connection box, "Reconnect" and "Terminate".
-
-**Proposed buttons.**
-
-- **Launch Julia** (large). Launches with remembered options - see below.
-- **Include File.** One step: a file picker, then `JuliaInclude` on the chosen file (JuliaInXL's separate Select and Include steps add nothing).
-- **Show Julia Window.** Brings Julia's console to the front, e.g. after launching minimised.
-- **Close Julia.** Ends the Julia session, like JuliaInXL's "Terminate".
-- **Help.** Opens the GitHub page.
-
-Not JuliaInXL's connection box or Reconnect: they belong to its connection model, not ours (Julia writes its port to the port file).
+- **Julia side (small).** A macro or function marks what to expose, e.g. `@excel function price_swap(notional, fixed_rate, curve) ... end` with a docstring, or `CallFromExcel.expose(price_swap; name=..., description=..., args=...)`. It records the Excel name, argument names (from the method, `Base.method_argnames`), descriptions (from the docstring, kept within Excel-DNA's 253/255-character limits) and flags such as volatile in a registry. A new HTTP endpoint returns that list.
+- **Add-in side (moderate).** After `JuliaLaunch`, and on request (a ribbon button, or after `JuliaInclude`/`JuliaEval` change the list), the add-in fetches the list and calls `ExcelIntegration.RegisterDelegates`. Each delegate takes the right number of `object` parameters (built with expression trees) and in effect calls `JuliaCall("price_swap", args...)`. Registration must run in a macro context (`ExcelAsyncUtil.QueueAsMacro`). Registering a name again replaces it, so redefining a function in Julia and refreshing works.
+- Free once registered: Function Wizard and IntelliSense help, and `Application.Run "PRICE_SWAP"` from VBA.
 
 **Decisions to make.**
 
-- **Launch options.** A button has no arguments. Either launch with defaults, or open a small dialog for `UseLinux`, `MinimiseWindow`, `CommandLineOptions` and `Packages`, remembering the last choices (e.g. in the registry). The dialog is most of the work.
-- **Ribbon versus formula.** A `JuliaLaunch` formula travels with the workbook and records how Julia should start; a ribbon click is per session. Both stay; the README would say when to use which.
-- **Include from the ribbon** loads the file at once, but Excel won't recalculate cells that use the functions it defines. Either recalculate afterwards or say so in the README.
-- **Close Julia** while formulas still depend on it: they will show "Please call JuliaLaunch..." on their next recalculation, which is probably right.
-- **Icons.** The Julia dots are licensed CC BY-NC-SA 4.0 by Stefan Karpinski (https://github.com/JuliaLang/julia-logo-graphics). Using them in a free, open-source add-in fits the licence with attribution, the image kept under that licence separately from the MIT code. But "NonCommercial" doesn't match MIT's allowance of commercial use. Options: ask Stefan Karpinski for permission, accept the low practical risk as many Julia projects do, or design our own icon. Don't copy JuliaInXL's other icons, which are Julia Computing's artwork; Office's built-in `imageMso` icons are free to use and look native. **Resolved:** the add-in reads the logo from the icon in the user's own julia.exe at run time (JuliaIcon.cs), so it never ships a copy and the licence question doesn't arise; with no julia.exe that has an icon, Launch Julia falls back to the Office icon MacroPlay.
+- **Workbooks opened before Julia is running.** Cells with `=PRICE_SWAP(...)` show `#NAME?`, and may not recover when the function is registered later. Add-ins that start their language runtime when Excel starts mostly avoid this; we launch on demand. Options: cache the last exposed list (per project folder) and register **stubs** when the add-in loads, which return "Julia not launched" until Julia is running and then forward normally; and/or a "launch Julia when Excel starts" setting.
+- **Removing functions.** Excel-DNA can't cleanly unregister, so a removed function stays as a stub returning an error until Excel restarts. Document it.
+- **Name clashes** with Excel's built-in functions or other add-ins (Excel's win). Warn, or offer an optional prefix.
+- **Several projects or sessions.** Which set applies after relaunching into another environment - probably whatever the current session exposes, plus cached stubs.
+- **IntelliSense** should pick up functions registered after load; confirm.
 
-**Sketch.** Excel-DNA supports ribbons directly: a `CustomUI` block in `CallFromExcel.AddIn.dna`, a class deriving from `ExcelRibbon` with one handler per button, and the icon packed into the `.xll`. Most handlers call existing code (`JuliaLaunch.Launch`, the `JuliaInclude` path, `WindowUtils` for the window). Ribbon callbacks run on Excel's main thread, like our worksheet functions. Expect the design to take time to get right: layout, wording, icons, and the options dialog.
+**Effort.** Roughly 1-2 weeks: the Julia macro and endpoint about a day, dynamic registration a few days, the rest on stubs and caching, `#NAME?` behaviour, tests and docs. Purely additive: `JuliaCall` users are unaffected.
 
-**Test.** Mostly by hand, as ribbon clicks can't easily be automated. The handlers' logic can sit in plain methods that the VBA tests call through the COM server.
+**First step: a spike** (about a day). Register one function from Julia at run time and check the Function Wizard, IntelliSense, and what a saved workbook using it does when reopened before and after launch.
+
+**Test.** Julia tests for the registry and endpoint (argument names, descriptions, length limits). VBA tests that call a registered function on a sheet and via `Application.Run`, redefine it and check the new definition is used.
+
+## Object handles
+
+**Problem.** Every result comes back to Excel as data. A large or structured Julia object (a curve, a model, a DataFrame, a portfolio) must be rebuilt on every call that needs it, or be kept in a global by hand (`JuliaEval("global curve = ...")`), which doesn't recalculate with the sheet. The handle pattern common in C++ and other Excel add-ins solves this: a function returns a short string naming an object kept in the add-in's language, and other functions accept that string in place of the object. Combines well with named worksheet functions: `=BUILD_CURVE(...)` returns a handle, `=PRICE(curve, trade)` uses it.
+
+**Sketch.**
+
+- **Creating.** `=JuliaHandle("build_curve", A1:B20)` calls the function as `JuliaCall` does, stores the result Julia-side in a `Dict{String,Any}` (not as globals), and returns a handle such as `jl:Curve#17` (type name plus an integer id).
+- **Using.** All existing functions accept handles transparently: Julia's decoder replaces any argument string that **exactly** matches `jl:<TypeName>#<integer>` **and** whose id is in the cache with the cached object. Doing it in the decoder means handles inside arrays (a column of trade handles) also work. An ordinary string can only collide by matching the pattern and an existing id, which is very unlikely.
+- **Reading.** `=JuliaCall("identity", D1)` already returns the object as data; a `JuliaObject(handle)` function would be a friendlier name for it.
+
+**Lifetime (most of the work).**
+
+- **Recalculation.** Key each entry by the calling cell (workbook, sheet, address; Excel-DNA's `xlfCaller`). When the cell recalculates, the new object replaces the old, which Julia's GC then frees. The id increases on every recalculation so that the handle string changes and Excel recalculates dependent cells; otherwise they would keep results from the old object.
+- **Deleted cells, closed workbooks.** Their entries leak until cleaned up: drop a workbook's entries when it closes (the add-in can watch `WorkbookBeforeClose`), plus `JuliaClearHandles()` or a ribbon button. Show the handle count (and perhaps memory) in the About dialog.
+- **Julia restarted.** Every handle is invalid. Functions given one return a clear error, e.g. `#Handle jl:Curve#17 not found - recalculate`; `JuliaLaunch` could offer to recalculate open workbooks.
+- **Reopened workbooks.** Saved cells hold handle strings whose objects no longer exist, and Excel won't recalculate them on open unless made to. Same clear error, plus an option to recalculate on launch.
+- **Called from VBA.** There is no calling cell: either return the data directly, or require an explicit key argument.
+
+**Decisions to make.** The handle format (prefix, whether to include the type name); whether `JuliaHandle` is a separate function or a flag on `JuliaCall`; whether named functions can declare that they return a handle; the cleanup triggers; whether handles from one workbook may be used in another (probably yes).
+
+**Test.** Julia tests for the cache, the pattern matching (strings that look like handles but aren't), replacement on recalculation and clean-up. VBA tests: create a handle on a sheet, use it from another cell, recalculate and check the dependent cell recalculates, close the workbook and check the cache entry is gone.

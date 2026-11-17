@@ -257,6 +257,7 @@ namespace CallFromExcel.AddIn
                         "Cannot find the WSL executable at '" + WSLExecutable + "'. Check if the file exists and " +
                         "whether read and execute permissions are set for user '" + Environment.UserName + "'");
                 }
+                if (!WslHasDistribution()) throw WslProblemError(false, false);
                 errorFileX = WSLAddress(errorFile);
                 flagFileX = WSLAddress(flagFile);
                 commsFolderX = WSLAddress(FileUtils.LocalTemp());
@@ -525,15 +526,13 @@ namespace CallFromExcel.AddIn
         public const string CommandLineDocsUrl = "https://docs.julialang.org/en/v1/manual/command-line-interface/#command-line-switches-for-julia";
 
         // Why Julia's process under WSL may have exited at once, for someone who has used
-        // CallFromExcel with Julia on Windows and is trying WSL: WSL isn't set up (no Linux
-        // distribution), or Julia isn't installed in it (no julia on a login shell's PATH, after
-        // any Bash statements, which may be what puts it there). Found by asking wsl.exe, only
-        // after a failure, so a successful launch isn't slowed. Null if neither, or the checks
-        // themselves fail - the general ProcessExitedError then applies.
+        // CallFromExcel with Julia on Windows and is trying WSL: Julia isn't installed in it (no
+        // julia on a login shell's PATH, after any Bash statements, which may be what puts it
+        // there). (WSL not set up at all is found before launching: WslHasDistribution.) Found
+        // by asking WSL, only after a failure, so a successful launch isn't slowed. Null if
+        // Julia is there, or the check itself fails - the general ProcessExitedError then applies.
         private static Exception WslProblem(string bashStatements)
         {
-            string distributions = RunHidden(WSLExecutable, "--list --quiet", Encoding.Unicode, out int listExit);
-            if (distributions == null) return null;
             string check = "command -v julia";
             if (!string.IsNullOrEmpty(bashStatements))
             {
@@ -542,10 +541,22 @@ namespace CallFromExcel.AddIn
                 FileUtils.SaveTextFile(checkFile, "#!/bin/bash\n" + bashStatements.TrimEnd('\n') + "\n" + check + "\n");
                 check = "bash " + BashQuote(WSLAddress(checkFile));
             }
-            bool wslSetUp = listExit == 0 && distributions.Trim() != "";
-            int juliaExit = 0;
-            if (wslSetUp && RunHidden(WSLExecutable, WslArguments(check), Encoding.UTF8, out juliaExit) == null) return null;
-            return WslProblemError(wslSetUp, juliaExit == 0);
+            if (RunHidden(WSLExecutable, WslArguments(check), Encoding.UTF8, out int juliaExit) == null) return null;
+            return WslProblemError(true, juliaExit == 0);
+        }
+
+        // Whether WSL has a Linux distribution, read from the registry, where WSL records each
+        // one for the user as a subkey of Lxss - not by running wsl.exe, which, on a PC without
+        // WSL, waits at a prompt offering to install it (for 60 seconds, outlasting a launch's
+        // time-out) rather than failing. Checked before launching, so that case is reported at
+        // once.
+        private static bool WslHasDistribution()
+        {
+            using (Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(
+                @"Software\Microsoft\Windows\CurrentVersion\Lxss"))
+            {
+                return key != null && key.GetSubKeyNames().Length > 0;
+            }
         }
 
         // The message for WslProblem's findings: null when WSL is set up and has Julia. Public, so

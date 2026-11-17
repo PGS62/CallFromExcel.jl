@@ -574,12 +574,19 @@ function start_server(start::Int=2700)
                 # handles a kept-alive connection's requests in one long-running task, whose world
                 # age would otherwise stay at that connection's start - JuliaEval("f(x)=2x") then
                 # JuliaCall("f", 1) failed with a MethodError. (HTTP.jl 1 happened not to need it.)
-                result = req.target == "/eval" ? Base.invokelatest(srv_eval_inner, body) :
-                         req.target == "/call" ? Base.invokelatest(srv_call_inner, body) :
-                         req.target == "/callkw" ? Base.invokelatest(srv_call_inner, body; named_args=true) :
-                         return HTTP.Response(404, ["X-CallFromExcel-Server" => server_token[]],
-                                              "Unknown CallFromExcel endpoint $(req.target)")
-                _text_response(result)
+                # An error here (srv_*_inner report their own) is answered as a 500 carrying the
+                # server token, so Excel shows it - rather than HTTP.jl's own 500, without the
+                # token, which Excel would take for "Julia not running".
+                try
+                    result = req.target == "/eval" ? Base.invokelatest(srv_eval_inner, body) :
+                             req.target == "/call" ? Base.invokelatest(srv_call_inner, body) :
+                             req.target == "/callkw" ? Base.invokelatest(srv_call_inner, body; named_args=true) :
+                             return HTTP.Response(404, ["X-CallFromExcel-Server" => server_token[]],
+                                                  "Unknown CallFromExcel endpoint $(req.target)")
+                    _text_response(result)
+                catch e
+                    HTTP.Response(500, ["X-CallFromExcel-Server" => server_token[]], sprint(showerror, e))
+                end
             end
             break
         catch
@@ -605,7 +612,8 @@ function start_server(start::Int=2700)
     # those.) Once per session; it deletes whichever port file is current then, if still ours.
     if !_atexit_registered[]
         _atexit_registered[] = true
-        atexit(_remove_portfile)
+        # A zero-argument function: atexit passes the exit code to one that takes an argument.
+        atexit(() -> _remove_portfile())
     end
     xlport[] = port
     settitle()
@@ -615,15 +623,18 @@ function start_server(start::Int=2700)
 end
 
 """
-    _remove_portfile()
+    _remove_portfile(file=portfile())
 Deletes this session's port file, if it is still this session's (its token is this session's) -
-not one a later session for the same Excel has written since. Run when Julia exits (see
-`start_server`).
+not one a later session for the same Excel has written since, or, when Excel has closed, one
+for a new Excel that Windows has given the same process id. Run when Julia exits (see
+`start_server`), and by `_watch_excel`.
 """
-function _remove_portfile()
+function _remove_portfile(file=nothing)
     try
-        (xlpid[] == 0 || commsfolder[] == "") && return nothing
-        file = portfile()
+        if file === nothing
+            (xlpid[] == 0 || commsfolder[] == "") && return nothing
+            file = portfile()
+        end
         isfile(file) || return nothing
         lines = readlines(file)
         length(lines) >= 2 && lines[2] == session_token[] && rm(file; force=true)
@@ -659,7 +670,7 @@ function _watch_excel(pid::Integer, portfile::AbstractString)
             if ccall((:WaitForSingleObject, "kernel32"), stdcall, UInt32, (Ptr{Cvoid}, UInt32), handle, 0) == WAIT_OBJECT_0
                 _excel_closed[] = true   # for the title, which stop_server sets
                 stop_server()
-                rm(portfile; force=true)
+                _remove_portfile(portfile)
                 # On a line of its own: the REPL is usually showing its prompt.
                 println("\nExcel (process id $pid) has closed, so this session has stopped serving it.")
                 break

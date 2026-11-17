@@ -590,6 +590,14 @@ end
             CallFromExcel._remove_portfile()
             @test isfile(portfile)
             rm(portfile)
+            # And it really is run at exit: in a Julia of its own, which starts a server, then exits.
+            dir = mktempdir()
+            code = "using CallFromExcel; CallFromExcel.setxlpid(98765); " *
+                   "CallFromExcel.comms_folder($(repr(dir))); CallFromExcel.start_server(47950); " *
+                   "print(\"written: \", isfile(CallFromExcel.portfile()))"
+            output = read(`$(Base.julia_cmd()) --project=$(dirname(Base.active_project())) --startup-file=no -e $code`, String)
+            @test endswith(output, "written: true")
+            @test !isfile(joinpath(dir, "Port_98765.txt"))
         end
     end
 
@@ -622,6 +630,18 @@ end
                     read(path, String)
                 end
                 @test occursin("Excel PID $pid has closed", title) && !occursin("serving", title)
+
+                # A port file that is no longer this session's - as if Windows had given the
+                # closed Excel's id to a new Excel, which has launched its own Julia - is left.
+                excel = dummy()
+                CallFromExcel.setxlpid(Int64(getpid(excel)))
+                CallFromExcel.start_server()
+                portfile = CallFromExcel.portfile()
+                write(portfile, "2700\nanothersessionstoken\n")
+                kill(excel); wait(excel)
+                @test stopped(5.0)
+                @test isfile(portfile)
+                rm(portfile)
 
                 excel = dummy()
                 CallFromExcel.setxlpid(Int64(getpid(excel)))
@@ -817,6 +837,11 @@ if Sys.iswindows()
         # Empty entries in Packages (a trailing or doubled comma) are skipped: a bare `using`
         # would make the whole script unparseable.
         @test !occursin(r"using *\n", startupscript("Example,, "))
+        # A Packages entry may be any `using` target: only its package name is checked as
+        # installed (and installed into @temp), and the entry itself is what's loaded.
+        withtargets = startupscript("Plots.PlotMeasures, LinearAlgebra: norm")
+        @test occursin("String[\"Plots\", \"LinearAlgebra\"]", withtargets)
+        @test occursin("using LinearAlgebra: norm", withtargets)
         # JULIA_PROJECT=@temp, without --project, is a temporary environment too, as for Julia.
         # In a new Julia, since this one was started with --project, which takes precedence.
         @test readchomp(addenv(`$(Base.julia_cmd()) --startup-file=no -e "using CallFromExcel; print(CallFromExcel.temporary_project())"`,

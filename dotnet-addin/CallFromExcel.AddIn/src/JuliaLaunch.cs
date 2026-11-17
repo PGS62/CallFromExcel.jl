@@ -541,8 +541,11 @@ namespace CallFromExcel.AddIn
                 FileUtils.SaveTextFile(checkFile, "#!/bin/bash\n" + bashStatements.TrimEnd('\n') + "\n" + check + "\n");
                 check = "bash " + BashQuote(WSLAddress(checkFile));
             }
-            if (RunHidden(WSLExecutable, WslArguments(check), Encoding.UTF8, out int juliaExit) == null) return null;
-            return WslProblemError(true, juliaExit == 0);
+            // command -v exits with 1 when julia isn't found. Any other failure is WSL itself (e.g.
+            // virtualisation turned off, or a broken distribution), which installing Julia
+            // wouldn't fix, so is left to ProcessExitedError.
+            int? exitCode = RunHidden(WSLExecutable, WslArguments(check));
+            return exitCode == 1 ? WslProblemError(true, false) : null;
         }
 
         // Whether WSL has a Linux distribution, read from the registry, where WSL records each
@@ -585,36 +588,21 @@ namespace CallFromExcel.AddIn
 
         public const string WslInstallUrl = "https://learn.microsoft.com/windows/wsl/install";
 
-        // Runs a program with no window and returns what it writes, or null if it can't be run
-        // or takes over 30 seconds (WSL's first start after a reboot takes a few).
-        private static string RunHidden(string fileName, string arguments, Encoding encoding, out int exitCode)
+        // Runs a program with no window and returns its exit code, or null if it can't be run or
+        // takes over 30 seconds (WSL's first start after a reboot takes a few).
+        private static int? RunHidden(string fileName, string arguments)
         {
-            exitCode = -1;
             try
             {
-                var info = new ProcessStartInfo(fileName, arguments)
-                {
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    StandardOutputEncoding = encoding
-                };
+                var info = new ProcessStartInfo(fileName, arguments) { UseShellExecute = false, CreateNoWindow = true };
                 using (Process process = Process.Start(info))
                 {
-                    var output = process.StandardOutput.ReadToEndAsync();
-                    process.StandardError.ReadToEndAsync();
-                    if (!process.WaitForExit(30000))
-                    {
-                        try { process.Kill(); } catch (InvalidOperationException) { }
-                        return null;
-                    }
-                    exitCode = process.ExitCode;
-                    return output.Result.Replace("\0", "");
+                    if (process.WaitForExit(30000)) return process.ExitCode;
+                    try { process.Kill(); } catch (InvalidOperationException) { }
+                    return null;
                 }
             }
             catch (System.ComponentModel.Win32Exception) { return null; }
-            catch (IOException) { return null; }
         }
 
         // The error when Julia's process exits before start-up finishes. An invalid command line
@@ -686,12 +674,14 @@ namespace CallFromExcel.AddIn
                 usingStatements.Append("            using " + trimmed + "\n");
             }
 
-            // The user's own Packages, as a Julia vector of names, for installing in a temporary
-            // environment (below).
+            // The user's own Packages, as a Julia vector of package names, for checking they're
+            // installed, and installing them in a temporary environment (below). Just the name: an
+            // entry may be any `using` target, such as Plots.PlotMeasures or LinearAlgebra: norm.
             var userPackages = new List<string>();
             foreach (string pkg in packages.Split(','))
             {
-                if (pkg.Trim() != "") userPackages.Add(JuliaLiteral.MakeJuliaLiteral(pkg.Trim()));
+                string name = pkg.Trim().Split('.', ':', ' ')[0];
+                if (name != "") userPackages.Add(JuliaLiteral.MakeJuliaLiteral(name));
             }
             string userPackagesVector = "String[" + string.Join(", ", userPackages) + "]";
 

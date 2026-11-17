@@ -247,6 +247,7 @@ namespace CallFromExcel.AddIn
             if (_cachedPort != 0) return _cachedPort;
             ReadPortFile(out _cachedPort, out _cachedToken);
             _cachedVersion = _cachedPort == 0 ? "" : VersionFromFile(_cachedPort);
+            _cachedServerToken = _cachedPort == 0 ? "" : ServerTokenFromFile(_cachedPort);
             return _cachedPort;
         }
 

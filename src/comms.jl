@@ -4,6 +4,7 @@ Set the process id of the instance of Excel that the current Julia process is se
 """
 function setxlpid(pid::Int64)
     xlpid[] = pid
+    _excel_closed[] = false
     settitle()
     println("xlpid set to $pid")
     nothing
@@ -546,6 +547,7 @@ its own port open indefinitely.
 """
 function start_server(start::Int=2700)
     _server[] !== nothing && close(_server[])
+    _server_generation[] += 1
     # A secret for this session, written to the port file (in the user's own temp folder) for
     # Excel to read and send with every request - see _reject_request.
     session_token[] = bytes2hex(rand(RandomDevice(), UInt8, 16))
@@ -595,6 +597,46 @@ function start_server(start::Int=2700)
     xlport[] = port
     settitle()
     println("CallFromExcel HTTP server listening on port $port")
+    _watch_excel(getxlpid(), portfile())
+    nothing
+end
+
+"""
+    _watch_excel(pid, portfile)
+Stops the server, and deletes its port file, when Excel process `pid` exits - normally or by a
+crash. Otherwise the session would go on serving a closed Excel, and since Windows reuses process
+ids, a later Excel given the same id would find the port file, with its valid token, and silently
+connect to this session and its leftover state. The REPL stays open, so nothing in it is lost.
+
+Holds a handle to the process (`OpenProcess`, `SYNCHRONIZE` access), rather than re-checking the
+id, so it can't be fooled by id reuse; a background task asks every few seconds whether that
+process has finished (`WaitForSingleObject` with no wait). Does nothing if the process can't be
+opened (e.g. no such process, as with the made-up pids in the tests), or under WSL, where Julia
+can't open a Windows process.
+"""
+function _watch_excel(pid::Integer, portfile::AbstractString)
+    Sys.iswindows() || return nothing
+    SYNCHRONIZE = 0x00100000
+    handle = ccall((:OpenProcess, "kernel32"), stdcall, Ptr{Cvoid}, (UInt32, Int32, UInt32), SYNCHRONIZE, 0, pid)
+    handle == C_NULL && return nothing
+    generation = _server_generation[]
+    @async try
+        while _server_generation[] == generation
+            sleep(_watch_interval[])
+            _server_generation[] == generation || break
+            WAIT_OBJECT_0 = 0x00000000
+            if ccall((:WaitForSingleObject, "kernel32"), stdcall, UInt32, (Ptr{Cvoid}, UInt32), handle, 0) == WAIT_OBJECT_0
+                _excel_closed[] = true   # for the title, which stop_server sets
+                stop_server()
+                rm(portfile; force=true)
+                # On a line of its own: the REPL is usually showing its prompt.
+                println("\nExcel (process id $pid) has closed, so this session has stopped serving it.")
+                break
+            end
+        end
+    finally
+        ccall((:CloseHandle, "kernel32"), stdcall, Int32, (Ptr{Cvoid},), handle)
+    end
     nothing
 end
 
@@ -678,6 +720,7 @@ Leaves the port file on disk untouched, so Excel will still try the now-dead por
 request - and get a clean "no connection" error rather than reaching this session again.
 """
 function stop_server()
+    _server_generation[] += 1   # so _watch_excel's task stands down
     if _server[] !== nothing
         close(_server[])
         _server[] = nothing
@@ -768,6 +811,12 @@ function settitle()
     # Any other OS by its kernel name (e.g. "Darwin" on macOS), so the tests run there too.
     os = Sys.islinux() ? "Linux" : Sys.iswindows() ? "Windows" : string(Sys.KERNEL)
 
+    # Once that Excel has closed, no longer "serving Excel PID ...": the add-in finds its Julia
+    # window by that text, so a later Excel given the same process id mustn't take this for its own.
+    if _excel_closed[]
+        print("\033]0;Julia $VERSION on $os - Excel PID $(getxlpid()) has closed\a")
+        return
+    end
     portpart = xlport[] == 0 ? "" : ", port $(xlport[])"
     print("\033]0;Julia $VERSION on $os serving Excel PID $(getxlpid())$portpart\a")
 end

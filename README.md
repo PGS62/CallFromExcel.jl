@@ -302,6 +302,8 @@ Other functions for managing a session started this way:
 
 On the ribbon, Display Results works with an attached session, but Show Julia can't find its window, and Close Julia closes it - Julia and all - rather than just detaching it. To detach, call `stop_server()` in the session instead.
 
+When the Excel being served closes, the session stops serving it by itself, whether it was attached with `serve_xl` or started by `JuliaLaunch`. Julia stays open, so nothing in it is lost. (Not under WSL, where Julia can't watch a Windows process.)
+
 ## Debugging
 Every call to `JuliaCall`/`JuliaCallVBA`/`JuliaEval`/`JuliaEvalVBA` leaves a trace behind in Julia, so a problem can be debugged at the REPL without needing to repeat the call from Excel:
 

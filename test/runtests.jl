@@ -515,6 +515,51 @@ end
     @test_throws String CallFromExcel._attach_to_excel(true, 4321)
     CallFromExcel.stop_server()
 
+    # When the Excel being served exits, the server stops and its port file goes, so a later
+    # Excel given the same process id can't connect to this session. A short-lived Julia stands
+    # in for Excel, and the checks are made every 0.2s rather than every 5s. Also: a watcher for
+    # an earlier server stands down, rather than stopping a newer one (here serving made-up pid
+    # 4321, which isn't watched).
+    if Sys.iswindows()
+        @testset "Stop serving when Excel closes" begin
+            CallFromExcel._watch_interval[] = 0.2
+            dummy() = run(`$(Base.julia_cmd()) --startup-file=no -e "sleep(120)"`; wait=false)
+            stopped(timeout) = timedwait(() -> !CallFromExcel.server_status().running, timeout) == :ok
+            try
+                excel = dummy()
+                pid = Int64(getpid(excel))   # while it runs: getpid fails once it has exited
+                CallFromExcel.setxlpid(pid)
+                CallFromExcel.start_server()
+                portfile = CallFromExcel.portfile()
+                @test isfile(portfile)
+                @test !stopped(1.0)   # still serving while "Excel" runs
+                kill(excel); wait(excel)
+                @test stopped(5.0)
+                @test timedwait(() -> !isfile(portfile), 2.0) == :ok
+                @test CallFromExcel._excel_closed[]
+                # The title no longer says "serving", which the add-in looks for.
+                title = mktemp() do path, io
+                    redirect_stdout(CallFromExcel.settitle, io)
+                    close(io)
+                    read(path, String)
+                end
+                @test occursin("Excel PID $pid has closed", title) && !occursin("serving", title)
+
+                excel = dummy()
+                CallFromExcel.setxlpid(Int64(getpid(excel)))
+                CallFromExcel.start_server()
+                CallFromExcel.setxlpid(4321)
+                CallFromExcel.start_server()
+                kill(excel); wait(excel)
+                @test !stopped(1.5)
+            finally
+                CallFromExcel._watch_interval[] = 5.0
+                CallFromExcel.stop_server()
+                CallFromExcel.setxlpid(4321)
+            end
+        end
+    end
+
     # setvar assigns the value itself. It used to re-parse the value's printed form as code, which
     # failed for strings ("hello" became the variable name hello) and for ExcelError values.
     for v in Any["hello", "a\"b\$c", 1.5, [1.0, 2.0], Any[1.0, missing, CallFromExcel.ExcelError(2042)],

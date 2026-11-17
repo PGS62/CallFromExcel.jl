@@ -16,6 +16,14 @@ const global xlport = Ref(0)
 const global session_token = Ref("")
 const global _display_results = Ref(false)
 const global _server = Ref{Any}(nothing)
+# For _watch_excel: seconds between checks that Excel is still running (shortened by the tests),
+# and a counter bumped by each start_server and stop_server, so a watcher for an earlier server
+# stands down rather than stopping a newer one.
+const global _watch_interval = Ref(5.0)
+const global _server_generation = Ref(0)
+# Set by _watch_excel when the Excel being served has closed, for the window title; cleared by
+# setxlpid.
+const global _excel_closed = Ref(false)
 
 """
     ExcelError(code::Int)

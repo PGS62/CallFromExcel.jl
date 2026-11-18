@@ -12,6 +12,19 @@ Ideas considered but not yet scheduled, each with a sketch of how it might be im
 - **Add-in side (moderate).** After `JuliaLaunch`, and on request (a ribbon button, or after `JuliaInclude`/`JuliaEval` change the list), the add-in fetches the list and calls `ExcelIntegration.RegisterDelegates`. Each delegate takes the right number of `object` parameters (built with expression trees) and in effect calls `JuliaCall("price_swap", args...)`. Registration must run in a macro context (`ExcelAsyncUtil.QueueAsMacro`). Registering a name again replaces it, so redefining a function in Julia and refreshing works.
 - Free once registered: Function Wizard and IntelliSense help, and `Application.Run "PRICE_SWAP"` from VBA.
 
+**Broadcasting over broadcastable arguments.** `JuliaCall("f.", ...)` broadcasts over every argument; in Julia, a function `f(a, b, c)` whose `c` is an array is broadcast over `a` and `b` alone as `f.(a, b, Ref(c))`. Named functions can do that automatically, so the Julia author writes `f` for scalars and ranges are handled correctly and consistently, with no `.` for the user to remember.
+
+- **Which arguments broadcast.** Declared at registration, e.g. `@excel broadcast=(:a, :b) function f(a, b, c) ... end`: the listed arguments broadcast, the rest are passed whole. This suits the common style of leaving arguments unannotated unless needed for dispatch. Where there is no list, declared types decide: an argument declared as an array type (`::AbstractVector`, `::AbstractMatrix`) is passed whole, any other argument broadcasts. So without a list or annotations everything broadcasts, as `JuliaCall("f.", ...)` does today. `broadcast=false` opts out entirely.
+- **The rule per call.** An array given to a broadcasting argument is broadcast over; every other value is wrapped in `Ref` (harmless for scalars, and it protects structs that don't support broadcasting). If nothing is broadcast, it's a plain call, so the result isn't a zero-dimensional array. A column of handles given to a broadcasting argument (see Object handles) broadcasts over the objects.
+- **In Julia, not by Excel's lifting.** Excel can lift an add-in function over a range itself if its parameters are registered as scalar types, but it calls the function once per cell: one HTTP round trip each. Registering every parameter as a generic value and broadcasting in Julia makes one round trip and one compiled broadcast.
+- **Consistent where Excel isn't.** Excel lifts a built-in function only when its parameter is registered as a scalar value, and many aren't: `=SQRT(A1:A3)` spills, but `=COMPLEX(A1:A3, B1:B3)` and `=EDATE(A1:A3, 1)` (Analysis ToolPak functions, whose parameters take references) give `#VALUE!` unless coerced with `+0`. Named Julia functions follow one rule; a surprised user can read the answer off the registration.
+- **Conversions for arguments passed whole.** A single cell arrives as a scalar and an `n x 1` range as a `Matrix`; for an argument declared `::AbstractVector`, wrap or `vec` it, so the Julia author never sees the difference. With no declared type, pass what arrives.
+- **Shapes.** Julia's rules match Excel's for compatible shapes: a column against a row gives a table, as `=A1:A10*B1:F1` does. For incompatible shapes (10 rows against 7) Excel pads with `#N/A`; don't copy that - give a clear error naming the two arguments.
+- **Functions returning arrays.** Broadcasting them gives an array of arrays, which can't spill: a clear error, suggesting `broadcast=false`.
+- **Several methods.** The method marked `@excel` defines the registered signature.
+- **Optional arguments.** Trailing Julia defaults become optional Excel arguments, arriving as missing - separate from broadcasting, but part of the same registration.
+- **Possible bonus for `JuliaCall`.** `JuliaCall("f.", ...)` could follow the same rule for a function with a single method whose declared types say which arguments are arrays. A change of behaviour, so separate and optional.
+
 **Decisions to make.**
 
 - **Workbooks opened before Julia is running.** Cells with `=PRICE_SWAP(...)` show `#NAME?`, and may not recover when the function is registered later. Add-ins that start their language runtime when Excel starts mostly avoid this; we launch on demand. Options: cache the last exposed list (per project folder) and register **stubs** when the add-in loads, which return "Julia not launched" until Julia is running and then forward normally; and/or a "launch Julia when Excel starts" setting.
@@ -24,7 +37,7 @@ Ideas considered but not yet scheduled, each with a sketch of how it might be im
 
 **First step: a spike** (about a day). Register one function from Julia at run time and check the Function Wizard, IntelliSense, and what a saved workbook using it does when reopened before and after launch.
 
-**Test.** Julia tests for the registry and endpoint (argument names, descriptions, length limits). VBA tests that call a registered function on a sheet and via `Application.Run`, redefine it and check the new definition is used.
+**Test.** Julia tests for the registry and endpoint (argument names, descriptions, length limits). VBA tests that call a registered function on a sheet and via `Application.Run`, redefine it and check the new definition is used. Julia tests for broadcasting: the `broadcast=` list, classification by declared type, `Ref` wrapping, plain call when nothing broadcasts, a column against a row, the shape-mismatch and array-of-arrays errors, the scalar-to-vector and `n x 1` conversions.
 
 ## Object handles
 

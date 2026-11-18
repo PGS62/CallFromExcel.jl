@@ -30,23 +30,73 @@ Ideas considered but not yet scheduled, each with a sketch of how it might be im
 
 **Problem.** Every result comes back to Excel as data. A large or structured Julia object (a curve, a model, a DataFrame, a portfolio) must be rebuilt on every call that needs it, or be kept in a global by hand (`JuliaEval("global curve = ...")`), which doesn't recalculate with the sheet. The handle pattern common in C++ and other Excel add-ins solves this: a function returns a short string naming an object kept in the add-in's language, and other functions accept that string in place of the object. Combines well with named worksheet functions: `=BUILD_CURVE(...)` returns a handle, `=PRICE(curve, trade)` uses it.
 
+The examples below come from finance, where Excel is the working environment for building models, not just a place to view results, and where the handle pattern is long established. The same need arises wherever models are built in workbooks (insurance, energy, engineering, operations): any object that is large or expensive to build once and then used from many cells, such as a fitted model, a loaded dataset, a simulation's results or an interpolator.
+
 **Sketch.**
 
-- **Creating.** `=JuliaHandle("build_curve", A1:B20)` calls the function as `JuliaCall` does, stores the result Julia-side in a `Dict{String,Any}` (not as globals), and returns a handle such as `jl:Curve#17` (type name plus an integer id).
-- **Using.** All existing functions accept handles transparently: Julia's decoder replaces any argument string that **exactly** matches `jl:<TypeName>#<integer>` **and** whose id is in the cache with the cached object. Doing it in the decoder means handles inside arrays (a column of trade handles) also work. An ordinary string can only collide by matching the pattern and an existing id, which is very unlikely.
+- **Creating.** Two functions, mirroring `JuliaCall` and `JuliaEval`: `=JuliaHandle("build_curve", A1:B20)` calls a function as `JuliaCall` does, and `=JuliaEvalHandle("(1:100).*(1:100)'")` evaluates code as `JuliaEval` does. Each stores the result Julia-side in a `Dict` (not as globals) and returns a handle such as `jl:Curve#17@k3x9`. Rejected: a blank first argument, `=JuliaHandle(,"code")`, meaning "evaluate code" - hard to discover, and the Function Arguments dialog would label the code as an argument to `f`.
+- **Using.** Every function accepts handles, with nothing to declare. In `decode_from_xl`'s string branch, a string that exactly matches the handle pattern is replaced by the cached object. So:
+  - The add-in doesn't change: to Excel and C# a handle is just a string.
+  - Handles work wherever values do: single cells, ranges, nested arrays, `JuliaCallKw`'s named arguments, VBA arrays.
+  - `_maybe_typed` narrows a range of `Trade` handles to a `Vector{Trade}`, not `Vector{Any}`.
+  - Ordinary strings cost one `startswith` check; numeric arrays ("V" format) never reach that branch.
+  - Any Julia function works, and dispatch picks the method: `=JuliaCall("length", A1)`, `=JuliaCall("price", A1, B1)` calling `price(curve::Curve, ...)`.
+- **Not found.** A string matching the pattern whose object isn't cached (freed, or from an earlier Julia session) raises an error such as `Handle jl:Curve#17@k3x9 not found - recalculate the cell that created it`, rather than passing the string on, which would end in a baffling `MethodError`. The cost: a genuine string of exactly that form can't be passed as a value.
+- **Same object, not a copy.** A 2 GB DataFrame used by 50 cells is stored once. But a function that mutates its argument (`sort!`, `push!`) changes the cached object without changing its handle, so dependent cells aren't recalculated and results depend on calculation order. Document "don't mutate" (Julia's `!` convention helps); copying on every use would defeat the purpose.
+- **Code can't take handles.** `JuliaEvalHandle` receives only a string, so to build an object from other handles use the call form, e.g. `=JuliaHandle("build_portfolio", A1:A10)` with trade handles in A1:A10. A `handle("jl:...")` lookup for use inside code could be added if asked for.
 - **Reading.** `=JuliaCall("identity", D1)` already returns the object as data; a `JuliaObject(handle)` function would be a friendlier name for it.
+
+**Handle format: `jl:<label>#<id>@<session>`.**
+
+- **Label.** Only for people reading the sheet - lookup ignores it, so it can't cause a wrong match. Default `string(nameof(typeof(x)))`, which is always short: `Curve` rather than `MyPkg.Internal.Curve`, `Dict` rather than `Dict{String, Vector{Float64}}` (though `Array` rather than `Matrix{Float64}`). Closure types contain `#`, so parse from the right (session after the last `@`, id after the last `#` before it), or strip labels to letters, digits and `_`. Users could customise labels through dispatch rather than a setting, e.g. `CallFromExcel.handle_label(c::Curve) = "Curve_" * c.currency` - add only if asked for.
+- **Id.** Increases with every handle created and is never reused, so a recalculated cell returns a new string (making Excel recalculate its dependents), and a freed handle can never come to name a different object.
+- **Session.** A few random characters chosen when the server starts. Without them, ids restart at 1 when Julia restarts, so a stale handle in a reopened workbook could silently pick up a new, unrelated object #17 - a wrong answer with no error. With them, a stale handle always gives "not found".
+- **Rejected:** a non-printing marker (e.g. a zero width space) to make accidental matches less likely. A handle typed by hand (in a formula, in VBA, while debugging) would silently not be one while looking identical; some paste paths and tools strip such characters; `LEN` and `=A1=B1` would puzzle. And an accidental exact match of this pattern is already implausible.
 
 **Lifetime (most of the work).**
 
-- **Recalculation.** Key each entry by the calling cell (workbook, sheet, address; Excel-DNA's `xlfCaller`). When the cell recalculates, the new object replaces the old, which Julia's GC then frees. The id increases on every recalculation so that the handle string changes and Excel recalculates dependent cells; otherwise they would keep results from the old object.
-- **Deleted cells, closed workbooks.** Their entries leak until cleaned up: drop a workbook's entries when it closes (the add-in can watch `WorkbookBeforeClose`), plus `JuliaClearHandles()` or a ribbon button. Show the handle count (and perhaps memory) in the About dialog.
-- **Julia restarted.** Every handle is invalid. Functions given one return a clear error, e.g. `#Handle jl:Curve#17 not found - recalculate`; `JuliaLaunch` could offer to recalculate open workbooks.
-- **Reopened workbooks.** Saved cells hold handle strings whose objects no longer exist, and Excel won't recalculate them on open unless made to. Same clear error, plus an option to recalculate on launch.
-- **Called from VBA.** There is no calling cell: either return the data directly, or require an explicit key argument.
+**Preferred: Excel-DNA's built-in object handles.** Excel-DNA (which the add-in uses, with automatic registration) has built-in handles since 1.9: `[return: ExcelHandle]` on a function's result, `[ExcelHandle]` on a parameter. Lifetime rests on RTD: each handle is an RTD topic, and Excel itself tells the add-in when the last formula using a topic has gone, at which point Excel-DNA calls `Dispose` on the stored object (`HandleInfo.Dispose` -> `ObjectHandler.Remove`, seen in its source). Excel knows its own formulas better than any scan, so:
 
-**Decisions to make.** The handle format (prefix, whether to include the type name); whether `JuliaHandle` is a separate function or a flag on `JuliaCall`; whether named functions can declare that they return a handle; the cleanup triggers; whether handles from one workbook may be used in another (probably yes).
+- Moved cells, inserted rows, renamed sheets, Save As, closed workbooks, copied cells: all tracked by Excel.
+- Nested `=JuliaCall("price", JuliaHandle(...))` and concatenation: the object lives while the formula exists - harmless.
+- No scan, so the scan-cost and `SpecialCells` questions below disappear.
 
-**Test.** Julia tests for the cache, the pattern matching (strings that look like handles but aren't), replacement on recalculation and clean-up. VBA tests: create a handle on a sheet, use it from another cell, recalculate and check the dependent cell recalculates, close the workbook and check the cache entry is gone.
+How it would fit: the C# object stored is a small proxy holding the Julia id (and session tag), whose `Dispose` tells Julia to drop the object - queued and batched, as `Dispose` comes from Excel's RTD machinery rather than a calculation. `JuliaCall` takes untyped arguments, so `[ExcelHandle]` parameter conversion doesn't apply; instead the add-in looks each string argument up (`ObjectHandler.TryGetObject`) and sends a found handle to Julia as a new wire-format type (e.g. `O<id>@<session>`), which the decoder replaces with the object. Julia then needs no string-pattern matching at all, and look-alike strings can't be mistaken for handles - only strings Excel-DNA actually issued are. The handle text is Excel-DNA's `<tag>:<n>`; the tag can be set (a custom `DisplayName` was added in early 2026, probably needing 1.10), so the type label could still appear. A Julia restarted while Excel stays open leaves proxies naming objects that no longer exist: the session tag turns those into the "not found" error.
+
+Status: live and maintained, not an abandoned experiment. In Excel-DNA's core (`ExcelDna.Integration/ObjectHandles`), with runtime tests and NativeAOT support; commits through 2026 (custom display name Feb, more than 16 arguments Apr, AOT fix Jul); issue #824 (handles from user code) closed Feb 2026; issue #860 (nested handle stops an RTD-based async function restarting) open, Oct 2026 - relevant to the nested case, though `JuliaCall` isn't async. RTD has its own quirks to check, e.g. issue #209 (RTD functions recalculated on cut and paste anywhere in a sheet).
+
+**Fallback: keep what's reachable.** If the Excel-DNA route fails the spike. The rule, as for Julia's own garbage collector: an object stays alive while some cell in an open workbook **displays its handle exactly**; everything else is freed. After each calculation (Excel's `AfterCalculate` event, which Excel-DNA can hook - nothing is half-calculated then, and no calculation runs during the scan) the add-in collects the handle strings visible in open workbooks and sends them to Julia (a new endpoint), which drops every other entry. It doesn't matter how formulas are written, only which handles are on show:
+
+- **Nested**, `=JuliaCall("price", JuliaHandle(...))`: the object has done its job once the price is calculated; nothing can refer to it later, so freeing it is correct.
+- **Concatenated**, `=JuliaHandle(...)&JuliaHandle(...)`: the cell's string isn't a handle (exact match), so nothing can use either object; freeing them is correct.
+- **Moved cells, inserted rows, renamed sheets, Save As**: the scan reads values, not addresses, so none of these matter.
+- **Copied cells**: both show the handle, so it's kept; each gets its own object when it next recalculates.
+- **Closed workbooks**: their cells drop out of the next scan. No special case.
+- **Manual calculation**: a cell awaiting recalculation still shows its old handle, which keeps the object its dependents still use.
+- **Spilled arrays of handles**: each spilled cell shows a handle and is scanned like any other (but see the `SpecialCells` caveat below).
+
+Rejected approaches:
+
+- **Keying entries by calling cell** (`xlfCaller`, workbook/sheet/address), replacing a cell's entry when it recalculates. Addresses change under routine edits without any recalculation: inserting a row moves every cell below it, as do cut and paste, renaming a sheet and Save As. A new handle formula at a vacated address would then free another cell's object, and entries for moved cells would leak.
+- **Asking the cell** (`xlCoerce` on the calling cell to read the handle it is about to replace). Assumes one visible handle per cell: `=JuliaCall("price", JuliaHandle(...))` would leak an object on every recalculation, and concatenation, `IF`, `LET`, `LAMBDA` and named formulas all break it.
+
+Open points:
+
+- **Scan cost.** Skip the sweep when no handle has been created since the last one. Two ways to scan, to measure on a big workbook:
+  - `SpecialCells(xlCellTypeFormulas, xlTextValues)` per sheet: formula cells **and** text result (the second argument filters the first; within it, `xlNumbers + xlTextValues` would be an OR). Raises error 1004 "No cells were found" rather than returning nothing, so each call needs a catch. Has historically failed on some protected sheets. **Unknown whether spilled cells count** - only the top-left cell holds the formula; if they don't, a spilled column of handles would be freed while in use. Test this first.
+  - Fallback: each sheet's `UsedRange.Value2` read as one array, checking strings with `startswith("jl:")`. Slower on a huge sheet, but misses nothing.
+- **Handles created from VBA** are invisible to the scan. Exclude them from sweeping and release them explicitly (`JuliaRelease`), or have VBA store them in a cell.
+- **Defined names** holding a handle as a constant: rare, cheap to include in the scan.
+- **Julia restarted, workbooks reopened.** Every saved handle gives "not found", and Excel won't recalculate on open unless made to; `JuliaLaunch` could offer to recalculate open workbooks.
+- **Safety valves.** `JuliaClearHandles()` or a ribbon button; the handle count (and perhaps memory) in the About dialog; a REPL function listing the cache (handle, label, size) - what a user would send when a complicated workbook misbehaves.
+
+Design aim: since no test suite can cover every workbook, a case we missed should end in a clear error or a leak, never a silent wrong answer.
+
+**Decisions to make.** Whether named worksheet functions can declare that they return a handle; whether a function returning an array of objects gives one handle or a spilled range of handles (one per element); whether handles from one workbook may be used in another (probably yes, and the sweep allows it).
+
+**Test.** Most of the logic can be tested in Julia without Excel: the pattern (look-alikes, labels containing `#`, the session tag), replacement inside arrays and the typed result, the not-found error, the sweep as a pure function (cache plus live set gives what remains), labels. In Excel, a few VBA scenarios, each checking the handle count after calculating: a handle used from another cell, with dependents recalculating when it's recalculated; nested; concatenated; a moved cell and an inserted row; a copied cell; a closed workbook; manual calculation; spilled handles. The complexity of users' workbooks doesn't multiply these cases, because the rule depends only on what is visible. No random or stress tests.
+
+**First step: a spike of the Excel-DNA route.** A `JuliaHandle` returning a disposable proxy via `[return: ExcelHandle]`; check that `Dispose` is called on recalculation with new inputs, cell deletion, formula edits, closing the workbook, and for nested and spilled handles; that moves, inserted rows and copies keep handles alive; whether `DisplayName` needs Excel-DNA 1.10; and what RTD costs with thousands of handle cells. Only if that fails: hook `AfterCalculate` for the sweep, scan a large workbook both ways and time it, and check whether `SpecialCells` reports spilled cells.
 
 ## Untrusted workbooks can run Julia code
 

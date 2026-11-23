@@ -145,6 +145,16 @@ namespace CallFromExcel.AddIn
             }
         }
 
+        // SPIKE: used by JuliaHandles to create, count and free handles.
+        internal static object CallForHandles(string juliaFunction, object[] args)
+        {
+            if (JuliaPort.GetJuliaPortOrZero() == 0)
+            {
+                return "#Please call JuliaLaunch before calling JuliaHandle!";
+            }
+            return DecodeForWorksheet(JuliaHttpClient.Post(BuildCallPayload(juliaFunction, args), "/call"));
+        }
+
         // One pass over the result: Julia's Excel errors become worksheet errors, and
         // nothing/missing an empty cell.
         private static object DecodeForWorksheet(string responseWire)
@@ -228,6 +238,8 @@ namespace CallFromExcel.AddIn
         {
             if (value is ExcelEmpty || value is ExcelMissing) return null;
             if (value is ExcelError error) return new ExcelErrorValue(2000 + (int)error);
+            // SPIKE: a live handle is sent as a reference to its Julia object.
+            if (value is string s && JuliaHandles.TryGetKey(s, out string key)) return new JuliaHandleRef(key);
             return value;
         }
 

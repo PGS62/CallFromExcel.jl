@@ -7,7 +7,7 @@ using DataFrames: DataFrames, DataFrame, Missing
 using Dates: Dates, Date, DateTime
 using HTTP: HTTP
 using Printf: @sprintf
-using Random: RandomDevice
+using Random: RandomDevice, randstring
 using Sockets: Sockets
 
 const global xlpid = Ref(0)
@@ -75,5 +75,6 @@ Base.show(io::IO, e::ExcelError) = print(io, get(EXCEL_ERROR_NAMES, e.code, "#ER
 include("comms.jl")
 include("encode.jl")
 include("decode.jl")
+include("handles.jl")
 
 end

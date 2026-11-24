@@ -1,7 +1,7 @@
 #=
 SPIKE (branch spike/object-handles): object handles, see "Object handles" in Enhancements.md.
 
-The add-in's JuliaHandle/JuliaEvalHandle call handle_create/handle_eval, which store the
+The add-in's JuliaCallHandle and JuliaEval(..., TRUE) call handle_create/handle_eval, which store the
 result here and return a handle string "jl:<label>#<id>@<session>". The add-in keeps the set
 of handles it has issued and still holds; when one of them is passed to any function it is
 sent as the wire-format type "O<id>@<session>" (see decode_from_xl), which is replaced by
@@ -38,17 +38,26 @@ end
 """
     handle_create(fn_name::String, args...)
 
-Call the function named `fn_name` with `args`, store the result and return its handle.
+Call the function named `fn_name` with `args`, store the result and return its handle. For
+the add-in's JuliaCallHandle, which covers both JuliaCall and JuliaCallNamedArgs: if any
+argument is the string ";", the arguments are split into positional and named ones as for
+JuliaCallNamedArgs (see `split_named_args`); otherwise all are positional, as for JuliaCall.
 """
 function handle_create(fn_name::String, args...)
     fn = Main.eval(Meta.parse(fn_name))
-    _store_handle(Base.invokelatest(fn, args...))
+    if any(x -> x isa AbstractString && x == ";", args)
+        positional, named = split_named_args(collect(Any, args))
+        _store_handle(Base.invokelatest(fn, positional...; named...))
+    else
+        _store_handle(Base.invokelatest(fn, args...))
+    end
 end
 
 """
     handle_eval(code::String)
 
-Evaluate `code`, store the result and return its handle.
+Evaluate `code`, store the result and return its handle. For the add-in's
+`JuliaEval(code, TRUE)`.
 """
 handle_eval(code::String) = _store_handle(Main.eval(Meta.parseall(code)))
 

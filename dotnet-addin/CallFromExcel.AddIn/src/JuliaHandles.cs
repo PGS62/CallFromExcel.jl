@@ -71,10 +71,13 @@ namespace CallFromExcel.AddIn
             if (Events.Count > 500) Events.RemoveAt(0);
         }
 
-        [ExcelFunction(Description = "SPIKE. Calls a Julia function and returns a handle to the result, which stays in Julia while a formula uses it.", IsThreadSafe = false)]
-        public static object JuliaHandle(
+        // Covers both JuliaCall and JuliaCallNamedArgs, so there is no JuliaCallNamedArgsHandle:
+        // handle_create treats the arguments as JuliaCallNamedArgs does if one of them is ";",
+        // else as JuliaCall does. The cost: a positional argument can't be the string ";".
+        [ExcelFunction(Description = "SPIKE. Calls a Julia function and returns a handle to the result, which stays in Julia while a formula uses it. As in JuliaCallNamedArgs, an argument \";\" marks where named arguments start.", IsThreadSafe = false)]
+        public static object JuliaCallHandle(
             [ExcelArgument(Name = "JuliaFunction", Description = "The name of a Julia function.")] string juliaFunction,
-            [ExcelArgument(Name = "Args", Description = "Zero or more arguments; handles are replaced by their objects.")] params object[] args)
+            [ExcelArgument(Name = "Args", Description = "Positional arguments, optionally followed by \";\" and name/value pairs for keyword arguments. Handles are replaced by their objects.")] params object[] args)
         {
             if (ExcelDnaUtil.IsInFunctionWizard()) return "#Disabled in Function Wizard!";
             // An error argument (e.g. an invalidated handle upstream) propagates, as in most
@@ -87,8 +90,8 @@ namespace CallFromExcel.AddIn
             // Excel-DNA calls the lambda only when no topic matches, so the copying in
             // HandleCreateArgs happens only when Julia is asked to build an object, not on every
             // recalculation that reuses an existing handle.
-            return ExcelAsyncUtil.Observe("JuliaHandle", topic,
-                () => new HandleObservable("JuliaHandle(" + juliaFunction + ")", "CallFromExcel.handle_create",
+            return ExcelAsyncUtil.Observe("JuliaCallHandle", topic,
+                () => new HandleObservable("JuliaCallHandle(" + juliaFunction + ")", "CallFromExcel.handle_create",
                     HandleCreateArgs(juliaFunction, args)));
         }
 
@@ -103,34 +106,43 @@ namespace CallFromExcel.AddIn
             return callArgs;
         }
 
-        [ExcelFunction(Description = "SPIKE. Evaluates Julia code and returns a handle to the result, which stays in Julia while a formula uses it.", IsThreadSafe = false)]
-        public static object JuliaEvalHandle(
-            [ExcelArgument(Name = "JuliaExpression", Description = "Julia code, as a string.")] string juliaExpression)
+        // JuliaEval(expression, TRUE). The topic is keyed on the expression text after
+        // JuliaEval has joined a range of cells into one string.
+        internal static object EvalHandle(string expression)
         {
-            if (ExcelDnaUtil.IsInFunctionWizard()) return "#Disabled in Function Wizard!";
-            return ExcelAsyncUtil.Observe("JuliaEvalHandle", new object[] { generation, juliaExpression },
-                () => new HandleObservable("JuliaEvalHandle", "CallFromExcel.handle_eval", new object[] { juliaExpression }));
+            return ExcelAsyncUtil.Observe("JuliaEvalHandle", new object[] { generation, expression },
+                () => new HandleObservable("JuliaEval(ReturnHandle)", "CallFromExcel.handle_eval", new object[] { expression }));
         }
 
-        [ExcelFunction(Description = "SPIKE. Handle counts: [handles the add-in holds, objects Julia stores].", IsThreadSafe = false, IsVolatile = true)]
-        public static object JuliaHandleCount()
+        // Info types JuliaHandleInfo recognises, as listed in its error for any other.
+        private static readonly string[] InfoTypes = { "count", "events" };
+
+        // One function for information about handles, in the style of Excel's INFO(type_text).
+        [ExcelFunction(Description = "SPIKE. Information about object handles: \"count\" for the number of handles the add-in holds and objects Julia stores, \"events\" for recent create/release events, newest last.", IsThreadSafe = false, IsVolatile = true)]
+        public static object JuliaHandleInfo(
+            [ExcelArgument(Name = "Type", Description = "\"count\" or \"events\".")] object type)
         {
-            object julia;
-            try { julia = JuliaFunctions.CallForHandles("CallFromExcel.handle_count", new object[0]); }
-            catch (Exception ex) { julia = "#" + ex.Message; }
-            return "addin live " + Live.Count + ", julia stored " + Convert.ToString(julia);
+            string t = type is string s ? s.Trim().ToLowerInvariant() : "";
+            if (t == "count")
+            {
+                object julia;
+                try { julia = JuliaFunctions.CallForHandles("CallFromExcel.handle_count", new object[0]); }
+                catch (Exception ex) { julia = "#" + ex.Message; }
+                return "addin live " + Live.Count + ", julia stored " + Convert.ToString(julia);
+            }
+            if (t == "events")
+            {
+                if (Events.Count == 0) return "(none)";
+                var result = new object[Events.Count, 1];
+                for (int i = 0; i < Events.Count; i++) result[i, 0] = Events[i];
+                return result;
+            }
+            return "#Type must be one of: \"" + string.Join("\", \"", InfoTypes) + "\"";
         }
 
-        [ExcelFunction(Description = "SPIKE. Recent handle create/release events, newest last.", IsThreadSafe = false, IsVolatile = true)]
-        public static object JuliaHandleEvents()
-        {
-            if (Events.Count == 0) return "(none)";
-            var result = new object[Events.Count, 1];
-            for (int i = 0; i < Events.Count; i++) result[i, 0] = Events[i];
-            return result;
-        }
-
-        [ExcelFunction(Description = "SPIKE. Clears the event log.", IsThreadSafe = false)]
+        // Hidden: a worksheet function that changes state is a poor fit for the documented set,
+        // but the spike's test scripts use it to see each step's events on their own.
+        [ExcelFunction(Description = "SPIKE. Clears the event log.", IsThreadSafe = false, IsHidden = true)]
         public static object JuliaHandleEventsClear()
         {
             Events.Clear();

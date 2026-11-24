@@ -150,7 +150,7 @@ namespace CallFromExcel.AddIn
         {
             if (JuliaPort.GetJuliaPortOrZero() == 0)
             {
-                return "#Please call JuliaLaunch before calling JuliaHandle!";
+                return "#Please call JuliaLaunch before calling JuliaCallHandle or JuliaEval!";
             }
             return DecodeForWorksheet(JuliaHttpClient.Post(BuildCallPayload(juliaFunction, args), "/call"));
         }
@@ -165,12 +165,20 @@ namespace CallFromExcel.AddIn
 
         [ExcelFunction(Description = "Evaluate a Julia expression and return the result to an Excel worksheet.", HelpTopic = HelpRoot + "juliaeval", IsThreadSafe = false)]
         public static object JuliaEval(
-            [ExcelArgument(Name = "JuliaExpression", Description = "Any valid Julia code, as a string. Can also be a one-column range to evaluate multiple Julia statements.")] object juliaExpression)
+            [ExcelArgument(Name = "JuliaExpression", Description = "Any valid Julia code, as a string. Can also be a one-column range to evaluate multiple Julia statements.")] object juliaExpression,
+            [ExcelArgument(Name = "ReturnHandle", Description = "SPIKE. Optional, default FALSE. TRUE returns a handle to the result, which stays in Julia while a formula uses it, and evaluates the code again only when it changes.")] object returnHandle)
         {
             if (ExcelDnaUtil.IsInFunctionWizard()) return FunctionWizardMessage;
             if (juliaExpression is ExcelError) return juliaExpression;
             try
             {
+                // Before the JuliaLaunch check: a handle's topic retries a failed create on the
+                // next recalculation, and reports "call JuliaLaunch" itself.
+                if (!IsOmitted(returnHandle) && Convert.ToBoolean(returnHandle))
+                {
+                    return JuliaHandles.EvalHandle(ConcatenateExpressions(juliaExpression));
+                }
+
                 if (JuliaPort.GetJuliaPortOrZero() == 0)
                 {
                     return "#Please call JuliaLaunch before calling JuliaEval or JuliaCall!";

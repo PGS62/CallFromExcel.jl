@@ -20,9 +20,9 @@ function Retry($sb) {
 function Settle { Retry { $excel.Calculate() }; Start-Sleep -Milliseconds 300; Retry { $excel.Calculate() } }
 function Ev($title) {
     Settle
-    $ev = Retry { $excel.Evaluate("JuliaHandleEvents()") }
+    $ev = Retry { $excel.Evaluate('JuliaHandleInfo("events")') }
     Write-Host ""
-    Write-Host "=== $title   [$($excel.Evaluate("JuliaHandleCount()"))]"
+    Write-Host "=== $title   [$($excel.Evaluate('JuliaHandleInfo("count")'))]"
     if ($ev -is [array]) { foreach ($e in $ev) { Write-Host "    $e" } } else { Write-Host "    $ev" }
     [void]$excel.Evaluate("JuliaHandleEventsClear()")
 }
@@ -35,9 +35,9 @@ try {
     $ws = $wb.Worksheets.Item(1)
     $ws.Range("Z1").Formula2 = $launch
     $ws.Range("Z2").Formula2 = $helpers
-    $ws.Range("A1").Formula2 = '=JuliaHandle("mkrand",3)'
+    $ws.Range("A1").Formula2 = '=JuliaCallHandle("mkrand",3)'
     $ws.Range("B1").Formula2 = '=JuliaCall("sum",A1)'
-    $ws.Range("A2").Formula2 = '=JuliaHandle("reverse",A1)'
+    $ws.Range("A2").Formula2 = '=JuliaCallHandle("reverse",A1)'
     $ws.Range("B2").Formula2 = '=JuliaCall("sum",A2)'
     ShowAll
     Ev "1 before restart"

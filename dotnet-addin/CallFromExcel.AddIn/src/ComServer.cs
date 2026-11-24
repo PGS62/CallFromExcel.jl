@@ -79,6 +79,23 @@ namespace CallFromExcel.AddIn
         int JuliaExcelPID();
         object JuliaSetVar(string VariableName, object RefersTo);
         object JuliaInclude(string FileName);
+
+        // SPIKE (branch spike/object-handles): object handles created from VBA. Added at the
+        // end of the interface so code compiled against the earlier type library is unaffected.
+        // A worksheet handle's lifetime comes from Excel's RTD machinery (it lives while a
+        // formula uses it); a COM call has no calling cell, so a handle created here lives
+        // until JuliaHandleRelease or JuliaHandleReleaseAll frees it. Errors are raised (as by
+        // JuliaCallVBA) rather than returned as strings, which could be mistaken for a handle.
+        string JuliaCallHandle(string JuliaFunction,
+            [Optional] object Arg1, [Optional] object Arg2, [Optional] object Arg3, [Optional] object Arg4, [Optional] object Arg5,
+            [Optional] object Arg6, [Optional] object Arg7, [Optional] object Arg8, [Optional] object Arg9, [Optional] object Arg10,
+            [Optional] object Arg11, [Optional] object Arg12, [Optional] object Arg13, [Optional] object Arg14, [Optional] object Arg15,
+            [Optional] object Arg16, [Optional] object Arg17, [Optional] object Arg18, [Optional] object Arg19, [Optional] object Arg20,
+            [Optional] object Arg21, [Optional] object Arg22, [Optional] object Arg23, [Optional] object Arg24, [Optional] object Arg25,
+            [Optional] object Arg26, [Optional] object Arg27, [Optional] object Arg28, [Optional] object Arg29, [Optional] object Arg30);
+        string JuliaEvalHandle(object JuliaExpression);
+        bool JuliaHandleRelease(string Handle);
+        int JuliaHandleReleaseAll();
     }
 
     [ComVisible(true)]
@@ -250,6 +267,116 @@ namespace CallFromExcel.AddIn
             }
         }
 
+        // SPIKE: handles created by JuliaCallHandle/JuliaEvalHandle and not yet released. Only
+        // these can be released from VBA: a worksheet handle is released by Excel when no
+        // formula uses it, and freeing it here would break the cells using it. Shared by every
+        // ComServer instance in this Excel (it's static), but not with the worksheet functions,
+        // which run in a separate copy of this assembly (see HandlePattern).
+        private static readonly System.Collections.Generic.Dictionary<string, string> VbaHandles =
+            new System.Collections.Generic.Dictionary<string, string>();
+
+        // JuliaCallHandle covers both JuliaCall and JuliaCallNamedArgs, as the worksheet
+        // function does: an argument ";" marks where named arguments start.
+        public string JuliaCallHandle(string JuliaFunction,
+            object Arg1, object Arg2, object Arg3, object Arg4, object Arg5,
+            object Arg6, object Arg7, object Arg8, object Arg9, object Arg10,
+            object Arg11, object Arg12, object Arg13, object Arg14, object Arg15,
+            object Arg16, object Arg17, object Arg18, object Arg19, object Arg20,
+            object Arg21, object Arg22, object Arg23, object Arg24, object Arg25,
+            object Arg26, object Arg27, object Arg28, object Arg29, object Arg30)
+        {
+            object[] args = ArgsList(
+                Arg1, Arg2, Arg3, Arg4, Arg5, Arg6, Arg7, Arg8, Arg9, Arg10,
+                Arg11, Arg12, Arg13, Arg14, Arg15, Arg16, Arg17, Arg18, Arg19, Arg20,
+                Arg21, Arg22, Arg23, Arg24, Arg25, Arg26, Arg27, Arg28, Arg29, Arg30);
+            var createArgs = new object[1 + args.Length];
+            createArgs[0] = JuliaFunction;
+            System.Array.Copy(args, 0, createArgs, 1, args.Length);
+            return CreateHandle("CallFromExcel.handle_create", createArgs);
+        }
+
+        public string JuliaEvalHandle(object JuliaExpression)
+        {
+            return CreateHandle("CallFromExcel.handle_eval", new object[] { JuliaExpressionToString(JuliaExpression) });
+        }
+
+        // TRUE if Handle was a live handle created from VBA, now freed. FALSE if it isn't one
+        // (already released, created by a worksheet formula, or from before Julia restarted
+        // and already released) - so releasing twice, e.g. from a class's Terminate event after
+        // JuliaHandleReleaseAll, is harmless.
+        public bool JuliaHandleRelease(string Handle)
+        {
+            if (!HandlePattern.TryGetKey(Handle, out _))
+            {
+                throw new System.ArgumentException("'" + Handle + "' is not an object handle");
+            }
+            if (!VbaHandles.TryGetValue(Handle, out string key)) return false;
+            VbaHandles.Remove(Handle);
+            FreeInJulia(key);
+            return true;
+        }
+
+        // Frees every live handle created from VBA; returns how many. Worksheet handles are
+        // unaffected.
+        public int JuliaHandleReleaseAll()
+        {
+            var keys = new System.Collections.Generic.List<string>(VbaHandles.Values);
+            VbaHandles.Clear();
+            foreach (string key in keys) FreeInJulia(key);
+            return keys.Count;
+        }
+
+        private static string CreateHandle(string juliaFunction, object[] args)
+        {
+            if (JuliaPort.GetJuliaPortOrZero() == 0)
+            {
+                throw new System.InvalidOperationException("Please call JuliaLaunch before calling JuliaCallHandle or JuliaEvalHandle");
+            }
+            string responseWire = JuliaHttpClient.Post(BuildCallPayload(juliaFunction, args), "/call");
+            object result = WireFormatDecode.Decode(responseWire, allowNesting: false, stringLengthLimit: 0, vectorToColumn: true);
+            string handle = result as string;
+            if (HandlePattern.TryGetKey(handle, out string key))
+            {
+                VbaHandles[handle] = key;
+                return handle;
+            }
+            // Julia reports a failed call as a string "#<message> Julia REPL has more details...".
+            string message = handle != null ? handle.TrimStart('#') : "Julia returned " + System.Convert.ToString(result) + " rather than a handle";
+            throw new System.InvalidOperationException(message);
+        }
+
+        // Julia not running, or restarted: its objects are gone anyway (and handle_free ignores
+        // a key from an earlier session), so a failure here needs no report.
+        private static void FreeInJulia(string key)
+        {
+            try
+            {
+                if (JuliaPort.GetJuliaPortOrZero() != 0)
+                {
+                    JuliaHttpClient.Post(BuildCallPayload("CallFromExcel.handle_free", new object[] { key }), "/call");
+                }
+            }
+            catch (System.Exception)
+            {
+            }
+        }
+
+        // The "*1,<n>;..." wire envelope of a call: the function name, then each argument.
+        // A Range argument becomes its values, and each object handle (a string of the handle
+        // pattern, here or in an array) a reference to its Julia object.
+        private static string BuildCallPayload(string juliaFunction, object[] args)
+        {
+            var encoded = new string[1 + args.Length];
+            encoded[0] = WireFormatEncode.Encode(juliaFunction);
+            for (int i = 0; i < args.Length; i++)
+            {
+                encoded[i + 1] = WireFormatEncode.Encode(HandlePattern.MapHandles(RangeToValue(args[i])));
+            }
+            var lens = new System.Text.StringBuilder();
+            foreach (string e in encoded) { lens.Append(e.Length); lens.Append(','); }
+            return "*1," + encoded.Length + ";" + lens + ";" + string.Concat(encoded);
+        }
+
         // Excel 2016 and later, as in JuliaFunctions.cs.
         private const int StringLengthLimit = 32768;
 
@@ -273,18 +400,7 @@ namespace CallFromExcel.AddIn
                     return "#Please call JuliaLaunch before calling JuliaEval or JuliaCall!";
                 }
 
-                string fnEncoded = WireFormatEncode.Encode(juliaFunction);
-                var encoded = new string[1 + args.Length];
-                encoded[0] = fnEncoded;
-                for (int i = 0; i < args.Length; i++)
-                {
-                    encoded[i + 1] = WireFormatEncode.Encode(RangeToValue(args[i]));
-                }
-                var lens = new System.Text.StringBuilder();
-                foreach (string e in encoded) { lens.Append(e.Length); lens.Append(','); }
-                string payload = "*1," + encoded.Length + ";" + lens + ";" + string.Concat(encoded);
-
-                string responseWire = JuliaHttpClient.Post(payload, endpoint);
+                string responseWire = JuliaHttpClient.Post(BuildCallPayload(juliaFunction, args), endpoint);
                 object result = WireFormatDecode.Decode(responseWire, allowNesting: false, stringLengthLimit: StringLengthLimit, vectorToColumn: true);
                 result = WireFormatDecode.MapErrorValues(result, MapToComError);
                 return ForVba(result);
@@ -297,18 +413,7 @@ namespace CallFromExcel.AddIn
 
         private static object CallVBACore(string juliaFunction, object[] args, string endpoint)
         {
-            string fnEncoded = WireFormatEncode.Encode(juliaFunction);
-            var encoded = new string[1 + args.Length];
-            encoded[0] = fnEncoded;
-            for (int i = 0; i < args.Length; i++)
-            {
-                encoded[i + 1] = WireFormatEncode.Encode(RangeToValue(args[i]));
-            }
-            var lens = new System.Text.StringBuilder();
-            foreach (string e in encoded) { lens.Append(e.Length); lens.Append(','); }
-            string payload = "*1," + encoded.Length + ";" + lens + ";" + string.Concat(encoded);
-
-            string responseWire = JuliaHttpClient.Post(payload, endpoint);
+            string responseWire = JuliaHttpClient.Post(BuildCallPayload(juliaFunction, args), endpoint);
             object result = WireFormatDecode.Decode(responseWire, allowNesting: true, stringLengthLimit: 0, vectorToColumn: false);
             result = WireFormatDecode.MapErrorValues(result, MapToComError);
             return ForVba(result);

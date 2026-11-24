@@ -74,7 +74,7 @@ function _lookup_handle(key::AbstractString)
     if session == _handle_session[] && haskey(_handles, id)
         return _handles[id]
     end
-    error("Handle #$key not found - recalculate the cell that created it")
+    error("Handle #$key not found - it has been released, or Julia has restarted since it was created")
 end
 
 """

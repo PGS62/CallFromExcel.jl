@@ -22,10 +22,10 @@ namespace CallFromExcel.AddIn
     // object per recalculation.
     public static class JuliaHandles
     {
-        // Handle text -> key "<id>@<session>" for every handle this add-in has issued and not
-        // yet released. Only strings in here are sent to Julia as handles.
-        private static readonly Dictionary<string, string> Live = new Dictionary<string, string>();
         // Handle text -> the observer of its topic, to push a new value into the cells using it.
+        // One entry per live worksheet handle. Which strings are handles is decided by their
+        // text (HandlePattern), not by this table, so that handles created from VBA - by the
+        // COM server, which can't see this table - work in formulas too.
         private static readonly Dictionary<string, IExcelObserver> Observers = new Dictionary<string, IExcelObserver>();
 
         // Part of every topic's key. Bumped when Julia restarts, so each handle formula asks for
@@ -48,7 +48,6 @@ namespace CallFromExcel.AddIn
             {
                 IExcelObserver observer = Observers[handle];
                 Observers.Remove(handle);
-                Live.Remove(handle);
                 Log("invalidate " + handle);
                 observer.OnNext(ExcelError.ExcelErrorNA);
             }
@@ -57,12 +56,6 @@ namespace CallFromExcel.AddIn
         // Create/release events, for checking the spike's scenarios from a sheet.
         private static readonly List<string> Events = new List<string>();
         private static int eventCount;
-
-        internal static bool TryGetKey(string text, out string key)
-        {
-            key = null;
-            return text.StartsWith("jl:", StringComparison.Ordinal) && Live.TryGetValue(text, out key);
-        }
 
         private static void Log(string what)
         {
@@ -118,7 +111,7 @@ namespace CallFromExcel.AddIn
         private static readonly string[] InfoTypes = { "count", "events" };
 
         // One function for information about handles, in the style of Excel's INFO(type_text).
-        [ExcelFunction(Description = "SPIKE. Information about object handles: \"count\" for the number of handles the add-in holds and objects Julia stores, \"events\" for recent create/release events, newest last.", IsThreadSafe = false, IsVolatile = true)]
+        [ExcelFunction(Description = "SPIKE. Information about object handles: \"count\" for the number of live handles created by worksheet formulas and of objects Julia stores (which includes those created from VBA), \"events\" for recent create/release events, newest last.", IsThreadSafe = false, IsVolatile = true)]
         public static object JuliaHandleInfo(
             [ExcelArgument(Name = "Type", Description = "\"count\" or \"events\".")] object type)
         {
@@ -128,7 +121,7 @@ namespace CallFromExcel.AddIn
                 object julia;
                 try { julia = JuliaFunctions.CallForHandles("CallFromExcel.handle_count", new object[0]); }
                 catch (Exception ex) { julia = "#" + ex.Message; }
-                return "addin live " + Live.Count + ", julia stored " + Convert.ToString(julia);
+                return "worksheet handles " + Observers.Count + ", julia stored " + Convert.ToString(julia);
             }
             if (t == "events")
             {
@@ -168,11 +161,8 @@ namespace CallFromExcel.AddIn
                 catch (Exception ex) { result = "#" + ex.Message; }
 
                 string handle = result as string;
-                int hash = handle == null ? -1 : handle.LastIndexOf('#');
-                if (handle != null && handle.StartsWith("jl:", StringComparison.Ordinal) && hash > 0)
+                if (HandlePattern.TryGetKey(handle, out string key))
                 {
-                    string key = handle.Substring(hash + 1);
-                    Live[handle] = key;
                     Observers[handle] = observer;
                     Log("create " + handle + " for " + description);
                     observer.OnNext(handle);
@@ -203,7 +193,6 @@ namespace CallFromExcel.AddIn
             public void Dispose()
             {
                 if (handle == null) return;
-                Live.Remove(handle);
                 Observers.Remove(handle);
                 string remaining;
                 try { remaining = Convert.ToString(JuliaFunctions.CallForHandles("CallFromExcel.handle_free", new object[] { key })); }
@@ -212,12 +201,5 @@ namespace CallFromExcel.AddIn
                 handle = null;
             }
         }
-    }
-
-    // A handle argument, sent to Julia as the wire-format type "O<id>@<session>".
-    public sealed class JuliaHandleRef
-    {
-        public readonly string Key;
-        public JuliaHandleRef(string key) { Key = key; }
     }
 }

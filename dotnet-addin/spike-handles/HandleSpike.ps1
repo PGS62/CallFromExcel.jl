@@ -37,105 +37,105 @@ try {
     $ws = $wb.Worksheets.Item(1)
 
     # 1. Before Julia is launched: error, then retry after launch.
-    $ws.Range("A1").Formula2 = '=JuliaCallHandle("mkrand",3)'
+    Retry { $ws.Range("A1").Formula2 = '=JuliaCallHandle("mkrand",3)' }
     Show $ws "A1"
     Ev "1a before launch"
-    $ws.Range("Z1").Formula2 = '=JuliaLaunch(FALSE,TRUE,"--project=C:\Projects\CallFromExcel")'
+    Retry { $ws.Range("Z1").Formula2 = '=JuliaLaunch(FALSE,TRUE,"--project=C:\Projects\CallFromExcel")' }
     Show $ws "Z1"
-    $ws.Range("Z2").Formula2 = '=JuliaEval("mkrand(n)=rand(Int(n)); mkones(n)=ones(Int(n)); mkzeros(n)=zeros(Int(n)); mkfill(x,n)=fill(x,Int(n)); mkkw(n; v=0)=fill(v,Int(n)); ""helpers defined""")'
+    Retry { $ws.Range("Z2").Formula2 = '=JuliaEval("mkrand(n)=rand(Int(n)); mkones(n)=ones(Int(n)); mkzeros(n)=zeros(Int(n)); mkfill(x,n)=fill(x,Int(n)); mkkw(n; v=0)=fill(v,Int(n)); ""helpers defined""")' }
     Show $ws "Z2"
     Settle; Show $ws "A1"
-    $excel.CalculateFull(); Show $ws "A1"
+    Retry { $excel.CalculateFull(); Show $ws "A1" }
     Ev "1b after launch + recalc"
 
     # 2. Use it; same args in another cell; recalc with same args.
-    $ws.Range("B1").Formula2 = '=JuliaCall("length",A1)'
-    $ws.Range("B2").Formula2 = '=JuliaCall("sum",A1)'
-    $ws.Range("A2").Formula2 = '=JuliaCallHandle("mkrand",3)'
+    Retry { $ws.Range("B1").Formula2 = '=JuliaCall("length",A1)' }
+    Retry { $ws.Range("B2").Formula2 = '=JuliaCall("sum",A1)' }
+    Retry { $ws.Range("A2").Formula2 = '=JuliaCallHandle("mkrand",3)' }
     Show $ws "B1"; Show $ws "B2"; Show $ws "A2"
     $before = $ws.Range("B2").Text
-    $excel.CalculateFull()
+    Retry { $excel.CalculateFull() }
     "sum before/after CalculateFull: $before / $($ws.Range('B2').Text)" | Write-Host
     Ev "2 use, same args, CalculateFull"
 
     # 3. New inputs, formula edit, delete.
-    $ws.Range("C3").Value2 = 4
-    $ws.Range("A3").Formula2 = '=JuliaCallHandle("mkrand",C3)'
-    $ws.Range("B3").Formula2 = '=JuliaCall("length",A3)'
+    Retry { $ws.Range("C3").Value2 = 4 }
+    Retry { $ws.Range("A3").Formula2 = '=JuliaCallHandle("mkrand",C3)' }
+    Retry { $ws.Range("B3").Formula2 = '=JuliaCall("length",A3)' }
     Show $ws "A3"; Show $ws "B3"
     Ev "3a create from C3=4"
-    $ws.Range("C3").Value2 = 5
+    Retry { $ws.Range("C3").Value2 = 5 }
     Show $ws "A3"; Show $ws "B3"
     Ev "3b C3 changed to 5"
-    $ws.Range("A3").Formula2 = '=JuliaCallHandle("mkones",2)'
+    Retry { $ws.Range("A3").Formula2 = '=JuliaCallHandle("mkones",2)' }
     Show $ws "A3"; Show $ws "B3"
     Ev "3c formula edited"
-    $ws.Range("A3").ClearContents()
+    Retry { $ws.Range("A3").ClearContents() }
     Show $ws "B3"
     Ev "3d cell cleared"
 
     # 4. Nested, concatenated, range of handles.
-    $ws.Range("D1").Formula2 = '=JuliaCall("length",JuliaCallHandle("mkones",7))'
+    Retry { $ws.Range("D1").Formula2 = '=JuliaCall("length",JuliaCallHandle("mkones",7))' }
     Show $ws "D1"
     Ev "4a nested"
-    $excel.CalculateFull()
+    Retry { $excel.CalculateFull() }
     Ev "4b nested after CalculateFull"
-    $ws.Range("D2").Formula2 = '=JuliaCallHandle("mkones",8)&"x"'
+    Retry { $ws.Range("D2").Formula2 = '=JuliaCallHandle("mkones",8)&"x"' }
     Show $ws "D2"
     Ev "4c concatenated"
-    $ws.Range("D3").Formula2 = '=JuliaCall("length",A1:A2)'
-    $ws.Range("D4").Formula2 = '=JuliaCall("typeof",A1:A2)'
-    $ws.Range("D5").Formula2 = '=JuliaEval("Dict(:a=>1, :b=>2)",TRUE)'
-    $ws.Range("D6").Formula2 = '=JuliaCall("length",D5)'
+    Retry { $ws.Range("D3").Formula2 = '=JuliaCall("length",A1:A2)' }
+    Retry { $ws.Range("D4").Formula2 = '=JuliaCall("typeof",A1:A2)' }
+    Retry { $ws.Range("D5").Formula2 = '=JuliaEval("Dict(:a=>1, :b=>2)",TRUE)' }
+    Retry { $ws.Range("D6").Formula2 = '=JuliaCall("length",D5)' }
     Show $ws "D3"; Show $ws "D4"; Show $ws "D5"; Show $ws "D6"
     Ev "4d range of handles, eval handle"
 
     # 4e. Named arguments in JuliaCallHandle; ";" as a positional argument (not supported);
     # JuliaEval with ReturnHandle omitted/FALSE; JuliaHandleInfo with an unknown type.
-    $ws.Range("E1").Formula2 = '=JuliaCallHandle("mkkw",3,";","v",7)'
-    $ws.Range("E2").Formula2 = '=JuliaCall("sum",E1)'
-    $ws.Range("E3").Formula2 = '=JuliaCallHandle("split","a;b",";")'
-    $ws.Range("E4").Formula2 = '=JuliaEval("1+1")'
-    $ws.Range("E5").Formula2 = '=JuliaEval("1+2",FALSE)'
-    $ws.Range("E6").Formula2 = '=JuliaHandleInfo("foo")'
-    $ws.Range("E7").Formula2 = '=JuliaEval({"x=10";"x+1"},TRUE)'
-    $ws.Range("E8").Formula2 = '=JuliaCall("identity",E7)'
+    Retry { $ws.Range("E1").Formula2 = '=JuliaCallHandle("mkkw",3,";","v",7)' }
+    Retry { $ws.Range("E2").Formula2 = '=JuliaCall("sum",E1)' }
+    Retry { $ws.Range("E3").Formula2 = '=JuliaCallHandle("split","a;b",";")' }
+    Retry { $ws.Range("E4").Formula2 = '=JuliaEval("1+1")' }
+    Retry { $ws.Range("E5").Formula2 = '=JuliaEval("1+2",FALSE)' }
+    Retry { $ws.Range("E6").Formula2 = '=JuliaHandleInfo("foo")' }
+    Retry { $ws.Range("E7").Formula2 = '=JuliaEval({"x=10";"x+1"},TRUE)' }
+    Retry { $ws.Range("E8").Formula2 = '=JuliaCall("identity",E7)' }
     foreach ($a in "E1","E2","E3","E4","E5","E6","E7","E8") { Show $ws $a }
     Ev "4e named args, ReturnHandle, JuliaHandleInfo"
 
     # 5. Spilled handles: one handle per element of an array argument?
-    $ws.Range("G1").Formula2 = '=JuliaCallHandle("mkrand",{2;3;4})'
+    Retry { $ws.Range("G1").Formula2 = '=JuliaCallHandle("mkrand",{2;3;4})' }
     Show $ws "G1"; Show $ws "G2"
     Ev "5 array argument"
 
     # 6. Moves, inserted rows, copies.
-    $ws.Range("A1").Cut($ws.Range("H10")) | Out-Null
+    Retry { $ws.Range("A1").Cut($ws.Range("H10")) | Out-Null }
     Show $ws "H10"; Show $ws "B1"
     Ev "6a cut A1 -> H10"
-    $ws.Rows.Item(1).Insert() | Out-Null
+    Retry { $ws.Rows.Item(1).Insert() | Out-Null }
     Show $ws "H11"; Show $ws "B2"
     Ev "6b row inserted"
-    $ws.Range("A4").Formula2 = '=JuliaCallHandle("mkrand",9)'
-    $ws.Range("A4").Copy($ws.Range("A5")) | Out-Null
+    Retry { $ws.Range("A4").Formula2 = '=JuliaCallHandle("mkrand",9)' }
+    Retry { $ws.Range("A4").Copy($ws.Range("A5")) | Out-Null }
     Show $ws "A4"; Show $ws "A5"
     Ev "6c copy of a handle cell"
-    $ws.Range("A4").ClearContents()
+    Retry { $ws.Range("A4").ClearContents() }
     Ev "6d one of the two cleared"
-    $ws.Range("A5").ClearContents()
+    Retry { $ws.Range("A5").ClearContents() }
     Ev "6e the other cleared"
 
     # 7. Close a workbook holding handles.
     $wb2 = $excel.Workbooks.Add()
-    $wb2.Worksheets.Item(1).Range("A1").Formula2 = '=JuliaCallHandle("mkzeros",11)'
-    $wb2.Worksheets.Item(1).Range("A2").Formula2 = '=JuliaCallHandle("mkzeros",12)'
+    Retry { $wb2.Worksheets.Item(1).Range("A1").Formula2 = '=JuliaCallHandle("mkzeros",11)' }
+    Retry { $wb2.Worksheets.Item(1).Range("A2").Formula2 = '=JuliaCallHandle("mkzeros",12)' }
     Ev "7a second workbook"
     $wb2.Close($false)
     Ev "7b second workbook closed"
     Start-Sleep -Seconds 3
     Ev "7c 3 s later, after Calculate"
-    $ws.Range("C3").Value2 = 6
+    Retry { $ws.Range("C3").Value2 = 6 }
     Ev "7d after an edit in the remaining workbook"
-    $excel.CalculateFull()
+    Retry { $excel.CalculateFull() }
     Ev "7e after CalculateFull"
 
     # 8. Performance: many handle cells, then use them, then clear.
@@ -170,18 +170,18 @@ try {
 
     # 9. Julia restarted while Excel stays open.
     Show $ws "H11"
-    $ws.Range("Y1").Formula2 = '=JuliaEval("exit()")'
+    Retry { $ws.Range("Y1").Formula2 = '=JuliaEval("exit()")' }
     Start-Sleep -Seconds 8
-    $ws.Range("Y1").ClearContents()
-    $ws.Range("Z1").Formula2 = '=JuliaLaunch(FALSE,TRUE,"--project=C:\Projects\CallFromExcel")'
-    $excel.CalculateFull()
+    Retry { $ws.Range("Y1").ClearContents() }
+    Retry { $ws.Range("Z1").Formula2 = '=JuliaLaunch(FALSE,TRUE,"--project=C:\Projects\CallFromExcel")' }
+    Retry { $excel.CalculateFull() }
     Show $ws "Z1"; Show $ws "H11"; Show $ws "B2"
     Ev "9a after Julia restart + CalculateFull"
     Show $ws "Z2"
-    $ws.Range("H11").Formula2 = '=JuliaCallHandle("mkrand",3)'
+    Retry { $ws.Range("H11").Formula2 = '=JuliaCallHandle("mkrand",3)' }
     Show $ws "H11"; Show $ws "B2"
     Ev "9b creating formula re-entered unchanged"
-    $ws.Range("H11").Formula2 = '=JuliaCallHandle("mkrand",3+0)'
+    Retry { $ws.Range("H11").Formula2 = '=JuliaCallHandle("mkrand",3+0)' }
     Show $ws "H11"; Show $ws "B2"
     Ev "9c creating formula edited (same value)"
 
@@ -192,7 +192,7 @@ try {
     Start-Sleep -Seconds 2
     Ev "10b 2 s later"
 
-    $ws.Range("Y1").Formula2 = '=JuliaEval("exit()")'
+    Retry { $ws.Range("Y1").Formula2 = '=JuliaEval("exit()")' }
     $wb.Close($false)
 } catch {
     Write-Host "SCRIPT ERROR: $($_.Exception.Message) at line $($_.InvocationInfo.ScriptLineNumber)"

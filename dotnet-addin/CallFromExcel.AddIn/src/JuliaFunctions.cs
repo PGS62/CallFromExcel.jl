@@ -246,8 +246,8 @@ namespace CallFromExcel.AddIn
         {
             if (value is ExcelEmpty || value is ExcelMissing) return null;
             if (value is ExcelError error) return new ExcelErrorValue(2000 + (int)error);
-            // SPIKE: a live handle is sent as a reference to its Julia object.
-            if (value is string s && JuliaHandles.TryGetKey(s, out string key)) return new JuliaHandleRef(key);
+            // SPIKE: a handle is sent as a reference to its Julia object.
+            if (value is string s && HandlePattern.TryGetKey(s, out string key)) return new JuliaHandleRef(key);
             return value;
         }
 

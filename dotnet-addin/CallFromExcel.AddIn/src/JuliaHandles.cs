@@ -84,13 +84,23 @@ namespace CallFromExcel.AddIn
             topic[0] = generation;
             topic[1] = juliaFunction;
             Array.Copy(args, 0, topic, 2, args.Length);
-            // Copies, because the payload builder converts arrays in place and Excel-DNA keeps
-            // the topic parameters to compare against later calls.
+            // Excel-DNA calls the lambda only when no topic matches, so the copying in
+            // HandleCreateArgs happens only when Julia is asked to build an object, not on every
+            // recalculation that reuses an existing handle.
+            return ExcelAsyncUtil.Observe("JuliaHandle", topic,
+                () => new HandleObservable("JuliaHandle(" + juliaFunction + ")", "CallFromExcel.handle_create",
+                    HandleCreateArgs(juliaFunction, args)));
+        }
+
+        // Arguments for handle_create: the function name, then copies of the arguments. Copies,
+        // because the payload builder converts arrays in place and Excel-DNA keeps the original
+        // arrays (in the topic) to compare against later calls.
+        private static object[] HandleCreateArgs(string juliaFunction, object[] args)
+        {
             object[] callArgs = new object[1 + args.Length];
             callArgs[0] = juliaFunction;
             for (int i = 0; i < args.Length; i++) callArgs[i + 1] = args[i] is Array a ? a.Clone() : args[i];
-            return ExcelAsyncUtil.Observe("JuliaHandle", topic,
-                () => new HandleObservable("JuliaHandle(" + juliaFunction + ")", "CallFromExcel.handle_create", callArgs));
+            return callArgs;
         }
 
         [ExcelFunction(Description = "SPIKE. Evaluates Julia code and returns a handle to the result, which stays in Julia while a formula uses it.", IsThreadSafe = false)]

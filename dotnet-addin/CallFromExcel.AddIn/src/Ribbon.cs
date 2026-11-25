@@ -58,7 +58,7 @@ namespace CallFromExcel.AddIn
                   supertip='Load the file in the box into Julia, as JuliaInclude does, making the functions it defines available to JuliaCall and JuliaEval. Does not trigger recalculation.' />
           <button id='RegisterFunctions' label='Register Functions' imageMso='FunctionWizard'
                   onAction='OnRegisterFunctions'
-                  supertip='Make the functions exposed in Julia with CallFromExcel.expose_to_excel callable as worksheet functions. Done automatically after JuliaLaunch, JuliaInclude and JuliaEval; use this after exposing functions from the Julia REPL.' />
+                  supertip='Make the Julia functions marked with @excel or expose_to_excel callable as worksheet functions. This happens automatically after JuliaLaunch, JuliaInclude and JuliaEval; use this button for functions exposed from the Julia REPL or from VBA.' />
           <button id='CallFromExcelHelp' label='Help' size='large' imageMso='Help'
                   onAction='OnHelp'
                   supertip='Open the CallFromExcel.jl documentation on GitHub.' />

@@ -1,7 +1,7 @@
 module CallFromExcel
 export serve_xl, display_results, last_question, last_answer, answer_again, args_from_xl,
        kwargs_from_xl,
-       ExcelError, server_status, stop_server, expose, @excel
+       ExcelError, server_status, stop_server, expose_to_excel, @excel
 
 using DataFrames: DataFrames, DataFrame, Missing
 using Dates: Dates, Date, DateTime

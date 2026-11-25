@@ -17,7 +17,7 @@ $wb = $excel.Workbooks.Add()
 $ws = $wb.Worksheets.Item(1)
 Retry { $ws.Range("A1").Value2 = "Spike: named worksheet functions. Julia was launched and jl.price_swap and jl.hypot registered by the cells in column Z." }
 Retry { $ws.Range("Z1").Formula2 = '=JuliaLaunch(FALSE,TRUE,"--project=C:\Projects\CallFromExcel")' }
-Retry { $ws.Range("Z2").Formula2 = '=JuliaEval({"price_swap(notional, fixed_rate, years) = notional * fixed_rate * years";"CallFromExcel.expose(""price_swap""; description=""Toy swap price: notional x fixed rate x years."", argdescriptions=[""The notional amount."", ""The fixed rate, e.g. 0.05 for 5%."", ""The term in years.""])";"CallFromExcel.expose(""hypot"")"})' }
+Retry { $ws.Range("Z2").Formula2 = '=JuliaEval({"price_swap(notional, fixed_rate, years) = notional * fixed_rate * years";"CallFromExcel.expose_to_excel(""price_swap""; description=""Toy swap price: notional x fixed rate x years."", argdescriptions=[""The notional amount."", ""The fixed rate, e.g. 0.05 for 5%."", ""The term in years.""])";"CallFromExcel.expose_to_excel(""hypot"")"})' }
 Retry { [void]$excel.Run("JuliaRegisterFunctions") }
 Retry { $ws.Range("A3").Formula2 = '=jl.price_swap(1000000, 0.05, 10)' }
 Retry { $ws.Range("A4").Formula2 = '=jl.hypot(3, 4)' }

@@ -38,9 +38,9 @@ function Log($excel, $title) {
 }
 $define = '=JuliaEval({"price_swap(notional, fixed_rate, years) = notional * fixed_rate * years";' +
     '"SIGMA(x) = 2x"; "f(x) = 1"; "F(x) = 2"; "abc123(x) = x + 1";' +
-    '"CallFromExcel.expose(""price_swap""; description=""Toy swap price"", argdescriptions=[""Notional"", ""Fixed rate"", ""Years""])";' +
-    '"CallFromExcel.expose(""hypot"")"; "CallFromExcel.expose(""SIGMA"")"; "CallFromExcel.expose(""f"")";' +
-    '"CallFromExcel.expose(""price_swap""; name=""PRICE_SWAP"")";' +
+    '"CallFromExcel.expose_to_excel(""price_swap""; description=""Toy swap price"", argdescriptions=[""Notional"", ""Fixed rate"", ""Years""])";' +
+    '"CallFromExcel.expose_to_excel(""hypot"")"; "CallFromExcel.expose_to_excel(""SIGMA"")"; "CallFromExcel.expose_to_excel(""f"")";' +
+    '"CallFromExcel.expose_to_excel(""price_swap""; name=""PRICE_SWAP"")";' +
     '"join(sort(collect(keys(CallFromExcel._exposed))), "", "")"})'
 $define = $define.Replace("SIGMA", [string][char]0x3C3)
 
@@ -49,14 +49,14 @@ try {
     $excel.RTD.ThrottleInterval = 0
     $wb = $excel.Workbooks.Add()
     $ws = $wb.Worksheets.Item(1)
-    Write-Host "=== 1 launch, define and expose, register"
+    Write-Host "=== 1 launch, define and expose_to_excel, register"
     F $ws "Z1" $launch
     F $ws "Z2" $define
     Show $ws "Z1"; Show $ws "Z2"
-    # Names expose refuses (expected: errors): F would replace jl.f, as Excel ignores case;
+    # Names expose_to_excel refuses (expected: errors): F would replace jl.f, as Excel ignores case;
     # abc123 is a cell reference.
-    F $ws "Z5" '=JuliaEval("CallFromExcel.expose(""F"")")'
-    F $ws "Z6" '=JuliaEval("CallFromExcel.expose(""abc123""; name=""abc123"")")'
+    F $ws "Z5" '=JuliaEval("CallFromExcel.expose_to_excel(""F"")")'
+    F $ws "Z6" '=JuliaEval("CallFromExcel.expose_to_excel(""abc123""; name=""abc123"")")'
     Show $ws "Z5"; Show $ws "Z6"
     Retry { [void]$excel.Run("JuliaRegisterFunctions") }
     Log $excel "register log"
@@ -84,7 +84,7 @@ try {
     Show $ws "A1"
 
     Write-Host "=== 5 new signature, re-registered"
-    F $ws "Z4" '=JuliaEval({"price_swap(notional, fixed_rate, years, spread) = notional * (fixed_rate + spread) * years"; "CallFromExcel.expose(""price_swap""; description=""Toy swap price with spread"")"})'
+    F $ws "Z4" '=JuliaEval({"price_swap(notional, fixed_rate, years, spread) = notional * (fixed_rate + spread) * years"; "CallFromExcel.expose_to_excel(""price_swap""; description=""Toy swap price with spread"")"})'
     Show $ws "Z4"
     Retry { [void]$excel.Run("JuliaRegisterFunctions") }
     Log $excel "register log after re-registering"
@@ -118,10 +118,10 @@ try {
     Retry { $excel.CalculateFull() }
     Write-Host "  after CalculateFull:"; Show $ws2 "A1"
 
-    Write-Host "=== 8 launch, expose, register, then recalculate"
+    Write-Host "=== 8 launch, expose_to_excel, register, then recalculate"
     $wbz = $excel.Workbooks.Add(); $wsz = $wbz.Worksheets.Item(1)
     F $wsz "Z1" $launch
-    F $wsz "Z2" '=JuliaEval("CallFromExcel.expose(""hypot"")")'
+    F $wsz "Z2" '=JuliaEval("CallFromExcel.expose_to_excel(""hypot"")")'
     Show $wsz "Z2"
     Retry { [void]$excel.Run("JuliaRegisterFunctions") }
     Log $excel "register log"

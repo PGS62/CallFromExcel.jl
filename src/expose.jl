@@ -2,7 +2,7 @@
 SPIKE (branch spike/named-functions): named worksheet functions, see "Named worksheet
 functions" in Enhancements.md.
 
-expose records a Julia function to be registered in Excel under its own name, by default
+expose_to_excel records a Julia function to be registered in Excel under its own name, by default
 "jl." followed by the Julia name. The add-in fetches the list with exposed_functions and
 registers each as a worksheet function that forwards to JuliaCall's code.
 =#
@@ -20,14 +20,14 @@ const _exposed_count = Ref(0)
 """
     exposed_version()
 
-For the add-in: `"<session>#<count>"`, which changes whenever `expose` is called. The session
+For the add-in: `"<session>#<count>"`, which changes whenever `expose_to_excel` is called. The session
 tag (as in handles) tells a relaunched Julia apart, whose count could match the old one's.
 """
 exposed_version() = _session_tag() * "#" * string(_exposed_count[])
 
 """
-    expose(fn_name; name=nothing, description="", argdescriptions=String[], broadcast=nothing)
-    expose(f::Function; ...)
+    expose_to_excel(fn_name; name=nothing, description="", argdescriptions=String[], broadcast=false)
+    expose_to_excel(f::Function; ...)
 
 SPIKE. Make a Julia function, named by `fn_name` (evaluated in `Main`) or given itself,
 callable from Excel as a worksheet function, by default `jl.<its name>`. Returns the Excel
@@ -46,30 +46,31 @@ the docstring's, position by position, where not empty.
 
 # Broadcasting
 
-Excel passes a range as a matrix. A range given to a *broadcasting* argument is broadcast
-over, as `f.(...)` would, so a function written for single values works on ranges, with one
-call from Excel. Other arguments are passed whole. Which arguments broadcast:
+Excel passes a range as a matrix, and by default the function receives it whole. A range
+given to a *broadcasting* argument is instead broadcast over, as `f.(...)` would, so a
+function written for single values works on ranges, with one call from Excel. Other
+arguments are passed whole to every call. Which arguments broadcast:
 
-- `broadcast=nothing` (the default): those not declared as arrays. `f(a, b, c::AbstractVector)`
-  broadcasts over `a` and `b`, and passes `c` whole.
-- `broadcast=(:a, :b)`: those listed.
-- `broadcast=false`: none.
+- `broadcast=false` (the default): none.
+- `broadcast=true`: all, except any declared as arrays (`c::AbstractVector`), which are
+  passed whole.
+- `broadcast=(:a, :b)`, or `broadcast=:a` for one: those named.
 
 An argument declared `::AbstractVector` gets a vector from a single cell, row or column.
 Ranges broadcast together must have the same number of rows, or one of them a single row
 (and likewise columns); a column against a row gives a table, as in Excel.
 """
-function expose(fn_name::AbstractString; name=nothing, kwargs...)
+function expose_to_excel(fn_name::AbstractString; name=nothing, kwargs...)
     f = Main.eval(Meta.parse(fn_name))
     _expose(f, String(fn_name), _pick_method(f); name=name, kwargs...)
 end
 
-function expose(f::Function; name=nothing, kwargs...)
+function expose_to_excel(f::Function; name=nothing, kwargs...)
     _expose(f, string(nameof(f)), _pick_method(f); name=name, kwargs...)
 end
 
 function _expose(f, julia_name::String, m::Method; name=nothing, description::AbstractString="",
-                 argdescriptions=String[], broadcast=nothing)
+                 argdescriptions=String[], broadcast=false)
     nrequired = _nrequired(f, m)
     argnames = [string(a) for a in Base.method_argnames(m)[2:end]]
     excel_name = name === nothing ? "jl." * julia_name : String(name)
@@ -77,12 +78,14 @@ function _expose(f, julia_name::String, m::Method; name=nothing, description::Ab
 
     types = _declared_types(m)
     asvector = [T <: AbstractVector for T in types]
-    bcast = if broadcast === nothing
-        [!(T <: AbstractArray) for T in types]
-    elseif broadcast === false
+    bcast = if broadcast === false
         fill(false, length(argnames))
+    elseif broadcast === true
+        # An argument declared as an array can't take one element of a range.
+        [!(T <: AbstractArray) for T in types]
     else
-        listed = string.(collect(broadcast))
+        listed = broadcast isa Symbol || broadcast isa AbstractString ? [String(broadcast)] :
+                 string.(collect(broadcast))
         for a in listed
             a in argnames || throw(ArgumentError("`broadcast` names `$a`, which isn't an argument of $julia_name ($(join(argnames, ", ")))."))
         end
@@ -141,9 +144,10 @@ end
 """
     @excel [name="..."] [description="..."] [argdescriptions=[...]] [broadcast=...] function f(...) ... end
 
-Define a function and [`expose`](@ref) it to Excel, as `jl.f` by default, following the method
-defined here (rather than the one with the most arguments). Options are as for `expose`. A
-docstring goes before `@excel`, as before the function.
+Define a function and make it callable from Excel, as `jl.f` by default, following the
+method defined here (rather than the one with the most arguments). Options are as for
+[`expose_to_excel`](@ref), e.g. `@excel broadcast=true f(x, y) = ...`. A docstring goes
+before `@excel`, as before the function.
 
 ```julia
 \"\"\"
@@ -205,7 +209,7 @@ end
 """
     _call_exposed(excel_name, args...)
 
-For the add-in: calls the function exposed as `excel_name`, broadcasting as `expose` describes.
+For the add-in: calls the function exposed as `excel_name`, broadcasting as `expose_to_excel` describes.
 """
 function _call_exposed(excel_name::String, args...)
     e = get(_exposed, excel_name, nothing)
@@ -215,7 +219,7 @@ function _call_exposed(excel_name::String, args...)
     isempty(ks) && return e.f(xs...)
     _check_shapes(excel_name, e.argnames, xs, ks)
     result = broadcast(e.f, (k in ks ? x : Ref(x) for (k, x) in enumerate(xs))...)
-    any(r -> r isa AbstractArray, result) && throw(ArgumentError("$excel_name returns an array for each element of a broadcast range, which can't be shown in one range. Declare the argument as an array (::AbstractVector), or expose it with broadcast=false, to pass ranges whole."))
+    any(r -> r isa AbstractArray, result) && throw(ArgumentError("$excel_name returns an array for each element of a broadcast range, which can't be shown in one range. Pass that range whole instead: leave its argument out of `broadcast`, or declare it as an array (::AbstractVector)."))
     result
 end
 

@@ -24,7 +24,7 @@ namespace CallFromExcel.AddIn
         private static bool registrationQueued;
 
         // Called after JuliaLaunch (worksheet and ribbon), JuliaInclude (worksheet and ribbon)
-        // and JuliaEval, which may have run code calling expose: if Julia's exposed_version()
+        // and JuliaEval, which may have run code calling expose_to_excel: if Julia's exposed_version()
         // differs from the version last registered, queues the registration, which needs a
         // macro context. One small call to Julia; nothing queued when nothing changed.
         internal static void AfterJuliaChange()
@@ -54,7 +54,7 @@ namespace CallFromExcel.AddIn
         }
 
         // Registers every exposed function; returns how many. The version is read first, so an
-        // expose that runs while this does leaves the next check seeing a change.
+        // expose_to_excel that runs while this does leaves the next check seeing a change.
         internal static int Register()
         {
             registrationQueued = false;
@@ -173,7 +173,7 @@ namespace CallFromExcel.AddIn
                 }
             }
             // Julia's _call_exposed finds the function by its Excel name and broadcasts as
-            // expose says; juliaName is kept for this file's log.
+            // expose_to_excel says; juliaName is kept for this file's log.
             var callArgs = new object[n + 1];
             callArgs[0] = excelName;
             Array.Copy(args, 0, callArgs, 1, n);

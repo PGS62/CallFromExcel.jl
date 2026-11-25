@@ -39,7 +39,7 @@ function WaitText($ws, $addr, $not) {
     return $t
 }
 $inc = Join-Path $env:TEMP "NamedAuto.jl"
-Set-Content -Path $inc -Encoding utf8 -Value 'timesthree(x) = 3x; CallFromExcel.expose("timesthree")'
+Set-Content -Path $inc -Encoding utf8 -Value 'timesthree(x) = 3x; CallFromExcel.expose_to_excel("timesthree")'
 $inc2 = Join-Path $env:TEMP "NamedAuto2.jl"
 Set-Content -Path $inc2 -Encoding utf8 -Value @'
 """
@@ -47,9 +47,9 @@ Set-Content -Path $inc2 -Encoding utf8 -Value @'
 
 Multiplies x by factor.
 """
-@excel scale(x, factor) = x * factor
+@excel broadcast=true scale(x, factor) = x * factor
 
-@excel wavg(x, w::AbstractVector) = x * sum(w) / length(w)
+@excel broadcast=true wavg(x, w::AbstractVector) = x * sum(w) / length(w)
 '@
 
 $ex = New-Excel; $excel = $ex[0]; $excelPid = $ex[1]
@@ -63,7 +63,7 @@ try {
 
     Write-Host "=== 2 launch, then JuliaEval exposes addtwo (no explicit registration)"
     F $ws "Z1" $launch
-    F $ws "Z2" '=JuliaEval("addtwo(a, b) = a + b; CallFromExcel.expose(""addtwo"")")'
+    F $ws "Z2" '=JuliaEval("addtwo(a, b) = a + b; CallFromExcel.expose_to_excel(""addtwo"")")'
     Show $ws "Z1"; Show $ws "Z2"
     # Registration is queued, running when Excel is next idle: a formula written before then
     # counts as typed while unregistered and stays #NAME?. So wait, as a script must.
@@ -92,7 +92,7 @@ try {
     foreach ($a in "A1", "A2") { $c = $ws.Range($a); Retry { $c.Formula2 = $c.Formula2 }; Show $ws $a }
 
     Write-Host "=== 7 optional arguments (defaults years=10, spread=0)"
-    F $ws "Z5" '=JuliaEval("swap(notional, rate, years=10, spread=0) = notional * (rate + spread) * years; CallFromExcel.expose(""swap"")")'
+    F $ws "Z5" '=JuliaEval("swap(notional, rate, years=10, spread=0) = notional * (rate + spread) * years; CallFromExcel.expose_to_excel(""swap"")")'
     Show $ws "Z5"
     for ($i = 0; $i -lt 50 -and -not ((Retry { $excel.Evaluate("=jl.swap(1, 1)") }) -is [double]); $i++) { Start-Sleep -Milliseconds 200 }
     F $ws "C1" '=jl.swap(100, 0.1)'           # expect 100

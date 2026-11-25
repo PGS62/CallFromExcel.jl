@@ -740,45 +740,45 @@ CallFromExcel.handle_label(x::HandleTestLabelled) = x.label
     @test_throws ErrorException C.decode_from_xl("O1@zzzz")
 end
 
-@testset "expose checks Excel names" begin
+@testset "expose_to_excel checks Excel names" begin
     C = CallFromExcel
     Core.eval(Main, :(expose_test_f(a, b) = a + b; Expose_Test_F(x) = x; expose_test!(v) = v))
     msg(f) = try f(); "" catch e; e.msg end
     empty!(C._exposed)
     @test C.exposed_functions() === nothing                        # Excel has no empty arrays
 
-    # The version the add-in compares: this session's tag, and a count every expose bumps.
+    # The version the add-in compares: this session's tag, and a count every expose_to_excel bumps.
     v0 = C.exposed_version()
     @test startswith(v0, C.handle_session() * "#")
-    @test C.expose("expose_test_f") == "jl.expose_test_f"
+    @test C.expose_to_excel("expose_test_f") == "jl.expose_test_f"
     @test C.exposed_version() != v0
     v1 = C.exposed_version()
-    @test (try C.expose("expose_test!") catch end; C.exposed_version() == v1)   # a refusal doesn't
+    @test (try C.expose_to_excel("expose_test!") catch end; C.exposed_version() == v1)   # a refusal doesn't
     @test C.exposed_functions()[1, 4] == "a\x1fb"
-    @test C.expose("expose_test_f") == "jl.expose_test_f"           # exposing again replaces
-    @test C.expose("expose_test_f"; name="PRICE_SWAP") == "PRICE_SWAP"
-    @test C.expose("expose_test_f"; name="jl.σ") == "jl.σ"
-    @test C.expose("expose_test_f"; name="abc.123") == "abc.123"
-    @test C.expose("expose_test_f"; name="\\abc") == "\\abc"
+    @test C.expose_to_excel("expose_test_f") == "jl.expose_test_f"           # exposing again replaces
+    @test C.expose_to_excel("expose_test_f"; name="PRICE_SWAP") == "PRICE_SWAP"
+    @test C.expose_to_excel("expose_test_f"; name="jl.σ") == "jl.σ"
+    @test C.expose_to_excel("expose_test_f"; name="abc.123") == "abc.123"
+    @test C.expose_to_excel("expose_test_f"; name="\\abc") == "\\abc"
 
     # Names Excel can't register.
-    @test occursin("isn't a valid Excel function name", msg(() -> C.expose("expose_test!")))
-    @test occursin("with `name=`", msg(() -> C.expose("expose_test!")))
-    @test C.expose("expose_test!"; name="jl.expose_test") == "jl.expose_test"
-    @test occursin("isn't a valid", msg(() -> C.expose("expose_test_f"; name="1abc")))
-    @test occursin("isn't a valid", msg(() -> C.expose("expose_test_f"; name="a b")))
-    @test occursin("too long", msg(() -> C.expose("expose_test_f"; name="a"^256)))
+    @test occursin("isn't a valid Excel function name", msg(() -> C.expose_to_excel("expose_test!")))
+    @test occursin("with `name=`", msg(() -> C.expose_to_excel("expose_test!")))
+    @test C.expose_to_excel("expose_test!"; name="jl.expose_test") == "jl.expose_test"
+    @test occursin("isn't a valid", msg(() -> C.expose_to_excel("expose_test_f"; name="1abc")))
+    @test occursin("isn't a valid", msg(() -> C.expose_to_excel("expose_test_f"; name="a b")))
+    @test occursin("too long", msg(() -> C.expose_to_excel("expose_test_f"; name="a"^256)))
     for ref in ["abc123", "A1", "xfd1048576", "R", "c", "R1", "C22", "RC", "R1C1", "r2c", "R1C1.x", "A1.b.c"]
-        @test occursin("cell reference", msg(() -> C.expose("expose_test_f"; name=ref)))
+        @test occursin("cell reference", msg(() -> C.expose_to_excel("expose_test_f"; name=ref)))
     end
     for reserved in ["JuliaCall", "juliaprice", "JULIA"]
-        @test occursin("reserved", msg(() -> C.expose("expose_test_f"; name=reserved)))
+        @test occursin("reserved", msg(() -> C.expose_to_excel("expose_test_f"; name=reserved)))
     end
 
     # Excel ignores case: jl.Expose_Test_F would replace jl.expose_test_f.
-    @test occursin("ignores case", msg(() -> C.expose("Expose_Test_F")))
-    @test occursin("ignores case", msg(() -> C.expose("expose_test_f"; name="price_swap")))
-    @test C.expose("Expose_Test_F"; name="jl.Expose_Test_F2") == "jl.Expose_Test_F2"
+    @test occursin("ignores case", msg(() -> C.expose_to_excel("Expose_Test_F")))
+    @test occursin("ignores case", msg(() -> C.expose_to_excel("expose_test_f"; name="price_swap")))
+    @test C.expose_to_excel("Expose_Test_F"; name="jl.Expose_Test_F2") == "jl.Expose_Test_F2"
 
     # A rejected name records nothing.
     @test sort(C.exposed_functions()[:, 1]) ==
@@ -786,7 +786,7 @@ end
     empty!(C._exposed)
 end
 
-@testset "expose reads docstrings and optional arguments" begin
+@testset "expose_to_excel reads docstrings and optional arguments" begin
     C = CallFromExcel
     include_string(Main, """
         \"\"\"
@@ -825,7 +825,7 @@ end
     rows() = Dict(r[1] => r for r in eachrow(C.exposed_functions()))
     empty!(C._exposed)
 
-    C.expose("expose_doc_swap")
+    C.expose_to_excel("expose_doc_swap")
     r = rows()["jl.expose_doc_swap"]
     @test r[3] == "Price a toy swap, with notional in USD and years whole."
     @test r[4] == join(["notional", "fixed_rate", "years", "spread"], "\x1f")
@@ -834,21 +834,21 @@ end
     @test r[6] == 2
 
     # Given descriptions win, position by position where not empty.
-    C.expose("expose_doc_swap"; description="Mine", argdescriptions=["", "Rate"])
+    C.expose_to_excel("expose_doc_swap"; description="Mine", argdescriptions=["", "Rate"])
     r = rows()["jl.expose_doc_swap"]
     @test r[3] == "Mine"
     @test split(r[5], "\x1f")[1:3] == ["the notional amount.", "Rate", "Optional. The term."]
-    C.expose("expose_doc_swap"; argdescriptions=["", "", "Optional, default 10"])
+    C.expose_to_excel("expose_doc_swap"; argdescriptions=["", "", "Optional, default 10"])
     @test split(rows()["jl.expose_doc_swap"][5], "\x1f")[3] == "Optional, default 10"
 
-    C.expose("expose_doc_fenced")
+    C.expose_to_excel("expose_doc_fenced")
     @test rows()["jl.expose_doc_fenced"][3] == "Doubles x."
-    C.expose("expose_doc_none")
+    C.expose_to_excel("expose_doc_none")
     r = rows()["jl.expose_doc_none"]
     @test r[3] == "" && r[5] == "\x1f" && r[6] == 2
 
     # Several methods: the non-varargs one with most arguments, all required (separate lines).
-    C.expose("expose_doc_methods")
+    C.expose_to_excel("expose_doc_methods")
     r = rows()["jl.expose_doc_methods"]
     @test r[4] == join(["a", "b", "c"], "\x1f") && r[6] == 3
 
@@ -869,18 +869,18 @@ end
 
         Scales x.
         \"\"\"
-        @excel excel_test_scale(x, factor) = x * factor
+        @excel broadcast=true excel_test_scale(x, factor) = x * factor
 
         excel_test_m(a) = 1
         @excel name="jl.excel_test_m1" excel_test_m(a::Int) = 2
         excel_test_m(a, b, c) = 3
 
-        @excel function excel_test_wavg(x, w::AbstractVector)
+        @excel broadcast=true function excel_test_wavg(x, w::AbstractVector)
             x * sum(w) / length(w)
         end
         @excel broadcast=(:b,) excel_test_list(a, b) = (a, b)
-        @excel broadcast=false excel_test_size(a) = size(a)
-        @excel excel_test_pair(x) = [x, x]
+        @excel excel_test_size(a) = size(a)
+        @excel broadcast=:x excel_test_pair(x) = [x, x]
         excel_test_plain(a, b) = a * length(b)
         """)
 
@@ -903,14 +903,14 @@ end
     @test call("jl.excel_test_wavg", 1.0, 5.0) == 5.0
     @test call("jl.excel_test_wavg", 1.0, [2.0; 4.0;;]) == 3.0
 
-    # broadcast= lists the arguments that broadcast; false, none.
+    # broadcast= names the arguments that broadcast; by default (false), none do.
     @test call("jl.excel_test_list", [1 2], [3 4]) == [([1 2], 3) ([1 2], 4)]
     @test call("jl.excel_test_size", [1 2 3]) == (1, 3)
-    @test occursin("isn't an argument", msg(() -> C.expose("excel_test_plain"; broadcast=(:z,))))
-    @test C.expose("excel_test_plain"; broadcast=(:a,)) == "jl.excel_test_plain"
+    @test occursin("isn't an argument", msg(() -> C.expose_to_excel("excel_test_plain"; broadcast=(:z,))))
+    @test C.expose_to_excel("excel_test_plain"; broadcast=(:a,)) == "jl.excel_test_plain"
     @test call("jl.excel_test_plain", [5 6], [1 2 3]) == [15 18]
-    @test C.expose(Main.excel_test_plain; name="jl.plain2") == "jl.plain2"     # a function, not a name
-    @test call("jl.plain2", [5 6], [1 2]) == [5 6]
+    @test C.expose_to_excel(Main.excel_test_plain; name="jl.plain2") == "jl.plain2"     # a function, not a name
+    @test call("jl.plain2", [5 6], [1 2]) == [10 12]                      # by default, nothing broadcasts
 
     # An array for each element can't spill; an unknown name (a relaunched Julia).
     @test occursin("returns an array for each element", msg(() -> call("jl.excel_test_pair", [1 2])))

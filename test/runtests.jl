@@ -740,6 +740,45 @@ CallFromExcel.handle_label(x::HandleTestLabelled) = x.label
     @test_throws ErrorException C.decode_from_xl("O1@zzzz")
 end
 
+@testset "expose checks Excel names" begin
+    C = CallFromExcel
+    Core.eval(Main, :(expose_test_f(a, b) = a + b; Expose_Test_F(x) = x; expose_test!(v) = v))
+    msg(f) = try f(); "" catch e; e.msg end
+    empty!(C._exposed)
+
+    @test C.expose("expose_test_f") == "jl.expose_test_f"
+    @test C.exposed_functions()[1, 4] == "a\x1fb"
+    @test C.expose("expose_test_f") == "jl.expose_test_f"           # exposing again replaces
+    @test C.expose("expose_test_f"; name="PRICE_SWAP") == "PRICE_SWAP"
+    @test C.expose("expose_test_f"; name="jl.σ") == "jl.σ"
+    @test C.expose("expose_test_f"; name="abc.123") == "abc.123"
+    @test C.expose("expose_test_f"; name="\\abc") == "\\abc"
+
+    # Names Excel can't register.
+    @test occursin("isn't a valid Excel function name", msg(() -> C.expose("expose_test!")))
+    @test occursin("with `name=`", msg(() -> C.expose("expose_test!")))
+    @test C.expose("expose_test!"; name="jl.expose_test") == "jl.expose_test"
+    @test occursin("isn't a valid", msg(() -> C.expose("expose_test_f"; name="1abc")))
+    @test occursin("isn't a valid", msg(() -> C.expose("expose_test_f"; name="a b")))
+    @test occursin("too long", msg(() -> C.expose("expose_test_f"; name="a"^256)))
+    for ref in ["abc123", "A1", "xfd1048576", "R", "c", "R1", "C22", "RC", "R1C1", "r2c", "R1C1.x", "A1.b.c"]
+        @test occursin("cell reference", msg(() -> C.expose("expose_test_f"; name=ref)))
+    end
+    for reserved in ["JuliaCall", "juliaprice", "JULIA"]
+        @test occursin("reserved", msg(() -> C.expose("expose_test_f"; name=reserved)))
+    end
+
+    # Excel ignores case: jl.Expose_Test_F would replace jl.expose_test_f.
+    @test occursin("ignores case", msg(() -> C.expose("Expose_Test_F")))
+    @test occursin("ignores case", msg(() -> C.expose("expose_test_f"; name="price_swap")))
+    @test C.expose("Expose_Test_F"; name="jl.Expose_Test_F2") == "jl.Expose_Test_F2"
+
+    # A rejected name records nothing.
+    @test sort(C.exposed_functions()[:, 1]) ==
+        sort(["jl.expose_test_f", "PRICE_SWAP", "jl.σ", "abc.123", "\\abc", "jl.expose_test", "jl.Expose_Test_F2"])
+    empty!(C._exposed)
+end
+
 @testset "Reminder to run installme()" begin
     mktempdir() do dir
         versionfile = joinpath(dir, "version.txt")

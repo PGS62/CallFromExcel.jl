@@ -39,8 +39,8 @@ function Log($excel, $title) {
 $define = '=JuliaEval({"price_swap(notional, fixed_rate, years) = notional * fixed_rate * years";' +
     '"SIGMA(x) = 2x"; "f(x) = 1"; "F(x) = 2"; "abc123(x) = x + 1";' +
     '"CallFromExcel.expose(""price_swap""; description=""Toy swap price"", argdescriptions=[""Notional"", ""Fixed rate"", ""Years""])";' +
-    '"CallFromExcel.expose(""hypot"")"; "CallFromExcel.expose(""SIGMA"")"; "CallFromExcel.expose(""f"")"; "CallFromExcel.expose(""F"")";' +
-    '"CallFromExcel.expose(""price_swap""; name=""PRICE_SWAP"")"; "CallFromExcel.expose(""abc123""; name=""abc123"")";' +
+    '"CallFromExcel.expose(""hypot"")"; "CallFromExcel.expose(""SIGMA"")"; "CallFromExcel.expose(""f"")";' +
+    '"CallFromExcel.expose(""price_swap""; name=""PRICE_SWAP"")";' +
     '"join(sort(collect(keys(CallFromExcel._exposed))), "", "")"})'
 $define = $define.Replace("SIGMA", [string][char]0x3C3)
 
@@ -53,6 +53,11 @@ try {
     F $ws "Z1" $launch
     F $ws "Z2" $define
     Show $ws "Z1"; Show $ws "Z2"
+    # Names expose refuses (expected: errors): F would replace jl.f, as Excel ignores case;
+    # abc123 is a cell reference.
+    F $ws "Z5" '=JuliaEval("CallFromExcel.expose(""F"")")'
+    F $ws "Z6" '=JuliaEval("CallFromExcel.expose(""abc123""; name=""abc123"")")'
+    Show $ws "Z5"; Show $ws "Z6"
     Retry { [void]$excel.Run("JuliaRegisterFunctions") }
     Log $excel "register log"
 

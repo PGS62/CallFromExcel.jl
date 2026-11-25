@@ -42,6 +42,32 @@ namespace CallFromExcel.AddIn
         // push #N/A into each old topic. The RTD update makes Excel recalculate each such cell,
         // which asks for a topic under the new generation (creating the object again, in
         // Excel's dependency order), and the old topic, no longer used, is disposed.
+        // Called after JuliaLaunch (the worksheet function) and the ribbon's Launch Julia button
+        // - not from the shared JuliaLaunch.Launch, which the COM server also calls from its own
+        // copy of this assembly, without Excel-DNA. Asks Julia for its session tag, so a
+        // launch that found the same Julia already running changes nothing, while a Julia
+        // restarted any way (closed and relaunched, from VBA, or serve_xl from a REPL) is
+        // caught here. Queued as a macro, to run after the calculation JuliaLaunch may be in.
+        internal static void AfterLaunch()
+        {
+            if (Observers.Count == 0) return;
+            string session;
+            try { session = JuliaFunctions.CallForHandles("CallFromExcel.handle_session", new object[0]) as string; }
+            catch (Exception) { return; }
+            // No answer (e.g. Julia still starting): the first use of a stale handle gives
+            // "not found", and the next JuliaLaunch tries again.
+            if (string.IsNullOrEmpty(session) || session.StartsWith("#", StringComparison.Ordinal)) return;
+            foreach (string handle in Observers.Keys)
+            {
+                if (!handle.EndsWith("@" + session, StringComparison.Ordinal))
+                {
+                    Log("Julia session is now " + session + ": invalidating handles");
+                    ExcelAsyncUtil.QueueAsMacro(InvalidateAll);
+                    return;
+                }
+            }
+        }
+
         [ExcelCommand(Name = "JuliaHandleInvalidateAll")]
         public static void InvalidateAll()
         {

@@ -54,7 +54,9 @@ namespace CallFromExcel.AddIn
                 string cmdOpts = IsOmitted(commandLineOptions) ? "" : Convert.ToString(commandLineOptions);
                 string pkgs = IsOmitted(packages) ? "" : Convert.ToString(packages);
                 int timeout = IsOmitted(timeOut) ? 30 : Convert.ToInt32(Convert.ToDouble(timeOut));
-                return CallFromExcel.AddIn.JuliaLaunch.Launch(useLinux: linux, minimiseWindow: minimise, commandLineOptions: cmdOpts, packages: pkgs, bashStatements: bash, timeoutSeconds: timeout);
+                string message = CallFromExcel.AddIn.JuliaLaunch.Launch(useLinux: linux, minimiseWindow: minimise, commandLineOptions: cmdOpts, packages: pkgs, bashStatements: bash, timeoutSeconds: timeout);
+                JuliaHandles.AfterLaunch();
+                return message;
             }
             catch (Exception ex)
             {

@@ -1,8 +1,11 @@
-# Object-handles spike: Julia restarted while Excel stays open, with JuliaHandleInvalidateAll.
+# Object-handles spike: Julia restarted while Excel stays open. JuliaLaunch notices the new
+# session and rebuilds the handles (JuliaHandles.AfterLaunch -> JuliaHandleInvalidateAll).
 $ErrorActionPreference = "Stop"
 $xll = "C:\Projects\CallFromExcel\dotnet-addin\CallFromExcel.AddIn\bin\Debug\net48\CallFromExcel.AddIn64.xll"
 $launch = '=JuliaLaunch(FALSE,TRUE,"--project=C:\Projects\CallFromExcel")'
-$helpers = '=JuliaEval("mkrand(n)=rand(Int(n)); ""helpers defined""")'
+# Refers to the launch cell, so it is recalculated - redefining mkrand - whenever that is, as a
+# workbook's own JuliaEval/JuliaInclude cells would be.
+$helpers = '=IF(LEN(Z1)>0,JuliaEval("mkrand(n)=rand(Int(n)); ""helpers defined"""))'
 
 $excel = New-Object -ComObject Excel.Application
 Add-Type -Namespace Win32 -Name User32 -MemberDefinition '[DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(System.IntPtr hWnd, out uint processId);'
@@ -33,42 +36,40 @@ try {
     $excel.RTD.ThrottleInterval = 0
     $wb = $excel.Workbooks.Add()
     $ws = $wb.Worksheets.Item(1)
-    $ws.Range("Z1").Formula2 = $launch
-    $ws.Range("Z2").Formula2 = $helpers
-    $ws.Range("A1").Formula2 = '=JuliaCallHandle("mkrand",3)'
-    $ws.Range("B1").Formula2 = '=JuliaCall("sum",A1)'
-    $ws.Range("A2").Formula2 = '=JuliaCallHandle("reverse",A1)'
-    $ws.Range("B2").Formula2 = '=JuliaCall("sum",A2)'
+    Retry { $ws.Range("Z1").Formula2 = $launch }
+    Retry { $ws.Range("Z2").Formula2 = $helpers }
+    Retry { $ws.Range("A1").Formula2 = '=JuliaCallHandle("mkrand",3)' }
+    Retry { $ws.Range("B1").Formula2 = '=JuliaCall("sum",A1)' }
+    Retry { $ws.Range("A2").Formula2 = '=JuliaCallHandle("reverse",A1)' }
+    Retry { $ws.Range("B2").Formula2 = '=JuliaCall("sum",A2)' }
     ShowAll
     Ev "1 before restart"
 
-    $ws.Range("Y1").Formula2 = '=JuliaEval("exit()")'
+    # 2. Close Julia and relaunch it: JuliaLaunch finds the new session and rebuilds the
+    # handles itself, in dependency order, after mkrand has been redefined.
+    Retry { $ws.Range("Y1").Formula2 = '=JuliaEval("exit()")' }
     Start-Sleep -Seconds 8
-    $ws.Range("Y1").ClearContents()
-    $ws.Range("Z1").Formula2 = $launch
-    $ws.Range("Z2").Formula2 = $helpers
-    "Z1 -> $($ws.Range('Z1').Text); Z2 -> $($ws.Range('Z2').Text)" | Write-Host
+    Retry { $ws.Range("Y1").ClearContents() }
+    Retry { $ws.Range("Z1").Formula2 = $launch }
+    "Z1 -> $(Retry { $ws.Range('Z1').Text }); Z2 -> $(Retry { $ws.Range('Z2').Text })" | Write-Host
     Settle
     ShowAll
-    Ev "2 Julia relaunched, no invalidation"
+    Ev "2 Julia relaunched: expect invalidate, then create of both in the new session"
 
-    [void]$excel.Run("JuliaHandleInvalidateAll")
+    # 3. JuliaLaunch again while the same Julia is running: nothing to rebuild.
+    Retry { $ws.Range("Z1").Formula2 = $launch }
+    "Z1 -> $(Retry { $ws.Range('Z1').Text })" | Write-Host
     Settle
     ShowAll
-    Ev "3 after JuliaHandleInvalidateAll + Calculate"
+    Ev "3 JuliaLaunch with the same Julia running: expect no events"
 
     Retry { $excel.CalculateFull() }
     Settle
     ShowAll
-    Ev "4 after CalculateFull"
-    Retry { $excel.CalculateFull() }
-    Settle
-    ShowAll
-    Ev "4b after a second CalculateFull"
-
-    $ws.Range("A1:B2").ClearContents()
+    Ev "4 after CalculateFull: expect no events"
+    Retry { $ws.Range("A1:B2").ClearContents() }
     Ev "5 cleared"
-    $ws.Range("Y1").Formula2 = '=JuliaEval("exit()")'
+    Retry { $ws.Range("Y1").Formula2 = '=JuliaEval("exit()")' }
     $wb.Close($false)
 } catch {
     Write-Host "SCRIPT ERROR: $($_.Exception.Message) at line $($_.InvocationInfo.ScriptLineNumber)"

@@ -182,22 +182,18 @@ try {
     $cnt = Retry { $excel.Evaluate('JuliaHandleInfo("count")') }
     "after clearing: [$cnt]" | Write-Host
 
-    # 9. Julia restarted while Excel stays open.
+    # 9. Julia restarted while Excel stays open: JuliaLaunch sees the new session and rebuilds
+    # every live handle (more in HandleRestart.ps1). Y2 refers to the launch cell, so it is
+    # recalculated - redefining the helpers - before the rebuild runs.
     Show $ws "H11"
     Retry { $ws.Range("Y1").Formula2 = '=JuliaEval("exit()")' }
     Start-Sleep -Seconds 8
     Retry { $ws.Range("Y1").ClearContents() }
+    Retry { $ws.Range("Y2").Formula2 = '=IF(LEN(Z1)>0,JuliaEval("mkrand(n)=rand(Int(n)); mkones(n)=ones(Int(n)); mkzeros(n)=zeros(Int(n)); mkfill(x,n)=fill(x,Int(n)); mkkw(n; v=0)=fill(v,Int(n)); ""helpers redefined"""))' }
     Retry { $ws.Range("Z1").Formula2 = '=JuliaLaunch(FALSE,TRUE,"--project=C:\Projects\CallFromExcel")' }
-    Retry { $excel.CalculateFull() }
-    Show $ws "Z1"; Show $ws "H11"; Show $ws "B2"
-    Ev "9a after Julia restart + CalculateFull"
-    Show $ws "Z2"
-    Retry { $ws.Range("H11").Formula2 = '=JuliaCallHandle("mkrand",3)' }
-    Show $ws "H11"; Show $ws "B2"
-    Ev "9b creating formula re-entered unchanged"
-    Retry { $ws.Range("H11").Formula2 = '=JuliaCallHandle("mkrand",3+0)' }
-    Show $ws "H11"; Show $ws "B2"
-    Ev "9c creating formula edited (same value)"
+    Settle
+    Show $ws "Z1"; Show $ws "Y2"; Show $ws "H11"; Show $ws "B2"
+    Ev "9 after Julia restart: expect invalidate, then every live handle rebuilt in the new session"
 
     # 10. From VBA / Application.Run, and Evaluate.
     try { $r = $excel.Run("JuliaCallHandle", "mkones", 13); "Run -> $r" | Write-Host } catch { "Run threw: $($_.Exception.Message)" | Write-Host }

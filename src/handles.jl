@@ -95,6 +95,15 @@ function handle_free(key::String)
     length(_handles)
 end
 
+"""
+    handle_session()
+
+This Julia process's session tag, the part of its handles after "@". The add-in compares it
+with its live handles' after a launch, to tell whether Julia has restarted since they were
+created.
+"""
+handle_session() = _session_tag()
+
 "Number of objects currently stored for handles."
 handle_count() = length(_handles)
 

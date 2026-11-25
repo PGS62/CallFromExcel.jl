@@ -374,6 +374,7 @@ namespace CallFromExcel.AddIn
                 {
                     SetCursor(XlDefault);
                 }
+                JuliaHandles.AfterLaunch();
                 ShowBriefly(message);
                 _ribbon?.InvalidateControl("DisplayResults");
             }

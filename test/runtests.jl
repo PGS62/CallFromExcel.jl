@@ -703,6 +703,43 @@ end
               Base.locate_package(Base.PkgId(CallFromExcel))) === nothing
 end
 
+# For the object handles tests: a type with a custom label, as a user's own package might define.
+struct HandleTestCurve
+    currency::String
+end
+CallFromExcel.handle_label(x::HandleTestCurve) = "Curve_$(x.currency)"
+struct HandleTestLabelled
+    label::String
+end
+CallFromExcel.handle_label(x::HandleTestLabelled) = x.label
+
+@testset "Object handles in Julia" begin
+    C = CallFromExcel
+    # Mirrors the add-in's HandlePattern.cs; the key is "<id>@<session>".
+    pattern = r"^jl:[^#@\s\p{Z}\p{Cc}\p{Cf}]*#([0-9]+@[A-Za-z0-9]+)$"
+    key(h) = String(match(pattern, h)[1])
+
+    h = C.handle_eval("[1.0 2.0; 3.0 4.0]")
+    @test startswith(h, "jl:Array#") && occursin(pattern, h)
+    @test occursin(r"@[A-Za-z0-9]{4}$", h)                   # the session tag: 4 letters or digits
+    @test C.decode_from_xl("O" * key(h)) == [1.0 2.0; 3.0 4.0]
+    @test startswith(C.handle_eval("Dict(\"a\" => 1)"), "jl:Dict#")
+
+    # Custom labels, and the characters a label can't contain.
+    h = C.handle_create("HandleTestCurve", "USD")
+    @test startswith(h, "jl:Curve_USD#") && occursin(pattern, h)
+    @test C.decode_from_xl("O" * key(h)).currency == "USD"
+    h = C.handle_create("HandleTestLabelled", "EUR/USD @ 1#2\tΣ​")
+    @test startswith(h, "jl:EUR/USD___1_2_Σ_#") && occursin(pattern, h)
+    @test startswith(C.handle_create("HandleTestLabelled", ""), "jl:#")
+    @test occursin(pattern, C.handle_eval("x -> 2x"))              # a closure's type name has '#'
+
+    # Freed, or from another session: not found.
+    @test C.handle_free(key(h)) isa Int
+    @test_throws ErrorException C.decode_from_xl("O" * key(h))
+    @test_throws ErrorException C.decode_from_xl("O1@zzzz")
+end
+
 @testset "Reminder to run installme()" begin
     mktempdir() do dir
         versionfile = joinpath(dir, "version.txt")

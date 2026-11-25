@@ -3,24 +3,29 @@ using System.Text.RegularExpressions;
 
 namespace CallFromExcel.AddIn
 {
-    // SPIKE (branch spike/object-handles): recognises object handles by their text, so that
-    // a handle can be passed to Julia from a worksheet formula or from VBA, whichever created
-    // it. Uses no Excel-DNA types: the COM server runs in a separate copy of this assembly
-    // (registered via mscoree, loaded from the DLL file), which can't see the worksheet
-    // functions' state (loaded by Excel-DNA from the packed .xll), and may run where
-    // ExcelDna.Integration.dll can't be resolved.
+    // Recognises object handles by their text, so that a handle can be passed to Julia from a
+    // worksheet formula or from VBA, whichever created it. Uses no Excel-DNA types: the COM
+    // server runs in a separate copy of this assembly (registered via mscoree, loaded from the
+    // DLL file), which can't see the worksheet functions' state (loaded by Excel-DNA from the
+    // packed .xll), and may run where ExcelDna.Integration.dll can't be resolved.
     //
-    // A handle is "jl:<label>#<id>@<session>" (see src/handles.jl): the label is letters,
-    // digits and "_", the session 4 random letters and digits. Any string of exactly that form
-    // is sent to Julia as a handle, and Julia, which knows which objects are alive, looks it
-    // up or raises "not found". A look-alike string would have to name a live session tag to
-    // pick up an object, so the realistic outcome of one is that error, not a wrong answer.
+    // A handle is "jl:<label>#<id>@<session>" (see src/handles.jl). The label is the type's
+    // name, or whatever a method of CallFromExcel.handle_label returns, with "#", "@",
+    // whitespace, control and format characters replaced by "_" (_clean_label), so it may
+    // contain any other characters, including non-ASCII ones. The session is random letters
+    // and digits (4 of them). Any string of exactly that form is sent to Julia as a handle,
+    // and Julia, which knows which objects are alive, looks it up or raises "not found". A
+    // look-alike string would have to name a live session tag to pick up an object, so the
+    // realistic outcome of one is that error, not a wrong answer.
     public static class HandlePattern
     {
         private static readonly Regex Pattern =
             // \z, not $: in .NET, $ also matches before a final line feed, so a handle pasted with
-            // a trailing line feed would count as one.
-            new Regex(@"^jl:[A-Za-z0-9_]*#([0-9]+@[A-Za-z0-9]+)\z", RegexOptions.CultureInvariant);
+            // a trailing line feed would count as one. Every character excluded from the label
+            // here must be one _clean_label replaces, or Julia could make a handle this doesn't
+            // recognise. (.NET's \s is Unicode whitespace, including \p{Z}; Julia's _clean_label
+            // replaces both.)
+            new Regex(@"^jl:[^#@\s\p{Cc}\p{Cf}]*#([0-9]+@[A-Za-z0-9]+)\z", RegexOptions.CultureInvariant);
 
         // The key "<id>@<session>" of a handle, or false if text isn't one.
         public static bool TryGetKey(string text, out string key)

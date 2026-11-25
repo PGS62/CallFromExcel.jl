@@ -117,6 +117,19 @@ try {
     Ev "4f review fixes"
     Retry { $ws.Range("P1:P7").ClearContents() }
 
+    # 4g. Labels from methods of CallFromExcel.handle_label for the user's own types; characters
+    # a label can't contain are replaced by "_", and others, including non-ASCII, are kept.
+    Retry { $ws.Range("R1").Formula2 = '=JuliaEval("struct YieldCurve; currency::String; end; CallFromExcel.handle_label(x::YieldCurve) = ""Curve_$(x.currency)""; struct Labelled; label::String; end; CallFromExcel.handle_label(x::Labelled) = x.label; ""types defined""")' }
+    Retry { $ws.Range("R2").Formula2 = '=JuliaCallHandle("YieldCurve","USD")' }
+    Retry { $ws.Range("R3").Formula2 = '=JuliaCall("x -> x.currency",R2)' }
+    Retry { $ws.Range("R4").Formula2 = '=JuliaCallHandle("Labelled","EUR/USD @ 1#2 "&UNICHAR(931))' }
+    Retry { $ws.Range("R5").Formula2 = '=JuliaCall("x -> x.label",R4)' }
+    Retry { $ws.Range("R6").Formula2 = '=UNICODE(MID(R4,LEN("jl:EUR/USD___1_2_")+1,1))' }
+    foreach ($a in "R1","R2","R3","R4","R5","R6") { Show $ws $a }
+    "expect: R2 jl:Curve_USD#..., R3 USD, R4 jl:EUR/USD___1_2_?#... (? = Sigma), R5 the original label, R6 931" | Write-Host
+    Ev "4g custom labels"
+    Retry { $ws.Range("R1:R6").ClearContents() }
+
     # 5. Spilled handles: one handle per element of an array argument?
     Retry { $ws.Range("G1").Formula2 = '=JuliaCallHandle("mkrand",{2;3;4})' }
     Show $ws "G1"; Show $ws "G2"

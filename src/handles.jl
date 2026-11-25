@@ -1,12 +1,12 @@
 #=
-SPIKE (branch spike/object-handles): object handles, see "Object handles" in Enhancements.md.
+Object handles - see "Object handles" in the README.
 
 The add-in's JuliaCallHandle and JuliaEval(..., TRUE) call handle_create/handle_eval, which store the
-result here and return a handle string "jl:<label>#<id>@<session>". The add-in keeps the set
-of handles it has issued and still holds; when one of them is passed to any function it is
-sent as the wire-format type "O<id>@<session>" (see decode_from_xl), which is replaced by
-the stored object. Excel-DNA's RTD machinery tells the add-in when no formula uses a handle
-any more, and the add-in then calls handle_free.
+result here and return a handle string "jl:<label>#<id>@<session>". The add-in recognises a
+handle by that pattern (HandlePattern.cs) and sends it to Julia as the wire-format type
+"O<id>@<session>" (see decode_from_xl), which is replaced by the stored object. Excel-DNA's RTD
+machinery tells the add-in when no formula uses a worksheet handle any more, and the add-in
+then calls handle_free; VBA frees the handles it creates with JuliaHandleRelease(All).
 
 The session tag is chosen when the first handle is created, so a handle from an earlier
 Julia process (saved in a workbook, or held by an Excel that outlived its Julia) gives
@@ -25,14 +25,32 @@ end
 """
     handle_label(x)
 
-Label shown in a handle for `x`, for people reading the sheet; lookup ignores it.
+The label in a handle for `x`, `jl:<label>#<id>@<session>`, for people reading the sheet -
+looking up the object ignores it. By default the name of `x`'s type, without its module or
+parameters: `Array` for a `Matrix{Float64}`, `Dict` for a `Dict{String,Int}`.
+
+Add methods for your own types to choose a more informative label, for example:
+
+```julia
+CallFromExcel.handle_label(x::YieldCurve) = "Curve_\$(x.currency)"
+```
+
+so that a handle to a US dollar curve reads `jl:Curve_USD#3@k3x9`. The label is worked out
+once, when the handle is created. Any `#`, `@`, whitespace or control character in it is
+replaced by `_`, since `#` and `@` mark where the id and session start.
 """
-handle_label(x) = replace(string(nameof(typeof(x))), r"[^A-Za-z0-9_]" => "")
+handle_label(x) = string(nameof(typeof(x)))
+
+# The label as it appears in a handle: handle_label's result with the characters a label can't
+# contain replaced by '_'. Every character left must be one HandlePattern.cs accepts in a
+# label: it rejects '#', '@', whitespace (.NET's \s, which includes Unicode separators) and
+# control and format characters (\p{Cc}, \p{Cf}), all of which are replaced here.
+_clean_label(label) = replace(string(label), r"[#@\s\p{Z}\p{Cc}\p{Cf}]" => "_")
 
 function _store_handle(x)
     id = (_handle_counter[] += 1)
     _handles[id] = x
-    "jl:" * handle_label(x) * "#" * string(id) * "@" * _session_tag()
+    "jl:" * _clean_label(handle_label(x)) * "#" * string(id) * "@" * _session_tag()
 end
 
 """

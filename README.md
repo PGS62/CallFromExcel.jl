@@ -301,7 +301,7 @@ Some Julia objects are large, or have no sensible representation on a worksheet:
 |A3|`=JuliaCallHandle("inv", A1)`|`jl:Array#2@k3x9`, a handle to its inverse|
 |A4|`=JuliaCall("maximum", A3)`|the inverse's largest element|
 
-The matrix is built once and stays in Julia, however many formulas use it. A handle can be passed to `JuliaCall`, `JuliaCallNamedArgs`, `JuliaCallHandle` and their VBA counterparts, including inside a range or array: a range of handles arrives in Julia as a vector of the objects. `=JuliaCall("identity", A1)` returns a handle's object to the worksheet as data. A handle's text is `jl:<label>#<id>@<session>`: the label is the object's type, for people reading the sheet, the id numbers each object, and the session identifies the Julia process holding it.
+The matrix is built once and stays in Julia, however many formulas use it. A handle can be passed to `JuliaCall`, `JuliaCallNamedArgs`, `JuliaCallHandle` and their VBA counterparts, including inside a range or array: a range of handles arrives in Julia as a vector of the objects. `=JuliaCall("identity", A1)` returns a handle's object to the worksheet as data. A handle's text is `jl:<label>#<id>@<session>`: the label is the object's type (or a label you choose, see below), for people reading the sheet, the id numbers each object, and the session identifies the Julia process holding it.
 
 Points to note:
  * **Lifetime.** A handle's object stays in Julia while a formula that creates it exists. Edit or delete that formula, or change its inputs, and the object is freed (and a new one created for new inputs). Excel sometimes frees an object only at a later recalculation, for example after a workbook is closed.
@@ -311,6 +311,7 @@ Points to note:
  * **Strings that look like handles are handles.** Any string matching the pattern `jl:<label>#<id>@<session>` is taken to be a handle, whether a formula returned it or it was typed. If its object has been freed, or it comes from an earlier Julia session (for example, saved in a workbook), the call gives a "not found" error, rather than passing the string to Julia.
  * **Errors pass through.** If an argument to `JuliaCallHandle` is an error value, such as `#N/A`, it returns that error without calling Julia.
  * **From VBA.** VBA can pass handles from cells to `jl.JuliaCall` etc. Handles that VBA creates, with `jl.JuliaCallHandle` or `jl.JuliaEvalHandle`, belong to no formula, so they last until `jl.JuliaHandleRelease` or `jl.JuliaHandleReleaseAll` frees them, or Julia exits. (Calling the worksheet function through `Application.Run` or `Evaluate` gives a handle that is freed straight away.)
+ * **Labels for your own types.** The label is the name of the object's type, without its module or parameters (`Array` for a `Matrix{Float64}`). To choose your own, add a method to `CallFromExcel.handle_label`, for example `CallFromExcel.handle_label(x::YieldCurve) = "Curve_$(x.currency)"`, so that a sheet shows `jl:Curve_USD#3@k3x9`. The label is worked out once, when the handle is created, and any `#`, `@`, whitespace or control character in it is replaced by `_`.
 
 ### `JuliaCallHandle`
 Call a named Julia function and return a [handle](#object-handles) to the result, which stays in Julia for other functions to use. An argument `";"` marks where named arguments start, as in `JuliaCallNamedArgs`.

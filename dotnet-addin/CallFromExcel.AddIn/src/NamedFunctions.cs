@@ -32,7 +32,17 @@ namespace CallFromExcel.AddIn
             string version = ExposedVersion();
             if (version == null || version == registeredVersion || registrationQueued) return;
             registrationQueued = true;
-            ExcelAsyncUtil.QueueAsMacro(RegisterAll);
+            ExcelAsyncUtil.QueueAsMacro(RegisterIfChanged);
+        }
+
+        // The queued registration. By the time it runs, the JuliaRegisterFunctions command (as
+        // VBA code calls it) may already have registered this version: then nothing to do.
+        private static void RegisterIfChanged()
+        {
+            registrationQueued = false;
+            string version = ExposedVersion();
+            if (version == null || version == registeredVersion) return;
+            Register();
         }
 
         // null when Julia gives no answer (not running, or an error).
@@ -57,7 +67,6 @@ namespace CallFromExcel.AddIn
         // expose_to_excel that runs while this does leaves the next check seeing a change.
         internal static int Register()
         {
-            registrationQueued = false;
             string version = ExposedVersion();
             if (version == null) { Log.Add("no answer from Julia"); return 0; }
             object list;

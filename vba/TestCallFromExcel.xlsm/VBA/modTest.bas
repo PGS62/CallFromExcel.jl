@@ -163,6 +163,11 @@ Function RunTests(Optional SilentMode As Boolean = False, Optional CommandLineOp
           AccResult "TestBigIntegerRangeVsCollect", TestBigIntegerRangeVsCollect, NumPassed, NumFailed
           AccResult "TestDateBefore1900WithTime", TestDateBefore1900WithTime, NumPassed, NumFailed
           AccResult "TestInvalidCharactersInArray", TestInvalidCharactersInArray, NumPassed, NumFailed
+          AccResult "WsTest_JuliaIncludeIntoMain", WsTest_JuliaIncludeIntoMain, NumPassed, NumFailed
+          AccResult "WsTest_NamedFunctionBroadcast", WsTest_NamedFunctionBroadcast, NumPassed, NumFailed
+          AccResult "WsTest_NamedFunctionOptionalArgs", WsTest_NamedFunctionOptionalArgs, NumPassed, NumFailed
+          AccResult "WsTest_NamedFunctionNameChecks", WsTest_NamedFunctionNameChecks, NumPassed, NumFailed
+          AccResult "WsTest_NamedFunctionRedefined", WsTest_NamedFunctionRedefined, NumPassed, NumFailed
 
 68        Prompt = NumPassed & " test(s) passed" & vbLf & _
               NumFailed & " test(s) failed"
@@ -1671,5 +1676,124 @@ End Function
 
 Private Function IsErrorCode(Value As Variant, ErrorNumber As Long) As Boolean
 1         If IsError(Value) Then IsErrorCode = (CLng(Value) = ErrorNumber)
+End Function
+
+' Regression test: JuliaInclude (worksheet and VBA) used to load the file into the
+' CallFromExcel module instead of Main, so JuliaCall couldn't find what it defined.
+Function WsTest_JuliaIncludeIntoMain() As Boolean
+          Dim ws As Worksheet
+          Dim FileName As String
+          Dim FileNum As Integer
+1         On Error GoTo ErrHandler
+2         Set ws = ScratchSheet()
+3         FileName = Environ("TEMP") & "\CallFromExcelIncludeTest.jl"
+4         FileNum = FreeFile
+5         Open FileName For Output As #FileNum
+6         Print #FileNum, "vba_test_included(x) = 2x"
+7         Close #FileNum
+8         ws.Range("A1").Formula2 = "=JuliaInclude(""" & FileName & """)"
+9         ws.Range("A2").Formula2 = "=JuliaCall(""vba_test_included"", 21)"
+10        WsTest_JuliaIncludeIntoMain = ws.Range("A2").Value2 = 42
+11        CallFromExcel.JuliaInclude FileName
+12        WsTest_JuliaIncludeIntoMain = WsTest_JuliaIncludeIntoMain And _
+              CallFromExcel.JuliaCall("vba_test_included", 4) = 8
+13        Kill FileName
+14        Exit Function
+ErrHandler:
+15        PrintTwice ReThrow("WsTest_JuliaIncludeIntoMain", Err, True)
+16        WsTest_JuliaIncludeIntoMain = False
+End Function
+
+' Named worksheet functions (@excel / expose_to_excel). JuliaInclude and JuliaEval queue
+' their registration to run when Excel is next idle - after this macro - so these tests
+' register with the JuliaRegisterFunctions command, as the README tells VBA code to.
+Function WsTest_NamedFunctionBroadcast() As Boolean
+          Dim ws As Worksheet
+1         On Error GoTo ErrHandler
+2         Set ws = ScratchSheet()
+3         CallFromExcel.JuliaEval "@excel broadcast=true vba_test_scale(x, factor) = x * factor"
+4         CallFromExcel.JuliaEval "@excel vba_test_total(x) = sum(x)"
+5         Application.Run "JuliaRegisterFunctions"
+6         ws.Range("A1:A3").Value2 = Application.WorksheetFunction.Transpose(Array(1, 2, 3))
+7         ws.Range("G1:H1").Value2 = Array(1, 100)
+8         ws.Range("B1").Formula2 = "=jl.vba_test_scale(A1:A3, 10)"         'a column
+9         ws.Range("C1").Formula2 = "=jl.vba_test_scale(A1:A3, G1:H1)"      'column x row: 3x2 table
+10        ws.Range("E1").Formula2 = "=jl.vba_test_scale(A1:A3, A1:A2)"      'shapes don't fit
+11        ws.Range("F1").Formula2 = "=jl.vba_test_total(A1:A3)"             'by default, passed whole
+12        WsTest_NamedFunctionBroadcast = ws.Range("B3").Value2 = 30 And _
+              ws.Range("C1").Value2 = 1 And ws.Range("D1").Value2 = 100 And _
+              ws.Range("C3").Value2 = 3 And ws.Range("D3").Value2 = 300 And _
+              InStr(ws.Range("E1").Value2, "x is 3x1 and factor is 2x1") > 0 And _
+              ws.Range("F1").Value2 = 6 And _
+              Application.Run("jl.vba_test_scale", 2, 3) = 6
+13        Exit Function
+ErrHandler:
+14        PrintTwice ReThrow("WsTest_NamedFunctionBroadcast", Err, True)
+15        WsTest_NamedFunctionBroadcast = False
+End Function
+
+' Arguments with default values are optional; a left-out required argument, or a gap before
+' a given one, is an error naming it rather than a value of missing reaching Julia.
+Function WsTest_NamedFunctionOptionalArgs() As Boolean
+          Dim ws As Worksheet
+1         On Error GoTo ErrHandler
+2         Set ws = ScratchSheet()
+3         CallFromExcel.JuliaEval "vba_test_swap(n, r, years=10) = n * r * years; expose_to_excel(""vba_test_swap"")"
+4         Application.Run "JuliaRegisterFunctions"
+5         ws.Range("A1").Formula2 = "=jl.vba_test_swap(100, 0.1)"
+6         ws.Range("A2").Formula2 = "=jl.vba_test_swap(100, 0.1, 2)"
+7         ws.Range("A3").Formula2 = "=jl.vba_test_swap(100)"
+8         ws.Range("A4").Formula2 = "=jl.vba_test_swap(100, , 2)"
+9         WsTest_NamedFunctionOptionalArgs = ws.Range("A1").Value2 = 100 And _
+              ws.Range("A2").Value2 = 20 And _
+              ws.Range("A3").Value2 = "#jl.vba_test_swap needs at least 2 arguments!" And _
+              ws.Range("A4").Value2 = "#jl.vba_test_swap: r can't be left out when a later argument is given!"
+10        Exit Function
+ErrHandler:
+11        PrintTwice ReThrow("WsTest_NamedFunctionOptionalArgs", Err, True)
+12        WsTest_NamedFunctionOptionalArgs = False
+End Function
+
+' Names Excel can't use are refused by expose_to_excel, with a message saying why. The code
+' is in cells, so JuliaEval's error text lands on the sheet.
+Function WsTest_NamedFunctionNameChecks() As Boolean
+          Dim ws As Worksheet
+1         On Error GoTo ErrHandler
+2         Set ws = ScratchSheet()
+3         CallFromExcel.JuliaEval "vba_test_names(x) = x; vba_test_names!(x) = x; expose_to_excel(""vba_test_names"")"
+4         ws.Range("A1").Value2 = "expose_to_excel(""vba_test_names""; name=""abc123"")"
+5         ws.Range("A2").Value2 = "expose_to_excel(""vba_test_names""; name=""JL.VBA_TEST_NAMES2""); expose_to_excel(""vba_test_names""; name=""jl.vba_test_names2"")"
+6         ws.Range("A3").Value2 = "expose_to_excel(""vba_test_names!"")"
+7         ws.Range("A4").Value2 = "expose_to_excel(""vba_test_names""; name=""JuliaCall"")"
+8         ws.Range("B1:B4").Formula2 = "=JuliaEval(A1)"
+9         WsTest_NamedFunctionNameChecks = InStr(ws.Range("B1").Value2, "as a cell reference") > 0 And _
+              InStr(ws.Range("B2").Value2, "ignores case") > 0 And _
+              InStr(ws.Range("B3").Value2, "isn't a valid Excel function name") > 0 And _
+              InStr(ws.Range("B4").Value2, "reserved") > 0
+10        Exit Function
+ErrHandler:
+11        PrintTwice ReThrow("WsTest_NamedFunctionNameChecks", Err, True)
+12        WsTest_NamedFunctionNameChecks = False
+End Function
+
+' Redefining an exposed function in Julia needs no re-registration: the registered function
+' forwards to whatever the Julia function now does. RunTests runs with calculation manual
+' (as this workbook was saved), so the cell is recalculated explicitly.
+Function WsTest_NamedFunctionRedefined() As Boolean
+          Dim ws As Worksheet
+1         On Error GoTo ErrHandler
+2         Set ws = ScratchSheet()
+3         CallFromExcel.JuliaEval "@excel vba_test_redef(x) = x + 1"
+4         Application.Run "JuliaRegisterFunctions"
+5         ws.Range("A1").Value2 = 1
+6         ws.Range("B1").Formula2 = "=jl.vba_test_redef(A1)"
+7         WsTest_NamedFunctionRedefined = ws.Range("B1").Value2 = 2
+8         CallFromExcel.JuliaEval "vba_test_redef(x) = x + 100"
+9         ws.Range("A1").Value2 = 2: ws.Range("B1").Calculate
+10        WsTest_NamedFunctionRedefined = WsTest_NamedFunctionRedefined And ws.Range("B1").Value2 = 102
+11        Exit Function
+ErrHandler:
+12        PrintTwice ReThrow("WsTest_NamedFunctionRedefined", Err, True)
+13        WsTest_NamedFunctionRedefined = False
 End Function
 

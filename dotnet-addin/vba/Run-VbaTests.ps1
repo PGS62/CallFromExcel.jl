@@ -66,9 +66,22 @@ try {
         Write-Host "CommandLineOptions: $CommandLineOptions"
     }
     $result = $excel.Run("'$xlPath'!modTest.RunTests", $true, $CommandLineOptions)
-    $log = $excel.Run("'$xlPath'!modTest.GetTestLog")
+    # Excel can be busy just after RunTests returns - running the named-function
+    # registration that the tests' worksheet JuliaEval/JuliaInclude cells queued - and then
+    # rejects calls (RPC_E_CALL_REJECTED, RPC_E_SERVERCALL_RETRYLATER). Retry for a while.
+    function Invoke-WhenExcelReady([scriptblock]$Call) {
+        for ($i = 0; $i -lt 100; $i++) {
+            try { return & $Call }
+            catch {
+                if ($_.Exception.Message -notmatch "0x80010001|0x8001010A|rejected") { throw }
+                Start-Sleep -Milliseconds 200
+            }
+        }
+        throw "Excel stayed busy"
+    }
+    $log = Invoke-WhenExcelReady { $excel.Run("'$xlPath'!modTest.GetTestLog") }
 
-    $wb.Close($false)
+    Invoke-WhenExcelReady { $wb.Close($false) }
 
     Write-Host ""
     Write-Host "--- Test log ---"

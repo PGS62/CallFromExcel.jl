@@ -17,6 +17,15 @@ Large or structured Julia objects - a big matrix, a fitted model, a DataFrame - 
 - 2,000 cells each creating a handle calculate in under a second (0.5 to 0.9 seconds in tests), and 2,000 `JuliaCall`s using them in about 0.3 seconds.
 - Any string of the form `jl:<label>#<id>@<session>` passed to a function is now taken to be a handle, so a string that merely looks like one gives a "not found" error rather than reaching Julia.
 
+### Your own worksheet functions
+
+A Julia function can now be a worksheet function of its own, `=jl.price_swap(A1, B1)` rather than `=JuliaCall("price_swap", A1, B1)`. See [Your own worksheet functions](README.md#your-own-worksheet-functions) in the README.
+
+- Mark a function with `@excel`, or make an existing one available with `expose_to_excel`. Its Excel name is `jl.` followed by its Julia name unless you choose another, and its description and arguments' descriptions, shown by the Insert Function dialog and the tooltips as you type, come from its docstring.
+- Arguments with default values are optional in Excel. Leaving out a required argument is an error naming it.
+- Ranges are passed whole by default. With `broadcast=true`, or `broadcast=(:x, :y)` for some arguments, a function written for single values is broadcast over ranges in one call, and its results spill.
+- The add-in registers exposed functions after `JuliaLaunch`, `JuliaInclude` and `JuliaEval`. A new ribbon button, Register Functions, does it for functions exposed from the Julia REPL, and VBA can run `Application.Run "JuliaRegisterFunctions"`.
+
 ### Fixes
 
 - `JuliaInclude` (worksheet, VBA and the ribbon's Include button) loaded the file into the `CallFromExcel` module instead of `Main`, so the functions it defined couldn't be called by name from `JuliaCall` or `JuliaEval`. It now loads into `Main`, as `include` at the REPL does.

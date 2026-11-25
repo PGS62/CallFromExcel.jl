@@ -4,6 +4,8 @@ Ideas considered but not yet scheduled, each with a sketch of how it might be im
 
 ## Named worksheet functions
 
+**Status: built on dev (0.2.0-DEV), documented in the README's "Your own worksheet functions".** What follows is the design and the record of how it was built; still open are the items under *Not done* at the end.
+
 **Problem.** Every Julia function is called through `=JuliaCall("price_swap", A1, B1)`. A demanding user wants `=PRICE_SWAP(A1, B1)`: a real worksheet function with its own name, argument names in the Function Wizard and IntelliSense, and help text. In-house bank add-ins are typically built this way. Probably the feature such users would notice most.
 
 **Sketch.** The calling path is unchanged: a named function forwards to the same code as `JuliaCall`, with the same wire format. What's new is registration.

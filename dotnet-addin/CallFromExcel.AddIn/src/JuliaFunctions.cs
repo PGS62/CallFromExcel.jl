@@ -165,10 +165,10 @@ namespace CallFromExcel.AddIn
             return WireFormatDecode.MapLeaves(result, v => v is ExcelErrorValue ev ? MapToExcelDnaError(ev.Code) : v ?? ExcelEmpty.Value);
         }
 
-        [ExcelFunction(Description = "Evaluate a Julia expression and return the result to an Excel worksheet.", HelpTopic = HelpRoot + "juliaeval", IsThreadSafe = false)]
+        [ExcelFunction(Description = "Evaluate a Julia expression and return the result to an Excel worksheet, or with ReturnHandle TRUE, a handle to the result.", HelpTopic = HelpRoot + "juliaeval", IsThreadSafe = false)]
         public static object JuliaEval(
             [ExcelArgument(Name = "JuliaExpression", Description = "Any valid Julia code, as a string. Can also be a one-column range to evaluate multiple Julia statements.")] object juliaExpression,
-            [ExcelArgument(Name = "ReturnHandle", Description = "SPIKE. Optional, default FALSE. TRUE returns a handle to the result, which stays in Julia while a formula uses it, and evaluates the code again only when it changes.")] object returnHandle)
+            [ExcelArgument(Name = "ReturnHandle", Description = "Optional, default FALSE. TRUE returns a handle to the result, which stays in Julia while a formula uses it. The code is evaluated again only when it changes.")] object returnHandle)
         {
             if (ExcelDnaUtil.IsInFunctionWizard()) return FunctionWizardMessage;
             if (juliaExpression is ExcelError) return juliaExpression;

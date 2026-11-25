@@ -105,13 +105,13 @@ CallFromExcel replaces [JuliaExcel](https://github.com/PGS62/JuliaExcel.jl). Its
 **Julia.** Functions and variables formerly accessed as `JuliaExcel.xxx`, such as `JuliaExcel.serve_xl()` and `JuliaExcel.last_answer`, are now `CallFromExcel.xxx`, after `using CallFromExcel`.
 
 ## Functions
-CallFromExcel makes the following functions available from Excel worksheets and from VBA, except that the three ending in `VBA` can only be called from VBA:
+CallFromExcel makes the following functions available from Excel worksheets and from VBA, except that those ending in `VBA`, and `JuliaEvalHandle`, `JuliaHandleRelease` and `JuliaHandleReleaseAll`, can only be called from VBA, and `JuliaHandleInfo` only from a worksheet:
 
 |Name|Description|
 |----|-----------|
 |[JuliaLaunch](#julialaunch)|Launches a local Julia session which listens to the current Excel session and responds to calls to `JuliaEval` etc.|
 |[JuliaInclude](#juliainclude)|Load a Julia source file into the Julia process, to make additional functions available via `JuliaEval` and `JuliaCall`.|
-|[JuliaEval](#juliaeval)|Evaluate a Julia expression and return the result to an Excel worksheet.|
+|[JuliaEval](#juliaeval)|Evaluate a Julia expression and return the result to an Excel worksheet, or with `ReturnHandle` TRUE, a [handle](#object-handles) to the result.|
 |[JuliaCall](#juliacall)|Call a named Julia function, passing in data from the worksheet. Returns an error string for results that cannot be displayed on a worksheet (nested arrays, dictionaries etc.). `JuliaCallVBA` lifts those restrictions.|
 |[JuliaSetVar](#juliasetvar)|Set a global variable in the Julia process.|
 |[JuliaEvalVBA](#juliaevalvba)|Evaluate a Julia expression from VBA. Differs from `JuliaCall` in handling of 1-d arrays and strings longer than 32,767 characters. May return data of types that cannot be displayed on a worksheet, such as a dictionary or an array of arrays.|
@@ -120,6 +120,11 @@ CallFromExcel makes the following functions available from Excel worksheets and 
 |[JuliaCallNamedArgsVBA](#juliacallnamedargsvba)|Call a named Julia function from VBA, passing positional and named arguments, with `";"` marking where the named arguments start. Differs from `JuliaCallNamedArgs` in the same ways that `JuliaCallVBA` differs from `JuliaCall`.|
 |[JuliaIsRunning](#juliaisrunning)|Returns TRUE if an instance of Julia is running and "listening" to the current Excel session, or FALSE otherwise.|
 |[JuliaExcelPID](#juliaexcelpid)|Returns the process id of the current Excel session. Only needed if more than one Excel instance is running - pass it to `serve_xl` to say which one to attach to.|
+|[JuliaCallHandle](#juliacallhandle)|Call a named Julia function and return a [handle](#object-handles) to the result, which stays in Julia for other functions to use. An argument `";"` marks where named arguments start, as in `JuliaCallNamedArgs`.|
+|[JuliaEvalHandle](#juliaevalhandle)|Evaluate a Julia expression from VBA and return a handle to the result. The VBA counterpart of `JuliaEval(JuliaExpression, TRUE)`.|
+|[JuliaHandleRelease](#juliahandlerelease)|Free the Julia object of a handle created from VBA.|
+|[JuliaHandleReleaseAll](#juliahandlereleaseall)|Free the Julia objects of all handles created from VBA.|
+|[JuliaHandleInfo](#juliahandleinfo)|Information about object handles: how many are live, or recent events.|
 
 ## Example VBA
 The VBA code below makes a call to `JuliaLaunch` and `JuliaEvalVBA` and then pastes the result to range A1:J10 in a new worksheet. VBA reaches CallFromExcel's functions through an object created with `CreateObject("CallFromExcel.ComServer")`, which needs no reference. Alternatively, add a reference to CallFromExcel (VBA editor, Tools menu -> References) and declare `Dim jl As New CallFromExcel.ComServer`: the VBA editor then shows each function's arguments as you type. But a workbook with that reference won't compile on a PC without CallFromExcel installed.
@@ -173,14 +178,15 @@ JuliaInclude(FileName)
 The ribbon's Include button does the same for the file in its File box, without needing a formula.
 
 ### `JuliaEval`
-Evaluate a Julia expression and return the result to an Excel worksheet.
+Evaluate a Julia expression and return the result to an Excel worksheet, or with `ReturnHandle` TRUE, a [handle](#object-handles) to the result.
 ```
-JuliaEval(JuliaExpression)
+JuliaEval(JuliaExpression, [ReturnHandle])
 ```
 
 |Argument|Description|
 |:-------|:----------|
 |`JuliaExpression`|Any valid Julia code, as a string. Can also be a one-column range to evaluate multiple Julia statements.|
+|`ReturnHandle`|Optional, default FALSE. TRUE returns a handle to the result, which stays in Julia while a formula uses it. The code is evaluated again only when it changes. From VBA, use `JuliaEvalHandle` instead.|
 
 ### `JuliaCall`
 Call a named Julia function, passing in data from the worksheet. Returns an error string for results that cannot be displayed on a worksheet (nested arrays, dictionaries etc.). `JuliaCallVBA` lifts those restrictions.
@@ -264,6 +270,78 @@ Returns the process id of the current Excel session. You'll rarely need this dir
 ```
 JuliaExcelPID()
 ```
+
+### Object handles
+Some Julia objects are large, or have no sensible representation on a worksheet: a big matrix, a fitted model, a DataFrame, a dictionary. Rather than returning such an object to Excel, `JuliaCallHandle` (and `JuliaEval` with `ReturnHandle` TRUE) keeps it in Julia and returns a _handle_, a short string naming it, such as `jl:Array#17@k3x9`. Pass the handle to any function in place of the object, and Julia receives the object itself:
+
+|Cell|Formula|Result|
+|:---|:------|:-----|
+|A1|`=JuliaEval("rand(1000, 1000)", TRUE)`|`jl:Array#1@k3x9`|
+|A2|`=JuliaCall("sum", A1)`|the sum of the matrix's million elements|
+|A3|`=JuliaCallHandle("inv", A1)`|`jl:Array#2@k3x9`, a handle to its inverse|
+|A4|`=JuliaCall("maximum", A3)`|the inverse's largest element|
+
+The matrix is built once and stays in Julia, however many formulas use it. A handle can be passed to `JuliaCall`, `JuliaCallNamedArgs`, `JuliaCallHandle` and their VBA counterparts, including inside a range or array: a range of handles arrives in Julia as a vector of the objects. `=JuliaCall("identity", A1)` returns a handle's object to the worksheet as data. A handle's text is `jl:<label>#<id>@<session>`: the label is the object's type, for people reading the sheet, the id numbers each object, and the session identifies the Julia process holding it.
+
+Points to note:
+ * **Lifetime.** A handle's object stays in Julia while a formula that creates it exists. Edit or delete that formula, or change its inputs, and the object is freed (and a new one created for new inputs). Excel sometimes frees an object only at a later recalculation, for example after a workbook is closed.
+ * **Same formula, same object.** Formulas with the same function and the same arguments share one object, as do copies of a cell, and recalculating - even with Ctrl+Alt+F9 - doesn't rebuild it. So `=JuliaEval("rand(3)", TRUE)` keeps its first random numbers. To get a separate, or new, object, change an input, for example an extra argument that the Julia function ignores. Running the macro `JuliaHandleInvalidateAll` (Alt+F8, type the name, Run) rebuilds every handle's object.
+ * **Don't change a handle's object.** A function that changes its argument, such as `push!` or `sort!`, changes the stored object without changing its handle, so cells using it aren't recalculated, and results depend on the order Excel calculates in. Use functions that return a new object, such as `sort`, and make a new handle of the result.
+ * **When Julia restarts.** `JuliaLaunch`, and the ribbon's Launch Julia button, notice a new Julia session and rebuild every handle's object in it, in the order Excel's dependencies require. A cell that defines functions the handles need should refer to the launch cell, so that it is recalculated first, e.g. `=IF(LEN(Z1)>0, JuliaInclude("C:\MyCode\models.jl"))` where `Z1` holds `=JuliaLaunch()`. Until then - for example after Julia is restarted from VBA - a handle from the old session gives an error saying it was not found.
+ * **Strings that look like handles are handles.** Any string matching the pattern `jl:<label>#<id>@<session>` is taken to be a handle, whether a formula returned it or it was typed. If its object has been freed, or it comes from an earlier Julia session (for example, saved in a workbook), the call gives a "not found" error, rather than passing the string to Julia.
+ * **Errors pass through.** If an argument to `JuliaCallHandle` is an error value, such as `#N/A`, it returns that error without calling Julia.
+ * **From VBA.** VBA can pass handles from cells to `jl.JuliaCall` etc. Handles that VBA creates, with `jl.JuliaCallHandle` or `jl.JuliaEvalHandle`, belong to no formula, so they last until `jl.JuliaHandleRelease` or `jl.JuliaHandleReleaseAll` frees them, or Julia exits. (Calling the worksheet function through `Application.Run` or `Evaluate` gives a handle that is freed straight away.)
+
+### `JuliaCallHandle`
+Call a named Julia function and return a [handle](#object-handles) to the result, which stays in Julia for other functions to use. An argument `";"` marks where named arguments start, as in `JuliaCallNamedArgs`.
+```
+JuliaCallHandle(JuliaFunction, [Arg1], [Arg2], ..., [";", Name1, Value1, ...])
+```
+
+|Argument|Description|
+|:-------|:----------|
+|`JuliaFunction`|The name of a Julia function visible from the Julia REPL. A trailing `.` broadcasts, as for `JuliaCall`.|
+|`Args...`|Zero or more positional arguments, optionally followed by `";"` and pairs of name and value for named arguments, as for `JuliaCallNamedArgs`. Handles among them are replaced by their objects.|
+
+Unlike `JuliaCallNamedArgs`, any `";"` argument starts the named arguments, so `";"` can't be passed as a positional argument.
+
+From VBA, `jl.JuliaCallHandle` takes at most 30 arguments after the function name, and raises an error, rather than returning an error string, if the call fails. The handle lasts until `JuliaHandleRelease` or `JuliaHandleReleaseAll` frees it.
+
+### `JuliaEvalHandle`
+Evaluate a Julia expression from VBA and return a handle to the result. The VBA counterpart of `JuliaEval(JuliaExpression, TRUE)`. Raises an error if the evaluation fails. The handle lasts until `JuliaHandleRelease` or `JuliaHandleReleaseAll` frees it.
+```
+jl.JuliaEvalHandle(JuliaExpression)
+```
+
+|Argument|Description|
+|:-------|:----------|
+|`JuliaExpression`|Any valid Julia code, as a string. Can also be a one-column range to evaluate multiple Julia statements.|
+
+### `JuliaHandleRelease`
+Free the Julia object of a handle created from VBA. Returns TRUE if it freed one, and FALSE otherwise - when the handle was already freed, was created by a worksheet formula (which frees its own), or isn't a handle at all, such as an empty string. So it is always safe to call, for example from a class's `Class_Terminate` event.
+```
+jl.JuliaHandleRelease(Handle)
+```
+
+|Argument|Description|
+|:-------|:----------|
+|`Handle`|A handle returned by `jl.JuliaCallHandle` or `jl.JuliaEvalHandle`.|
+
+### `JuliaHandleReleaseAll`
+Free the Julia objects of all handles created from VBA, and return how many. Handles created by worksheet formulas are unaffected.
+```
+jl.JuliaHandleReleaseAll()
+```
+
+### `JuliaHandleInfo`
+Information about object handles: how many are live, or recent events.
+```
+JuliaHandleInfo(Type)
+```
+
+|Argument|Description|
+|:-------|:----------|
+|`Type`|`"count"` for the number of live handles created by worksheet formulas, and of objects Julia holds (which includes those created from VBA). `"events"` for a column of recent create and release events, newest last.|
 
 ## Performance
 Calls are fast: a simple call takes under a millisecond, and `=JuliaCall("sort", A1:A1000000)` sorts a million numbers in about 0.4 seconds, including sending them to Julia and back. That's faster than Excel's own `=SORT(A1:A1000000)`, which takes about 0.6 seconds, and about a third of the time taken by CallFromExcel's predecessor, JuliaExcel. See the [changelog](CHANGELOG.md) for more timings.
@@ -379,6 +457,7 @@ CallFromExcel's Excel add-in is written in C#, using [Excel-DNA](https://excel-d
 Other points to note:
  * The wire format distinguishes the types VBA does (e.g. `Long` from `Double`), and supports 2-D arrays (a worksheet range) and Excel error values. JSON, the obvious alternative, has only nested 1-D arrays and a much thinner type system. Arrays of numbers are sent in bulk, without per-element type or length information, and Julia ranges such as `1:1000000` are sent as just their first value, step and length.
  * Each `JuliaEval`/`JuliaCall` is a synchronous HTTP request/response, over connections kept open between calls. If Julia isn't there to answer (e.g. after `=JuliaEval("exit()")`), the call returns an error saying so.
+ * [Object handles](#object-handles) hook into Excel's RTD (real-time data) mechanism, through Excel-DNA's `ExcelAsyncUtil.Observe`. A `JuliaCallHandle` formula subscribes to an RTD topic keyed on the function name and its arguments, so the same formula implies the same object. Only the first formula to ask for a topic makes Julia build and store the object (`CallFromExcel.handle_create`) and return its handle. Later recalculations, and other formulas with the same function and arguments, get the same handle without calling Julia. When no formula uses a topic any more, Excel tells the add-in, which tells Julia to free the object. Any string argument matching the handle pattern is assumed to be a handle: it is sent to Julia as a reference, which Julia replaces with the stored object, or reports as not found. The key also includes a generation number, increased when `JuliaLaunch` finds a new Julia session, so that every handle formula subscribes again and rebuilds its object.
  * Running Julia inside Excel's own process, via [Julia embedding](https://docs.julialang.org/en/v1/manual/embedding/), would avoid the HTTP round trip altogether. But Julia could then only be restarted by restarting Excel and there would be no separate Julia REPL to watch or debug in.
 
 ## Viewing the code
@@ -390,4 +469,4 @@ The Excel add-in is written in C#, using [Excel-DNA](https://excel-dna.net/); it
 
 Philip Swannell  
 8 December 2021  
-Last updated 12 November 2026
+Last updated 25 November 2026

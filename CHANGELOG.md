@@ -2,6 +2,21 @@
 
 CallFromExcel is the successor to [JuliaExcel](https://github.com/PGS62/JuliaExcel.jl), and its version numbers start again at 0.1.0. The entries from JuliaExcel 2.4.1 down are JuliaExcel's, kept for the record of how it evolved, including its performance.
 
+## [Unreleased]
+
+### Object handles
+
+Large or structured Julia objects - a big matrix, a fitted model, a DataFrame - can now stay in Julia, with Excel holding a short string naming each one, a _handle_ such as `jl:Array#17@k3x9`. See [Object handles](README.md#object-handles) in the README.
+
+- `JuliaCallHandle` calls a Julia function and returns a handle to the result. Named arguments follow `";"`, as in `JuliaCallNamedArgs`, and a trailing `.` on the function name broadcasts, as for `JuliaCall`. `JuliaEval` has a new optional argument, `ReturnHandle`, which does the same for an expression.
+- A handle can be passed to `JuliaCall` and the other functions in place of its object, alone or in a range or array, and Julia receives the object itself.
+- Handles use Excel's RTD (real-time data) mechanism, so an object lives while a formula that creates it exists, and is freed when that formula is edited or deleted, or its inputs change. The same function with the same arguments gives the same object, built once, however many cells use it and however often they recalculate.
+- When `JuliaLaunch`, or the ribbon's Launch Julia button, finds a new Julia session, every handle's object is rebuilt in it.
+- From VBA, handles from cells can be passed to `jl.JuliaCall` etc., and `jl.JuliaCallHandle` and `jl.JuliaEvalHandle` create handles that last until `jl.JuliaHandleRelease` or `jl.JuliaHandleReleaseAll` frees them. These methods are at the end of the COM interface, so VBA code compiled against the earlier type library is unaffected.
+- `JuliaHandleInfo("count")` shows how many handles are live, and `JuliaHandleInfo("events")` recent activity.
+- 2,000 cells each creating a handle calculate in under a second (0.5 to 0.9 seconds in tests), and 2,000 `JuliaCall`s using them in about 0.3 seconds.
+- Any string of the form `jl:<label>#<id>@<session>` passed to a function is now taken to be a handle, so a string that merely looks like one gives a "not found" error rather than reaching Julia.
+
 ## [0.1.7] - 2026-11-17
 
 ### Clearer guidance when Julia can't start

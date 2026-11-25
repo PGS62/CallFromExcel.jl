@@ -96,10 +96,10 @@ namespace CallFromExcel.AddIn
         // Covers both JuliaCall and JuliaCallNamedArgs, so there is no JuliaCallNamedArgsHandle:
         // handle_create treats the arguments as JuliaCallNamedArgs does if one of them is ";",
         // else as JuliaCall does. The cost: a positional argument can't be the string ";".
-        [ExcelFunction(Description = "SPIKE. Calls a Julia function and returns a handle to the result, which stays in Julia while a formula uses it. As in JuliaCallNamedArgs, an argument \";\" marks where named arguments start.", IsThreadSafe = false)]
+        [ExcelFunction(Description = "Call a named Julia function and return a handle to the result, which stays in Julia for other functions to use. An argument \";\" marks where named arguments start, as in JuliaCallNamedArgs.", HelpTopic = JuliaFunctions.HelpRoot + "juliacallhandle", IsThreadSafe = false)]
         public static object JuliaCallHandle(
-            [ExcelArgument(Name = "JuliaFunction", Description = "The name of a Julia function.")] string juliaFunction,
-            [ExcelArgument(Name = "Args", Description = "Positional arguments, optionally followed by \";\" and name/value pairs for keyword arguments. Handles are replaced by their objects.")] params object[] args)
+            [ExcelArgument(Name = "JuliaFunction", Description = "The name of a Julia function visible from the Julia REPL. A trailing \".\" broadcasts, as for JuliaCall.")] string juliaFunction,
+            [ExcelArgument(Name = "Args", Description = "Positional arguments, optionally followed by \";\" and name/value pairs for named arguments. Handles among them are replaced by their objects.")] params object[] args)
         {
             if (ExcelDnaUtil.IsInFunctionWizard()) return "#Disabled in Function Wizard!";
             // An error argument (e.g. an invalidated handle upstream) propagates, as in most
@@ -140,9 +140,9 @@ namespace CallFromExcel.AddIn
         private static readonly string[] InfoTypes = { "count", "events" };
 
         // One function for information about handles, in the style of Excel's INFO(type_text).
-        [ExcelFunction(Description = "SPIKE. Information about object handles: \"count\" for the number of live handles created by worksheet formulas and of objects Julia stores (which includes those created from VBA), \"events\" for recent create/release events, newest last.", IsThreadSafe = false, IsVolatile = true)]
+        [ExcelFunction(Description = "Information about object handles: how many are live, or recent events.", HelpTopic = JuliaFunctions.HelpRoot + "juliahandleinfo", IsThreadSafe = false, IsVolatile = true)]
         public static object JuliaHandleInfo(
-            [ExcelArgument(Name = "Type", Description = "\"count\" or \"events\".")] object type)
+            [ExcelArgument(Name = "Type", Description = "\"count\" for the number of live handles created by worksheet formulas, and of objects Julia holds (including those created from VBA). \"events\" for a column of recent create and release events, newest last.")] object type)
         {
             string t = type is string s ? s.Trim().ToLowerInvariant() : "";
             if (t == "count")
@@ -164,7 +164,7 @@ namespace CallFromExcel.AddIn
 
         // Hidden: a worksheet function that changes state is a poor fit for the documented set,
         // but the spike's test scripts use it to see each step's events on their own.
-        [ExcelFunction(Description = "SPIKE. Clears the event log.", IsThreadSafe = false, IsHidden = true)]
+        [ExcelFunction(Description = "Clears the log of handle events that JuliaHandleInfo(\"events\") shows.", IsThreadSafe = false, IsHidden = true)]
         public static object JuliaHandleEventsClear()
         {
             Events.Clear();

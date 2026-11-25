@@ -467,26 +467,44 @@ function srv_call_inner(payload::String; named_args::Bool=false)::String
     broadcasting = false
     success = true
     kwpart = named_args ? "; kwargs_from_xl..." : ""
+    exposed_name = nothing
     global last_answer = try
         decoded = decode_from_xl(payload)
         fn_name = decoded[1]::String
-        broadcasting = endswith(fn_name, ".")
-        broadcasting && (fn_name = chop(fn_name))
+        if fn_name == "CallFromExcel._call_exposed"
+            # A named worksheet function (=jl.f(...)). Shown in the REPL as a call of f itself,
+            # with args_from_xl as f receives them (see _exposed_args), not as the call of
+            # _call_exposed that carries it.
+            exposed_name = decoded[2]::String
+            e = _exposed_entry(exposed_name)
+            fn_name = _repl_name(e.f)
+            fn_to_call = e.f
+            # As received, in case _exposed_args throws (ranges that don't fit together).
+            args_from_xl = decoded[3:end]
+            broadcasting = any(e.bcast)
+            args_from_xl, broadcasting = _exposed_args(exposed_name, e, args_from_xl)
+        else
+            broadcasting = endswith(fn_name, ".")
+            broadcasting && (fn_name = chop(fn_name))
+        end
         global last_question = broadcasting ? "$fn_name.(args_from_xl...$kwpart)" : "$fn_name(args_from_xl...$kwpart)"
         if _display_results[]
             printstyled("question> ", color=:green)
             println(last_question)
         end
-        fn_to_call = Main.eval(Meta.parse(fn_name))             # fast: parses only the short function name
-        args_from_xl = decoded[2:end]
-        named_args && ((args_from_xl, kwargs_from_xl) = split_named_args(args_from_xl))
+        if exposed_name === nothing
+            fn_to_call = Main.eval(Meta.parse(fn_name))         # fast: parses only the short function name
+            args_from_xl = decoded[2:end]
+            named_args && ((args_from_xl, kwargs_from_xl) = split_named_args(args_from_xl))
+        end
         # invokelatest, as well as the one around this whole function: evaluating fn_name can
         # itself define a method - "(x->2x)" defines an anonymous function - which this
         # function's world, fixed when it was entered, can't see ("method too new"). Each such
         # call defines and compiles a new function, so it's fine occasionally, but leaks memory
         # if repeated many times.
         if broadcasting
-            Base.invokelatest(broadcast, (xs...) -> fn_to_call(xs...; kwargs_from_xl...), args_from_xl...)
+            result = Base.invokelatest(broadcast, (xs...) -> fn_to_call(xs...; kwargs_from_xl...), args_from_xl...)
+            exposed_name === nothing ? result : _check_broadcast_result(exposed_name, result)
         else
             Base.invokelatest(fn_to_call, args_from_xl...; kwargs_from_xl...)
         end

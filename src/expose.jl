@@ -212,15 +212,39 @@ end
 For the add-in: calls the function exposed as `excel_name`, broadcasting as `expose_to_excel` describes.
 """
 function _call_exposed(excel_name::String, args...)
+    e = _exposed_entry(excel_name)
+    xs, broadcasting = _exposed_args(excel_name, e, args)
+    broadcasting ? _check_broadcast_result(excel_name, broadcast(e.f, xs...)) : e.f(xs...)
+end
+
+function _exposed_entry(excel_name::String)
     e = get(_exposed, excel_name, nothing)
     e === nothing && throw(ArgumentError("$excel_name isn't exposed in this Julia session. Run the code that exposes it again (with JuliaInclude, say)."))
+    e
+end
+
+# The arguments as the exposed function receives them, and whether to broadcast: vectors for
+# arguments declared ::AbstractVector and, when a range reaches a broadcasting argument, every
+# other argument wrapped in Ref - so that f.(xs...) (or f(xs...) when not broadcasting) makes
+# the call. The server keeps them in args_from_xl, so the REPL can repeat the call exactly.
+function _exposed_args(excel_name::String, e, args)
     xs = Any[e.asvector[k] ? _as_vector(a) : a for (k, a) in enumerate(args)]
     ks = [k for k in eachindex(xs) if e.bcast[k] && xs[k] isa AbstractArray]
-    isempty(ks) && return e.f(xs...)
+    isempty(ks) && return xs, false
     _check_shapes(excel_name, e.argnames, xs, ks)
-    result = broadcast(e.f, (k in ks ? x : Ref(x) for (k, x) in enumerate(xs))...)
+    Any[k in ks ? x : Ref(x) for (k, x) in enumerate(xs)], true
+end
+
+function _check_broadcast_result(excel_name::String, result)
     any(r -> r isa AbstractArray, result) && throw(ArgumentError("$excel_name returns an array for each element of a broadcast range, which can't be shown in one range. Pass that range whole instead: leave its argument out of `broadcast`, or declare it as an array (::AbstractVector)."))
     result
+end
+
+# The exposed function's name as the REPL can use it: plain if Main sees that very function,
+# otherwise qualified by its module (LinearAlgebra.det).
+function _repl_name(f)
+    name = nameof(f)
+    isdefined(Main, name) && getfield(Main, name) === f ? string(name) : string(parentmodule(f), ".", name)
 end
 
 # A single cell, row or column as a vector, for an argument declared ::AbstractVector.

@@ -917,6 +917,22 @@ end
     @test call("jl.excel_test_pair", 1) == [1, 1]
     @test occursin("isn't exposed in this Julia session", msg(() -> call("jl.nonesuch", 1)))
 
+    # Through the server (as =jl.f(...) arrives), the call is shown, saved and repeatable in the
+    # REPL as a call of the function itself, with args_from_xl as the function receives them.
+    srv(args...) = C.decode_from_xl(C.srv_call_inner(C.encode_for_xl(Any["CallFromExcel._call_exposed", args...])))
+    @test srv("jl.excel_test_scale", 2.0, 3.0) == 6.0
+    @test C.last_question == "excel_test_scale(args_from_xl...)"
+    @test C.args_from_xl == [2.0, 3.0] && C.answer_again() == 6.0
+    @test vec(srv("jl.excel_test_scale", [1.0; 2.0;;], 10.0)) == [10.0, 20.0]
+    @test C.last_question == "excel_test_scale.(args_from_xl...)"
+    @test C.args_from_xl[2] isa Ref && vec(C.answer_again()) == [10.0, 20.0]
+    @test srv("jl.excel_test_wavg", 1.0, [2.0; 4.0;;]) == 3.0
+    @test C.args_from_xl[2] == [2.0, 4.0] && C.answer_again() == 3.0         # the vector w receives
+    @test occursin("x is 3x1 and factor is 2x1", srv("jl.excel_test_scale", [1.0; 2; 3;;], [1.0; 2;;]))
+    @test C.last_question == "excel_test_scale.(args_from_xl...)"
+    @test occursin("returns an array for each element", srv("jl.excel_test_pair", [1.0 2.0]))
+    @test occursin("isn't exposed in this Julia session", srv("jl.nonesuch", 1.0))
+
     # Bad uses of the macro.
     @test_throws Exception include_string(Main, "@excel nonsense=1 excel_test_bad(x) = x")
     @test_throws Exception include_string(Main, "@excel 42")

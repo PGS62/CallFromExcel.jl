@@ -40,6 +40,17 @@ function WaitText($ws, $addr, $not) {
 }
 $inc = Join-Path $env:TEMP "NamedAuto.jl"
 Set-Content -Path $inc -Encoding utf8 -Value 'timesthree(x) = 3x; CallFromExcel.expose("timesthree")'
+$inc2 = Join-Path $env:TEMP "NamedAuto2.jl"
+Set-Content -Path $inc2 -Encoding utf8 -Value @'
+"""
+    scale(x, factor)
+
+Multiplies x by factor.
+"""
+@excel scale(x, factor) = x * factor
+
+@excel wavg(x, w::AbstractVector) = x * sum(w) / length(w)
+'@
 
 $ex = New-Excel; $excel = $ex[0]; $excelPid = $ex[1]
 try {
@@ -91,6 +102,19 @@ try {
     F $ws "C5" '=jl.swap(100)'                # expect "needs at least 2 arguments"
     F $ws "C6" '=jl.swap(100, )'              # expect "needs at least 2 arguments"
     foreach ($a in "C1", "C2", "C3", "C4", "C5", "C6") { Show $ws $a }
+
+    Write-Host "=== 8 @excel in an included file, broadcasting over ranges"
+    F $ws "Z6" ('=JuliaInclude("' + $inc2 + '")')
+    Show $ws "Z6"
+    for ($i = 0; $i -lt 50 -and -not ((Retry { $excel.Evaluate("=jl.scale(1, 1)") }) -is [double]); $i++) { Start-Sleep -Milliseconds 200 }
+    foreach ($v in @(@("E1", 1), @("E2", 2), @("E3", 3), @("F1", 10), @("G1", 100), @("F3", 4), @("G3", 6))) { $c = $ws.Range($v[0]); $val = $v[1]; Retry { $c.Value2 = $val } }
+    F $ws "H1" '=jl.scale(E1:E3, 10)'          # expect a column 10, 20, 30
+    F $ws "I1" '=jl.scale(E1:E3, F1:G1)'       # expect a 3x2 table
+    F $ws "K1" '=jl.scale(E1:E3, E1:E2)'       # expect "x is 3x1 and factor is 2x1"
+    F $ws "L1" '=jl.wavg(E1:E3, F3:G3)'        # w whole: mean 5, expect 5, 10, 15
+    F $ws "M1" '=jl.wavg(2, 7)'                # expect 14
+    Retry { $excel.Calculate() }
+    foreach ($a in "H1", "H2", "H3", "I1", "J1", "I3", "J3", "K1", "L1", "L3", "M1") { Show $ws $a }
     F $ws "Y1" '=JuliaEval("exit()")'
     Retry { $wb.Close($false) }
 } catch {

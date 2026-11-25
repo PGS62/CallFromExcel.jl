@@ -858,6 +858,71 @@ end
     empty!(C._exposed)
 end
 
+@testset "@excel, and broadcasting in named functions" begin
+    C = CallFromExcel
+    empty!(C._exposed)
+    call(name, args...) = C._call_exposed(name, args...)
+    msg(f) = try f(); "" catch e; e.msg end
+    include_string(Main, """
+        \"\"\"
+            excel_test_scale(x, factor)
+
+        Scales x.
+        \"\"\"
+        @excel excel_test_scale(x, factor) = x * factor
+
+        excel_test_m(a) = 1
+        @excel name="jl.excel_test_m1" excel_test_m(a::Int) = 2
+        excel_test_m(a, b, c) = 3
+
+        @excel function excel_test_wavg(x, w::AbstractVector)
+            x * sum(w) / length(w)
+        end
+        @excel broadcast=(:b,) excel_test_list(a, b) = (a, b)
+        @excel broadcast=false excel_test_size(a) = size(a)
+        @excel excel_test_pair(x) = [x, x]
+        excel_test_plain(a, b) = a * length(b)
+        """)
+
+    # @excel defines, exposes and documents.
+    r = Dict(r[1] => r for r in eachrow(C.exposed_functions()))
+    @test r["jl.excel_test_scale"][3] == "Scales x."
+    @test Main.excel_test_scale(2, 3) == 6
+    # The method @excel is attached to, not the one with most arguments.
+    @test r["jl.excel_test_m1"][4] == "a"
+    @test C._exposed["jl.excel_test_m1"].f === Main.excel_test_m
+
+    # Scalars: a plain call. A range broadcasts; a column against a row gives a table.
+    @test call("jl.excel_test_scale", 2.0, 3.0) == 6.0
+    @test call("jl.excel_test_scale", [1.0; 2.0;;], 10.0) == [10.0; 20.0;;]
+    @test call("jl.excel_test_scale", [1.0; 2.0;;], [1.0 10.0 100.0]) == [1.0 10.0 100.0; 2.0 20.0 200.0]
+    @test occursin("x is 3x1 and factor is 2x1", msg(() -> call("jl.excel_test_scale", [1.0; 2; 3;;], [1.0; 2;;])))
+
+    # Declared ::AbstractVector: passed whole, as a vector, from a cell, row or column.
+    @test call("jl.excel_test_wavg", [1.0; 2.0;;], [1.0 3.0]) == [2.0; 4.0;;]
+    @test call("jl.excel_test_wavg", 1.0, 5.0) == 5.0
+    @test call("jl.excel_test_wavg", 1.0, [2.0; 4.0;;]) == 3.0
+
+    # broadcast= lists the arguments that broadcast; false, none.
+    @test call("jl.excel_test_list", [1 2], [3 4]) == [([1 2], 3) ([1 2], 4)]
+    @test call("jl.excel_test_size", [1 2 3]) == (1, 3)
+    @test occursin("isn't an argument", msg(() -> C.expose("excel_test_plain"; broadcast=(:z,))))
+    @test C.expose("excel_test_plain"; broadcast=(:a,)) == "jl.excel_test_plain"
+    @test call("jl.excel_test_plain", [5 6], [1 2 3]) == [15 18]
+    @test C.expose(Main.excel_test_plain; name="jl.plain2") == "jl.plain2"     # a function, not a name
+    @test call("jl.plain2", [5 6], [1 2]) == [5 6]
+
+    # An array for each element can't spill; an unknown name (a relaunched Julia).
+    @test occursin("returns an array for each element", msg(() -> call("jl.excel_test_pair", [1 2])))
+    @test call("jl.excel_test_pair", 1) == [1, 1]
+    @test occursin("isn't exposed in this Julia session", msg(() -> call("jl.nonesuch", 1)))
+
+    # Bad uses of the macro.
+    @test_throws Exception include_string(Main, "@excel nonsense=1 excel_test_bad(x) = x")
+    @test_throws Exception include_string(Main, "@excel 42")
+    empty!(C._exposed)
+end
+
 @testset "Reminder to run installme()" begin
     mktempdir() do dir
         versionfile = joinpath(dir, "version.txt")

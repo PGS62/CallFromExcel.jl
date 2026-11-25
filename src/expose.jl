@@ -7,7 +7,8 @@ expose records a Julia function to be registered in Excel under its own name, by
 registers each as a worksheet function that forwards to JuliaCall's code.
 =#
 
-const _exposed = Dict{String,Any}()   # Excel name => (julia, description, argnames, argdescriptions)
+# Excel name => (f, julia, description, argnames, argdescriptions, nrequired, bcast, asvector)
+const _exposed = Dict{String,Any}()
 
 # Separates the arguments' names, and their descriptions, in one string for the add-in.
 const _ARGSEP = "\x1f"
@@ -25,12 +26,14 @@ tag (as in handles) tells a relaunched Julia apart, whose count could match the 
 exposed_version() = _session_tag() * "#" * string(_exposed_count[])
 
 """
-    expose(fn_name; name=nothing, description="", argdescriptions=String[])
+    expose(fn_name; name=nothing, description="", argdescriptions=String[], broadcast=nothing)
+    expose(f::Function; ...)
 
-SPIKE. Make the Julia function named `fn_name` callable from Excel as a worksheet function,
-by default `jl.<fn_name>`. Returns the Excel name. The add-in registers exposed functions
-after `JuliaLaunch`, `JuliaInclude` and `JuliaEval`, and when the ribbon's Register
-Functions button is clicked (for functions exposed from the REPL).
+SPIKE. Make a Julia function, named by `fn_name` (evaluated in `Main`) or given itself,
+callable from Excel as a worksheet function, by default `jl.<its name>`. Returns the Excel
+name. The add-in registers exposed functions after `JuliaLaunch`, `JuliaInclude` and
+`JuliaEval`, and when the ribbon's Register Functions button is clicked (for functions
+exposed from the REPL). [`@excel`](@ref) does the same for the method it's attached to.
 
 The Excel function's arguments are those of the method with the most positional arguments
 (not counting varargs methods). Arguments with default values (`f(a, b=2)`) are optional in
@@ -40,14 +43,51 @@ Descriptions, shown by Excel's Function Wizard and IntelliSense, come from the f
 docstring unless given: the first paragraph after the signature describes the function, and
 an `# Arguments` list (``- `name`: description``) its arguments. `argdescriptions` replaces
 the docstring's, position by position, where not empty.
+
+# Broadcasting
+
+Excel passes a range as a matrix. A range given to a *broadcasting* argument is broadcast
+over, as `f.(...)` would, so a function written for single values works on ranges, with one
+call from Excel. Other arguments are passed whole. Which arguments broadcast:
+
+- `broadcast=nothing` (the default): those not declared as arrays. `f(a, b, c::AbstractVector)`
+  broadcasts over `a` and `b`, and passes `c` whole.
+- `broadcast=(:a, :b)`: those listed.
+- `broadcast=false`: none.
+
+An argument declared `::AbstractVector` gets a vector from a single cell, row or column.
+Ranges broadcast together must have the same number of rows, or one of them a single row
+(and likewise columns); a column against a row gives a table, as in Excel.
 """
-function expose(fn_name::AbstractString; name=nothing, description::AbstractString="",
-                argdescriptions=String[])
+function expose(fn_name::AbstractString; name=nothing, kwargs...)
     f = Main.eval(Meta.parse(fn_name))
-    m, nrequired = _excel_method(f)
+    _expose(f, String(fn_name), _pick_method(f); name=name, kwargs...)
+end
+
+function expose(f::Function; name=nothing, kwargs...)
+    _expose(f, string(nameof(f)), _pick_method(f); name=name, kwargs...)
+end
+
+function _expose(f, julia_name::String, m::Method; name=nothing, description::AbstractString="",
+                 argdescriptions=String[], broadcast=nothing)
+    nrequired = _nrequired(f, m)
     argnames = [string(a) for a in Base.method_argnames(m)[2:end]]
-    excel_name = name === nothing ? "jl." * fn_name : String(name)
+    excel_name = name === nothing ? "jl." * julia_name : String(name)
     _check_excel_name(excel_name, name === nothing)
+
+    types = _declared_types(m)
+    asvector = [T <: AbstractVector for T in types]
+    bcast = if broadcast === nothing
+        [!(T <: AbstractArray) for T in types]
+    elseif broadcast === false
+        fill(false, length(argnames))
+    else
+        listed = string.(collect(broadcast))
+        for a in listed
+            a in argnames || throw(ArgumentError("`broadcast` names `$a`, which isn't an argument of $julia_name ($(join(argnames, ", ")))."))
+        end
+        [a in listed for a in argnames]
+    end
 
     doc = _docstring(f, m)
     desc = isempty(description) ? _doc_description(doc) : String(description)
@@ -58,32 +98,143 @@ function expose(fn_name::AbstractString; name=nothing, description::AbstractStri
         k > nrequired && !startswith(lowercase(d), "optional") && (d = rstrip("Optional. " * uppercasefirst(d)))
         _fit(d)
     end
-    _exposed[excel_name] = (julia=String(fn_name), description=_fit(desc),
-        argnames=argnames, argdescriptions=argdescs, nrequired=nrequired)
+    _exposed[excel_name] = (f=f, julia=julia_name, description=_fit(desc), argnames=argnames,
+        argdescriptions=argdescs, nrequired=nrequired, bcast=bcast, asvector=asvector)
     _exposed_count[] += 1
     excel_name
 end
 
-# The method Excel's function follows, and how many of its arguments are required: the
-# non-varargs method with the most arguments (the first such, if several), and the fewest
-# arguments among the methods its default values generate - those share its file and line,
-# and their argument names begin its own.
-function _excel_method(f)
+# The method Excel's function follows, by default: the non-varargs method with the most
+# arguments (the first such, if several).
+function _pick_method(f)
     ms = collect(methods(f))
     isempty(ms) && throw(ArgumentError("`$f` has no methods."))
     fixed = filter(m -> !m.isva, ms)
     candidates = isempty(fixed) ? ms : fixed
-    m = candidates[argmax([c.nargs for c in candidates])]
+    candidates[argmax([c.nargs for c in candidates])]
+end
+
+# How many of m's arguments are required: the fewest among the methods its default values
+# generate - those share its file and line, and their argument names begin its own.
+function _nrequired(f, m::Method)
     names = Base.method_argnames(m)[2:end]
     nrequired = length(names)
-    for other in fixed
+    for other in methods(f)
         n = other.nargs - 1
-        if other.file == m.file && other.line == m.line && n < nrequired &&
+        if !other.isva && other.file == m.file && other.line == m.line && n < nrequired &&
            Base.method_argnames(other)[2:end] == names[1:n]
             nrequired = n
         end
     end
-    m, nrequired
+    nrequired
+end
+
+# The declared type of each of m's arguments: a type parameter's bound (x::T where
+# T<:AbstractVector gives AbstractVector), and Any for varargs.
+function _declared_types(m::Method)
+    sig = Base.unwrap_unionall(m.sig)
+    map(sig.parameters[2:end]) do T
+        T isa TypeVar ? T.ub : T isa Core.TypeofVararg ? Any : T
+    end
+end
+
+"""
+    @excel [name="..."] [description="..."] [argdescriptions=[...]] [broadcast=...] function f(...) ... end
+
+Define a function and [`expose`](@ref) it to Excel, as `jl.f` by default, following the method
+defined here (rather than the one with the most arguments). Options are as for `expose`. A
+docstring goes before `@excel`, as before the function.
+
+```julia
+\"\"\"
+    price_swap(notional, fixed_rate, years=10)
+
+Toy swap price.
+\"\"\"
+@excel function price_swap(notional, fixed_rate, years=10)
+    notional * fixed_rate * years
+end
+```
+"""
+macro excel(exprs...)
+    isempty(exprs) && throw(ArgumentError("@excel needs a function definition."))
+    def = exprs[end]
+    kw = map(exprs[1:end-1]) do o
+        (o isa Expr && o.head === :(=) && o.args[1] in (:name, :description, :argdescriptions, :broadcast)) ||
+            throw(ArgumentError("@excel's options are name=..., description=..., argdescriptions=... and broadcast=...; not `$o`."))
+        Expr(:kw, o.args[1], esc(o.args[2]))
+    end
+    fname, argnames = _def_signature(def)
+    file, line = string(__source__.file), __source__.line
+    quote
+        Base.@__doc__ $(esc(def))
+        $_expose_defined($(esc(fname)), $(string(fname)), $argnames, $file, $line; $(kw...))
+    end
+end
+
+# The function name and positional argument names of a definition (nothing for an
+# argument with no name, f(::Int)).
+function _def_signature(def)
+    ok = def isa Expr && def.head in (:function, :(=)) && def.args[1] isa Expr
+    call = ok ? def.args[1] : nothing
+    while call isa Expr && call.head in (:where, :(::))
+        call = call.args[1]
+    end
+    (call isa Expr && call.head === :call) ||
+        throw(ArgumentError("@excel must be followed by a function definition, as in `@excel f(x) = 2x`."))
+    argname(p) = p isa Symbol ? p :
+                 p.head === :(::) ? (length(p.args) == 1 ? nothing : argname(p.args[1])) :
+                 p.head in (:kw, :...) ? argname(p.args[1]) : nothing
+    params = filter(p -> !(p isa Expr && p.head === :parameters), call.args[2:end])
+    call.args[1], [argname(p) for p in params]
+end
+
+# Exposes the method of f just defined by @excel: the one with these argument names, from
+# this file at or after this line (the nearest).
+function _expose_defined(f, julia_name, argnames, file, line; kwargs...)
+    matches(m) = m.nargs - 1 == length(argnames) &&
+        all(a === nothing || a === b for (a, b) in zip(argnames, Base.method_argnames(m)[2:end]))
+    ms = filter(matches, collect(methods(f)))
+    here = filter(m -> string(m.file) == file && m.line >= line, ms)
+    isempty(here) || (ms = here)
+    isempty(ms) && throw(ArgumentError("@excel couldn't find the method of $julia_name it defined."))
+    m = ms[argmin([m.line for m in ms])]
+    _expose(f, julia_name, m; kwargs...)
+end
+
+"""
+    _call_exposed(excel_name, args...)
+
+For the add-in: calls the function exposed as `excel_name`, broadcasting as `expose` describes.
+"""
+function _call_exposed(excel_name::String, args...)
+    e = get(_exposed, excel_name, nothing)
+    e === nothing && throw(ArgumentError("$excel_name isn't exposed in this Julia session. Run the code that exposes it again (with JuliaInclude, say)."))
+    xs = Any[e.asvector[k] ? _as_vector(a) : a for (k, a) in enumerate(args)]
+    ks = [k for k in eachindex(xs) if e.bcast[k] && xs[k] isa AbstractArray]
+    isempty(ks) && return e.f(xs...)
+    _check_shapes(excel_name, e.argnames, xs, ks)
+    result = broadcast(e.f, (k in ks ? x : Ref(x) for (k, x) in enumerate(xs))...)
+    any(r -> r isa AbstractArray, result) && throw(ArgumentError("$excel_name returns an array for each element of a broadcast range, which can't be shown in one range. Declare the argument as an array (::AbstractVector), or expose it with broadcast=false, to pass ranges whole."))
+    result
+end
+
+# A single cell, row or column as a vector, for an argument declared ::AbstractVector.
+_as_vector(a::AbstractVector) = a
+_as_vector(a::AbstractMatrix) = (size(a, 1) == 1 || size(a, 2) == 1) ? vec(a) : a
+_as_vector(a) = [a]
+
+# Broadcasting would fail (or, in Excel, pad with #N/A): say which two arguments don't fit.
+function _check_shapes(excel_name, argnames, xs, ks)
+    shape(a) = join(ndims(a) == 1 ? (length(a), 1) : size(a), "x")
+    for i in eachindex(ks), j in i+1:length(ks)
+        a, b = xs[ks[i]], xs[ks[j]]
+        for d in 1:max(ndims(a), ndims(b))
+            sa, sb = size(a, d), size(b, d)
+            sa == sb || sa == 1 || sb == 1 || throw(ArgumentError(
+                "$excel_name: $(argnames[ks[i]]) is $(shape(a)) and $(argnames[ks[j]]) is $(shape(b)). Ranges broadcast together must have the same number of rows, or one of them a single row, and likewise columns."))
+        end
+    end
 end
 
 # The raw text of f's docstring - the one for method m if there are several - or "".

@@ -172,8 +172,12 @@ namespace CallFromExcel.AddIn
                     return "#" + excelName + ": " + argNames[k] + " can't be left out when a later argument is given!";
                 }
             }
-            if (n < args.Length) Array.Resize(ref args, n);
-            return JuliaFunctions.CallCore(juliaName, args, "/call");
+            // Julia's _call_exposed finds the function by its Excel name and broadcasts as
+            // expose says; juliaName is kept for this file's log.
+            var callArgs = new object[n + 1];
+            callArgs[0] = excelName;
+            Array.Copy(args, 0, callArgs, 1, n);
+            return JuliaFunctions.CallCore("CallFromExcel._call_exposed", callArgs, "/call");
         }
     }
 }

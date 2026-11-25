@@ -431,11 +431,12 @@ From VBA, one-dimensional arrays arrive in Julia as vectors, and `JuliaCallVBA` 
  </p></details>
 
 ### Numbers from a worksheet arrive as `Float64`
-Excel stores every number on a worksheet as a double-precision float, so numbers passed from a worksheet to `JuliaCall`, `JuliaCallNamedArgs` or `JuliaSetVar` always arrive in Julia as `Float64`, even whole numbers such as `2`. This includes the results of other functions in the same formula, since Excel converts a function's result to a worksheet value before passing it on. So `=JuliaCall("typeof", JuliaEval("2"))` returns `Float64`, even though `JuliaEval("2")` returns an `Int64` to VBA.
+Excel stores every number on a worksheet as a double-precision float, so numbers passed from a worksheet to `JuliaCall`, `JuliaCallNamedArgs` or `JuliaSetVar` always arrive in Julia as `Float64`, even whole numbers such as `2`. This includes the results of other functions in the same formula, since Excel converts a function's result to a worksheet value before passing it on. So `=JuliaCall("typeof", JuliaEval("2"))` returns `Float64`, even though `JuliaEval("2")` returns an `Int64` to VBA (but see the third workaround below).
 
-This matters when calling a Julia function that requires an integer, whether as a positional argument (e.g. `rand(3)`) or a named one (e.g. `round(x; digits=2)`, `split(s, ","; limit=2)`). Passing `Float64` gives a `MethodError` or `TypeError`. There are two workarounds:
+This matters when calling a Julia function that requires an integer, whether as a positional argument (e.g. `rand(3)`) or a named one (e.g. `round(x; digits=2)`, `split(s, ","; limit=2)`). Passing `Float64` gives a `MethodError` or `TypeError`. There are three workarounds:
  * Write the whole call in `JuliaEval`, e.g. `=JuliaEval("rand(3)")`, if the integer is a constant.
  * Write a small Julia function that converts, e.g. `myrand(n) = rand(Int(n))`, loaded with `JuliaInclude`, and call that instead.
+ * Pass the integer as a [handle](#object-handles). `JuliaEval("3", TRUE)` evaluates `3` in Julia and returns a handle to the resulting `Int64`, which Julia receives as the integer itself, not as a worksheet number. So `=JuliaCall("rand", JuliaEval("3", TRUE))` calls `rand(3)`, and `=JuliaCallNamedArgs("round", A1, ";", "digits", JuliaEval("2", TRUE))` calls `round(A1; digits=2)`. Unlike the first workaround, the integer can come from a cell: `JuliaEval(B1, TRUE)` evaluates B1's number as Julia code.
 
 From VBA, numbers keep their VBA type: `Integer` arrives as `Int16`, `Long` as `Int32`, `LongLong` as `Int64`, `Single` as `Float32` and `Double` as `Float64`. So pass a `LongLong` (e.g. `2^` or `CLngLng(n)`) where Julia needs an `Int64`. Note that a literal such as `2` in VBA code is an `Integer`, which arrives as `Int16` - some Julia functions, such as `split`, require an `Int64` and won't accept that either.
 

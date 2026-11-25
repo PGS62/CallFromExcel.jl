@@ -103,6 +103,20 @@ try {
     foreach ($a in "E1","E2","E3","E4","E5","E6","E7","E8") { Show $ws $a }
     Ev "4e named args, ReturnHandle, JuliaHandleInfo"
 
+    # 4f. Review fixes 2026-11-25: broadcasting; ReturnHandle as an error, text or number; a
+    # handle with a trailing line feed is plain text; handle text given to JuliaEval is code.
+    Retry { $ws.Range("P1").Formula2 = '=JuliaCallHandle("sqrt.",{1;4;9})' }
+    Retry { $ws.Range("P2").Formula2 = '=JuliaCall("sum",P1)' }
+    Retry { $ws.Range("P3").Formula2 = '=JuliaEval("1+1",NA())' }
+    Retry { $ws.Range("P4").Formula2 = '=JuliaEval("1+1","yes")' }
+    Retry { $ws.Range("P5").Formula2 = '=JuliaEval("1+1",1)' }
+    Retry { $ws.Range("P6").Formula2 = '=JuliaCall("typeof",D5&CHAR(10))' }
+    Retry { $ws.Range("P7").Formula2 = '=JuliaEval(D5,TRUE)' }
+    foreach ($a in "P1","P2","P3","P4","P5","P6","P7") { Show $ws $a }
+    "expect: P1 handle, P2 6, P3 #N/A, P4 #ReturnHandle must be TRUE or FALSE!, P5 handle, P6 String, P7 UndefVarError jl" | Write-Host
+    Ev "4f review fixes"
+    Retry { $ws.Range("P1:P7").ClearContents() }
+
     # 5. Spilled handles: one handle per element of an array argument?
     Retry { $ws.Range("G1").Formula2 = '=JuliaCallHandle("mkrand",{2;3;4})' }
     Show $ws "G1"; Show $ws "G2"

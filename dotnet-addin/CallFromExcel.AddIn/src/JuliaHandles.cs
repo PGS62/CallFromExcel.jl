@@ -34,8 +34,11 @@ namespace CallFromExcel.AddIn
 
         // SPIKE: what to do when Julia restarts. Every live handle names an object that no
         // longer exists, and its topic would otherwise keep that dead handle for as long as its
-        // arguments are unchanged (completing the topic doesn't help: Excel-DNA then returns
-        // its final value for as long as the arguments are unchanged). So: new generation, and
+        // arguments are unchanged. Completing the topic now doesn't help: once a topic has
+        // delivered a value, Excel-DNA keeps it and returns its final value for as long as the
+        // arguments are unchanged (tested in the spike). That differs from a failed create in
+        // Subscribe below, which completes before the first value is returned, so Excel-DNA
+        // keeps no topic and the next recalculation tries again. So: new generation, and
         // push #N/A into each old topic. The RTD update makes Excel recalculate each such cell,
         // which asks for a topic under the new generation (creating the object again, in
         // Excel's dependency order), and the old topic, no longer used, is disposed.
@@ -104,7 +107,7 @@ namespace CallFromExcel.AddIn
         internal static object EvalHandle(string expression)
         {
             return ExcelAsyncUtil.Observe("JuliaEvalHandle", new object[] { generation, expression },
-                () => new HandleObservable("JuliaEval(ReturnHandle)", "CallFromExcel.handle_eval", new object[] { expression }));
+                () => new HandleObservable("JuliaEval(ReturnHandle)", "CallFromExcel.handle_eval", new object[] { expression }, mapHandles: false));
         }
 
         // Info types JuliaHandleInfo recognises, as listed in its error for any other.
@@ -146,18 +149,22 @@ namespace CallFromExcel.AddIn
         {
             private readonly string description, juliaFunction;
             private readonly object[] args;
+            // False for code to evaluate, which must reach Julia as text even if it looks like
+            // a handle.
+            private readonly bool mapHandles;
 
-            internal HandleObservable(string description, string juliaFunction, object[] args)
+            internal HandleObservable(string description, string juliaFunction, object[] args, bool mapHandles = true)
             {
                 this.description = description;
                 this.juliaFunction = juliaFunction;
                 this.args = args;
+                this.mapHandles = mapHandles;
             }
 
             public IDisposable Subscribe(IExcelObserver observer)
             {
                 object result;
-                try { result = JuliaFunctions.CallForHandles(juliaFunction, args); }
+                try { result = JuliaFunctions.CallForHandles(juliaFunction, args, mapHandles); }
                 catch (Exception ex) { result = "#" + ex.Message; }
 
                 string handle = result as string;
@@ -169,9 +176,12 @@ namespace CallFromExcel.AddIn
                     return new Release(handle, key);
                 }
 
-                // Failed (Julia not running, error in the function...): report it and complete,
-                // so the topic ends and the next recalculation tries again rather than keeping
-                // the error for as long as the arguments are unchanged.
+                // Failed (Julia not running, error in the function...): report it and complete.
+                // Completing here, inside the first Subscribe, means Excel-DNA keeps no topic,
+                // so the next recalculation tries again rather than keeping the error for as
+                // long as the arguments are unchanged (tested: a create before JuliaLaunch
+                // succeeds on the next recalculation after it). Completing a topic that has
+                // already delivered a value is different - see InvalidateAll.
                 Log("failed " + description + ": " + Convert.ToString(result));
                 observer.OnNext(result);
                 observer.OnCompleted();

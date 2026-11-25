@@ -18,7 +18,9 @@ namespace CallFromExcel.AddIn
     public static class HandlePattern
     {
         private static readonly Regex Pattern =
-            new Regex(@"^jl:[A-Za-z0-9_]*#([0-9]+@[A-Za-z0-9]+)$", RegexOptions.CultureInvariant);
+            // \z, not $: in .NET, $ also matches before a final line feed, so a handle pasted with
+            // a trailing line feed would count as one.
+            new Regex(@"^jl:[A-Za-z0-9_]*#([0-9]+@[A-Za-z0-9]+)\z", RegexOptions.CultureInvariant);
 
         // The key "<id>@<session>" of a handle, or false if text isn't one.
         public static bool TryGetKey(string text, out string key)

@@ -96,6 +96,7 @@ try {
     $v1 = T "JuliaCallHandle mkones(3)" "CallHandle" "mkones" 3
     $v2 = T "JuliaCallHandle mkkw(3; v=7) (named args)" "CallHandleKw" "mkkw" 3 ";" "v" 7
     $v3 = T "JuliaEvalHandle Dict(:a=>1, :b=>2)" "EvalHandle" "Dict(:a=>1, :b=>2)"
+    [void](T "JuliaEvalHandle(handle text) is code (expect raised: UndefVarError jl)" "EvalHandle" $v3)
     [void](T "JuliaCall length(v1)" "Call" "length" $v1)
     [void](T "JuliaCall sum(v2)" "Call" "sum" $v2)
     [void](T "JuliaCall length(v3)" "Call" "length" $v3)
@@ -111,7 +112,8 @@ try {
     [void](T "JuliaHandleRelease(v1) again (expect False)" "Release" $v1)
     [void](T "JuliaCall length(v1) after release (expect not found)" "Call" "length" $v1)
     Retry { $excel.CalculateFull() }; Show "B2"
-    [void](T "JuliaHandleRelease('hello') (expect raised)" "Release" "hello")
+    [void](T "JuliaHandleRelease('hello') (expect False)" "Release" "hello")
+    [void](T "JuliaHandleRelease('') (expect False)" "Release" "")
     JuliaCount
     [void](T "JuliaHandleReleaseAll (expect 2)" "ReleaseAll")
     [void](T "JuliaCall sum(v2) after ReleaseAll (expect not found)" "Call" "sum" $v2)

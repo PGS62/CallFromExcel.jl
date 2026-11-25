@@ -297,20 +297,18 @@ namespace CallFromExcel.AddIn
 
         public string JuliaEvalHandle(object JuliaExpression)
         {
-            return CreateHandle("CallFromExcel.handle_eval", new object[] { JuliaExpressionToString(JuliaExpression) });
+            // The code goes as text, even if it looks like a handle.
+            return CreateHandle("CallFromExcel.handle_eval", new object[] { JuliaExpressionToString(JuliaExpression) }, mapHandles: false);
         }
 
         // TRUE if Handle was a live handle created from VBA, now freed. FALSE if it isn't one
-        // (already released, created by a worksheet formula, or from before Julia restarted
-        // and already released) - so releasing twice, e.g. from a class's Terminate event after
-        // JuliaHandleReleaseAll, is harmless.
+        // (already released, created by a worksheet formula, from before Julia restarted and
+        // already released, or not a handle at all, e.g. "" when creating it failed) - so
+        // releasing is always harmless, e.g. twice, or from a class's Terminate event after
+        // JuliaHandleReleaseAll or after its create raised an error.
         public bool JuliaHandleRelease(string Handle)
         {
-            if (!HandlePattern.TryGetKey(Handle, out _))
-            {
-                throw new System.ArgumentException("'" + Handle + "' is not an object handle");
-            }
-            if (!VbaHandles.TryGetValue(Handle, out string key)) return false;
+            if (Handle == null || !VbaHandles.TryGetValue(Handle, out string key)) return false;
             VbaHandles.Remove(Handle);
             FreeInJulia(key);
             return true;
@@ -326,13 +324,13 @@ namespace CallFromExcel.AddIn
             return keys.Count;
         }
 
-        private static string CreateHandle(string juliaFunction, object[] args)
+        private static string CreateHandle(string juliaFunction, object[] args, bool mapHandles = true)
         {
             if (JuliaPort.GetJuliaPortOrZero() == 0)
             {
                 throw new System.InvalidOperationException("Please call JuliaLaunch before calling JuliaCallHandle or JuliaEvalHandle");
             }
-            string responseWire = JuliaHttpClient.Post(BuildCallPayload(juliaFunction, args), "/call");
+            string responseWire = JuliaHttpClient.Post(BuildCallPayload(juliaFunction, args, mapHandles), "/call");
             object result = WireFormatDecode.Decode(responseWire, allowNesting: false, stringLengthLimit: 0, vectorToColumn: true);
             string handle = result as string;
             if (HandlePattern.TryGetKey(handle, out string key))
@@ -364,13 +362,15 @@ namespace CallFromExcel.AddIn
         // The "*1,<n>;..." wire envelope of a call: the function name, then each argument.
         // A Range argument becomes its values, and each object handle (a string of the handle
         // pattern, here or in an array) a reference to its Julia object.
-        private static string BuildCallPayload(string juliaFunction, object[] args)
+        // mapHandles false sends string arguments as they are: for code to evaluate.
+        private static string BuildCallPayload(string juliaFunction, object[] args, bool mapHandles = true)
         {
             var encoded = new string[1 + args.Length];
             encoded[0] = WireFormatEncode.Encode(juliaFunction);
             for (int i = 0; i < args.Length; i++)
             {
-                encoded[i + 1] = WireFormatEncode.Encode(HandlePattern.MapHandles(RangeToValue(args[i])));
+                object value = RangeToValue(args[i]);
+                encoded[i + 1] = WireFormatEncode.Encode(!mapHandles && value is string ? value : HandlePattern.MapHandles(value));
             }
             var lens = new System.Text.StringBuilder();
             foreach (string e in encoded) { lens.Append(e.Length); lens.Append(','); }

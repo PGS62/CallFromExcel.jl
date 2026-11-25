@@ -146,13 +146,13 @@ namespace CallFromExcel.AddIn
         }
 
         // SPIKE: used by JuliaHandles to create, count and free handles.
-        internal static object CallForHandles(string juliaFunction, object[] args)
+        internal static object CallForHandles(string juliaFunction, object[] args, bool mapHandles = true)
         {
             if (JuliaPort.GetJuliaPortOrZero() == 0)
             {
                 return "#Please call JuliaLaunch before calling JuliaCallHandle or JuliaEval!";
             }
-            return DecodeForWorksheet(JuliaHttpClient.Post(BuildCallPayload(juliaFunction, args), "/call"));
+            return DecodeForWorksheet(JuliaHttpClient.Post(BuildCallPayload(juliaFunction, args, mapHandles), "/call"));
         }
 
         // One pass over the result: Julia's Excel errors become worksheet errors, and
@@ -170,11 +170,18 @@ namespace CallFromExcel.AddIn
         {
             if (ExcelDnaUtil.IsInFunctionWizard()) return FunctionWizardMessage;
             if (juliaExpression is ExcelError) return juliaExpression;
+            if (returnHandle is ExcelError) return returnHandle;
+            // As Excel's own logical arguments: TRUE/FALSE or a number (non-zero is TRUE).
+            bool wantHandle;
+            if (IsOmitted(returnHandle)) wantHandle = false;
+            else if (returnHandle is bool b) wantHandle = b;
+            else if (returnHandle is double d) wantHandle = d != 0;
+            else return "#ReturnHandle must be TRUE or FALSE!";
             try
             {
                 // Before the JuliaLaunch check: a handle's topic retries a failed create on the
                 // next recalculation, and reports "call JuliaLaunch" itself.
-                if (!IsOmitted(returnHandle) && Convert.ToBoolean(returnHandle))
+                if (wantHandle)
                 {
                     return JuliaHandles.EvalHandle(ConcatenateExpressions(juliaExpression));
                 }
@@ -202,14 +209,17 @@ namespace CallFromExcel.AddIn
         // calling convention -- confirmed for the VBA original earlier in this project's
         // own investigation (a Variant-typed UDF parameter never receives a Range object
         // when called from a worksheet formula).
-        private static string BuildCallPayload(string juliaFunction, object[] args)
+        //
+        // mapHandles false sends string arguments as they are, even if they look like object
+        // handles: for code to evaluate, which must reach Julia as text.
+        private static string BuildCallPayload(string juliaFunction, object[] args, bool mapHandles = true)
         {
             string fnEncoded = WireFormatEncode.Encode(juliaFunction);
             var encoded = new string[1 + args.Length];
             encoded[0] = fnEncoded;
             for (int i = 0; i < args.Length; i++)
             {
-                encoded[i + 1] = WireFormatEncode.Encode(FromExcelDna(args[i]));
+                encoded[i + 1] = WireFormatEncode.Encode(!mapHandles && args[i] is string ? args[i] : FromExcelDna(args[i]));
             }
 
             var lens = new StringBuilder();

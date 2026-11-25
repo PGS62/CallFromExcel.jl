@@ -42,15 +42,21 @@ Call the function named `fn_name` with `args`, store the result and return its h
 the add-in's JuliaCallHandle, which covers both JuliaCall and JuliaCallNamedArgs: if any
 argument is the string ";", the arguments are split into positional and named ones as for
 JuliaCallNamedArgs (see `split_named_args`); otherwise all are positional, as for JuliaCall.
+A trailing "." on the function name broadcasts, as in `srv_call_inner`: the object stored is
+the broadcast result, and named arguments are passed unchanged to every call.
 """
 function handle_create(fn_name::String, args...)
+    broadcasting = endswith(fn_name, ".")
+    broadcasting && (fn_name = chop(fn_name))
     fn = Main.eval(Meta.parse(fn_name))
-    if any(x -> x isa AbstractString && x == ";", args)
-        positional, named = split_named_args(collect(Any, args))
-        _store_handle(Base.invokelatest(fn, positional...; named...))
+    positional, named = any(x -> x isa AbstractString && x == ";", args) ?
+        split_named_args(collect(Any, args)) : (args, NamedTuple())
+    result = if broadcasting
+        Base.invokelatest(broadcast, (xs...) -> fn(xs...; named...), positional...)
     else
-        _store_handle(Base.invokelatest(fn, args...))
+        Base.invokelatest(fn, positional...; named...)
     end
+    _store_handle(result)
 end
 
 """

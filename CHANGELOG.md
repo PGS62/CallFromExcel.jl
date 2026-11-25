@@ -19,7 +19,7 @@ Large or structured Julia objects - a big matrix, a fitted model, a DataFrame - 
 
 ### Your own worksheet functions
 
-A Julia function can now be a worksheet function of its own, `=jl.price_swap(A1, B1)` rather than `=JuliaCall("price_swap", A1, B1)`. See [Your own worksheet functions](README.md#your-own-worksheet-functions) in the README.
+A Julia function can now be a worksheet function of its own, `=jl.birthday(A1)` rather than `=JuliaCall("birthday", A1)`. See [Your own worksheet functions](README.md#your-own-worksheet-functions) in the README.
 
 - Mark a function with `@excel`, or make an existing one available with `expose_to_excel`. Its Excel name is `jl.` followed by its Julia name unless you choose another, and its description and arguments' descriptions, shown by the Insert Function dialog and the tooltips as you type, come from its docstring.
 - Arguments with default values are optional in Excel. Leaving out a required argument is an error naming it.

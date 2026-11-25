@@ -4,7 +4,9 @@
 
 Call [Julia](https://julialang.org/) from Microsoft Excel worksheets and from VBA.  
 
-CallFromExcel is an Excel add-in that lets you use any Julia function in a worksheet formula. For example, `=JuliaEval("using LinearAlgebra")` makes the functions of one of Julia's standard libraries available, then `=JuliaCall("eigvals", A1:J10)` passes a range to Julia as a matrix and returns its eigenvalues to the worksheet (as complex numbers, if the matrix isn't symmetric) - something Excel has no built-in function for. Your own Julia functions can also be worksheet functions in their own right: mark one with `@excel` and call it as `=jl.price_swap(A1, B1)` - see [Your own worksheet functions](#your-own-worksheet-functions). Keep your front end in Excel, and do the heavy computation in Julia. A Julia tab on Excel's ribbon starts Julia and loads your Julia files. Installation doesn't need admin rights.
+CallFromExcel is an Excel add-in that lets you use any Julia function in a worksheet formula. For example, `=JuliaEval("using LinearAlgebra")` makes the functions of one of Julia's standard libraries available, then `=JuliaCall("eigvals", A1:J10)` passes a range to Julia as a matrix and returns its eigenvalues to the worksheet (as complex numbers, if the matrix isn't symmetric) - something Excel has no built-in function for. Keep your front end in Excel, and do the heavy computation in Julia. A Julia tab on Excel's ribbon starts Julia and loads your Julia files. Installation doesn't need admin rights.
+
+Your own Julia functions can also be worksheet functions in their own right: mark one with `@excel` and call it as `=jl.my_function(A1, B1)` - see [Your own worksheet functions](#your-own-worksheet-functions). 
 
 CallFromExcel is compatible with Excel's [dynamic array formulas](https://support.microsoft.com/en-us/office/dynamic-array-formulas-and-spilled-array-behavior-205c6b06-03ba-4151-89a1-87a7eb36e531), and supports 64-bit Excel for Windows (not Mac, not 32-bit Excel). It works with Julia running under either Windows or Linux (via [WSL](https://docs.microsoft.com/en-us/windows/wsl/about)).
 
@@ -376,43 +378,42 @@ JuliaHandleInfo(Type)
 |`Type`|`"count"` for the number of live handles created by worksheet formulas, and of objects Julia holds (which includes those created from VBA). `"events"` for a column of recent create and release events, newest last.|
 
 ## Your own worksheet functions
-Instead of `=JuliaCall("price_swap", A1, B1)`, a Julia function can be a worksheet function of its own, `=jl.price_swap(A1, B1)`, with its arguments and description shown by Excel's Insert Function (fx) dialog and in the tooltips as you type. Mark it with `@excel`:
+Instead of `=JuliaCall("birthday", A1)`, a Julia function can be a worksheet function of its own, `=jl.birthday(A1)`, with its arguments and description shown by Excel's Insert Function (fx) dialog and in the tooltips as you type. Mark it with `@excel`:
 
 ```julia
 """
-    price_swap(notional, fixed_rate, years=10)
+    birthday(people, days=365)
 
-Price a toy interest rate swap.
+The probability that, in a group of people, at least two share a birthday.
 
 # Arguments
-- `notional`: the notional amount.
-- `fixed_rate`: the fixed rate, as a decimal.
-- `years`: the term in years.
+- `people`: the number of people in the group.
+- `days`: the number of days in the year.
 """
-@excel function price_swap(notional, fixed_rate, years=10)
-    notional * fixed_rate * years
+@excel function birthday(people, days=365)
+    1 - prod((days - k) / days for k in 0:people-1)
 end
 ```
 
-Include the file - with `JuliaInclude`, or the ribbon's Include button - and `=jl.price_swap(1000000, 0.05)` works in any cell of any open workbook. Typing `=jl.` lists all such functions. A Julia function that's already defined, including one from a package, can be made available without changing its definition with `expose_to_excel`, for example `expose_to_excel("hypot")`, or `expose_to_excel(LinearAlgebra.det)` for `=jl.det(A1:C3)`.
+Include the file - with `JuliaInclude`, or the ribbon's Include button - and `=jl.birthday(23)` works in any cell of any open workbook, returning 0.507: in a group of just 23 people, it's more likely than not that two share a birthday. Typing `=jl.` lists all such functions. A Julia function that's already defined, including one from a package, can be made available without changing its definition with `expose_to_excel`, for example `expose_to_excel("hypot")`, or `expose_to_excel(LinearAlgebra.det)` for `=jl.det(A1:C3)`.
 
 `@excel` and `expose_to_excel` take the same options:
 
 |Option|Description|
 |:-----|:----------|
-|`name`|The Excel name. Default `"jl."` followed by the Julia name. The prefix keeps your functions apart from Excel's own (when names clash, Excel's built-in function wins) and from cell references: `abc123` is a cell, `jl.abc123` isn't. A name without it, such as `name="PRICE_SWAP"`, is allowed. A name Excel can't use is refused with an error saying why: one with characters Excel doesn't allow (`push!`), one Excel would read as a cell reference, one beginning with `Julia` (reserved for the add-in's functions), or one differing only in case from a name already in use, since Excel ignores case.|
+|`name`|The Excel name. Default `"jl."` followed by the Julia name. The prefix keeps your functions apart from Excel's own (when names clash, Excel's built-in function wins) and from cell references: `abc123` is a cell, `jl.abc123` isn't. A name without it, such as `name="BIRTHDAY"`, is allowed. A name Excel can't use is refused with an error saying why: one with characters Excel doesn't allow (`push!`), one Excel would read as a cell reference, one beginning with `Julia` (reserved for the add-in's functions), or one differing only in case from a name already in use, since Excel ignores case.|
 |`description`, `argdescriptions`|Descriptions of the function and of each argument, for the Insert Function dialog. By default they come from the docstring: the first paragraph after the signature, and the `# Arguments` list. Each is cut to 253 characters, Excel's limit.|
 |`broadcast`|Which arguments, given a range, are broadcast over - see below. Default `false`, none.|
 
 Points to note:
- * **Optional arguments.** Arguments with default values (`years=10`) are optional: leave them out at the end of a call, as in `=jl.price_swap(1000000, 0.05)`, and Julia uses the defaults. Leaving out a required argument, or one before an argument that is given (`=jl.price_swap(1000000, , 5)`), is an error naming it. Keyword arguments aren't available as worksheet arguments; use `JuliaCallNamedArgs` for those.
+ * **Optional arguments.** Arguments with default values (`days=365`) are optional: leave them out at the end of a call, as in `=jl.birthday(23)`, and Julia uses the defaults; give them to override the defaults, as in `=jl.birthday(23, 366)`. Leaving out a required argument (`=jl.birthday()`), or one before an argument that is given (`=jl.birthday(, 366)`), is an error naming it. Keyword arguments aren't available as worksheet arguments; use `JuliaCallNamedArgs` for those.
  * **Which method.** `@excel` follows the method it's attached to. `expose_to_excel` follows the method with the most arguments, not counting methods with a variable number of arguments (`f(x...)`).
  * **Ranges are passed whole.** By default a range arrives in Julia as a matrix (a single cell as a single value), as with `JuliaCall`. An argument declared `::AbstractVector` receives a vector, from a single cell, a row or a column.
- * **Broadcasting.** For a function written for single values, `broadcast` makes it work on ranges: a range given to a broadcasting argument is broadcast over, as Julia's `f.(x, y)` does, in one call from Excel, and the result spills. `broadcast=true` broadcasts every argument, except those declared as arrays (`w::AbstractVector`), which are passed whole; `broadcast=(:x, :y)`, or `broadcast=:x` for one, names the arguments to broadcast. For example, after `@excel broadcast=true scale(x, factor) = x * factor`, `=jl.scale(A1:A10, 2)` returns a column of ten results, and `=jl.scale(A1:A10, B1:D1)`, a column against a row, a 10 by 3 table. Ranges broadcast together must have the same number of rows, or one of them a single row, and likewise for columns; otherwise the error names the two arguments (where Excel would pad with `#N/A`). A broadcast function that returns an array for each element gives an error, as the result can't be shown in one range.
+ * **Broadcasting.** For a function written for single values, `broadcast` makes it work on ranges: a range given to a broadcasting argument is broadcast over, as Julia's `f.(x, y)` does, in one call from Excel, and the result spills. `broadcast=true` broadcasts every argument, except those declared as arrays (`w::AbstractVector`), which are passed whole; `broadcast=(:x, :y)`, or `broadcast=:x` for one, names the arguments to broadcast. For example, had `birthday` above been marked `@excel broadcast=true`, then with the numbers 1 to 60 in A1:A60, `=jl.birthday(A1:A60)` would return a column of 60 probabilities, ready to chart, and with 365 and 366 in B1:C1, `=jl.birthday(A1:A60, B1:C1)` - a column against a row - a 60 by 2 table. Ranges broadcast together must have the same number of rows, or one of them a single row, and likewise for columns; otherwise the error names the two arguments (where Excel would pad with `#N/A`). A broadcast function that returns an array for each element gives an error, as the result can't be shown in one range.
  * **When functions are registered.** After `JuliaLaunch`, `JuliaInclude` and `JuliaEval`, and the ribbon's Launch Julia and Include buttons, the add-in registers any functions that have been exposed since it last did, once Excel is next idle. Functions exposed from the Julia REPL, or from VBA's `jl.JuliaEval` or `jl.JuliaInclude`, are registered by the ribbon's Register Functions button, or from VBA with `Application.Run "JuliaRegisterFunctions"`, which registers them straight away. Registered functions stay registered until Excel closes: a function no longer exposed in a new Julia session gives an error saying so.
  * **Formulas typed too soon show `#NAME?`.** A formula that uses a function before it is registered shows `#NAME?`, and goes on doing so after registration, until it is re-entered (select it, press F2, then Enter). This doesn't affect saved workbooks: reopened before Julia is running, their cells keep their saved values, and recalculate correctly once the functions are registered. VBA code that writes such formulas should run `Application.Run "JuliaRegisterFunctions"` first.
  * **Changing a function.** Change its code and re-include the file: the worksheet function calls whatever the Julia function now does, with no need to register again. (Cells using it aren't recalculated by the change; press Ctrl+Alt+F9.) Changing its arguments needs it to be exposed again, which re-including a file with `@excel` does.
- * **From VBA.** `Application.Run "jl.price_swap", 1000000, 0.05` calls a registered function.
+ * **From VBA.** `Application.Run("jl.birthday", 23)` calls a registered function.
 
 ## Performance
 Calls are fast: a simple call takes under a millisecond, and `=JuliaCall("sort", A1:A1000000)` sorts a million numbers in about 0.4 seconds, including sending them to Julia and back. That's faster than Excel's own `=SORT(A1:A1000000)`, which takes about 0.6 seconds, and about a third of the time taken by CallFromExcel's predecessor, JuliaExcel. See the [changelog](CHANGELOG.md) for more timings.

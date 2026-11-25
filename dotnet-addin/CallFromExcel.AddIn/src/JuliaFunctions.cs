@@ -127,7 +127,7 @@ namespace CallFromExcel.AddIn
             return arg is ExcelMissing || arg is ExcelEmpty;
         }
 
-        private static object CallCore(string juliaFunction, object[] args, string endpoint)
+        internal static object CallCore(string juliaFunction, object[] args, string endpoint)
         {
             if (ExcelDnaUtil.IsInFunctionWizard()) return FunctionWizardMessage;
             try

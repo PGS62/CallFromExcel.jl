@@ -76,5 +76,6 @@ include("comms.jl")
 include("encode.jl")
 include("decode.jl")
 include("handles.jl")
+include("expose.jl")
 
 end

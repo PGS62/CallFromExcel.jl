@@ -5,38 +5,51 @@ using ExcelDna.Integration;
 
 namespace CallFromExcel.AddIn
 {
-    // SPIKE (branch spike/named-functions): named worksheet functions, see "Named worksheet
-    // functions" in Enhancements.md and src/expose.jl. Fetches the functions Julia has exposed
+    // Named worksheet functions (README, "Your own worksheet functions"; Julia side in
+    // src/expose.jl). Fetches the functions Julia has exposed with @excel or expose_to_excel
     // and registers each as a worksheet function - by default named "jl.<julia name>" - that
-    // forwards its arguments to the same code as JuliaCall.
+    // forwards its arguments to Julia's CallFromExcel._call_exposed.
     public static class NamedFunctions
     {
         private const char ArgSep = '\x1f';
 
-        // Recent registrations, for checking the spike from a sheet.
+        // Recent registrations, newest last, for the hidden JuliaRegisterLog (diagnostics and
+        // the drivers in dotnet-addin/spike-named). Capped, as it grows on every registration.
         private static readonly List<string> Log = new List<string>();
+        private const int LogLimit = 200;
+
+        private static void AddToLog(string entry)
+        {
+            Log.Add(entry);
+            if (Log.Count > LogLimit) Log.RemoveRange(0, Log.Count - LogLimit);
+        }
 
         // Julia's exposed_version() when the add-in last registered: "<session>#<count>".
         private static string registeredVersion = "";
+
+        // What each Excel name was last registered with in this Excel session (descriptions,
+        // argument names and descriptions, number required), so Register skips the unchanged.
+        private static readonly Dictionary<string, string> registeredSignatures = new Dictionary<string, string>();
 
         // A registration is queued and hasn't started: several checks in one calculation (a
         // JuliaLaunch and a JuliaEval cell, say) queue it once. Main thread only.
         private static bool registrationQueued;
 
         // Called after JuliaLaunch (worksheet and ribbon), JuliaInclude (worksheet and ribbon)
-        // and JuliaEval, which may have run code calling expose_to_excel: if Julia's exposed_version()
-        // differs from the version last registered, queues the registration, which needs a
-        // macro context. One small call to Julia; nothing queued when nothing changed.
+        // and JuliaEval (including with ReturnHandle), which may have run code calling
+        // expose_to_excel. Doesn't call Julia itself: it queues one check, which needs a macro
+        // context to register anyway, so a calculation with many JuliaEval cells checks once,
+        // when Excel is next idle, rather than once per cell.
         internal static void AfterJuliaChange()
         {
-            string version = ExposedVersion();
-            if (version == null || version == registeredVersion || registrationQueued) return;
+            if (registrationQueued) return;
             registrationQueued = true;
             ExcelAsyncUtil.QueueAsMacro(RegisterIfChanged);
         }
 
-        // The queued registration. By the time it runs, the JuliaRegisterFunctions command (as
-        // VBA code calls it) may already have registered this version: then nothing to do.
+        // The queued check: registers if Julia's exposed_version() differs from the version last
+        // registered. The JuliaRegisterFunctions command (as VBA code calls it) may already have
+        // registered it, and a JuliaEval that exposes nothing leaves it unchanged.
         private static void RegisterIfChanged()
         {
             registrationQueued = false;
@@ -68,21 +81,30 @@ namespace CallFromExcel.AddIn
         internal static int Register()
         {
             string version = ExposedVersion();
-            if (version == null) { Log.Add("no answer from Julia"); return 0; }
+            if (version == null) { AddToLog("no answer from Julia"); return 0; }
             object list;
             try { list = JuliaFunctions.CallForHandles("CallFromExcel.exposed_functions", new object[0]); }
-            catch (Exception ex) { Log.Add("fetch failed: " + ex.Message); return 0; }
+            catch (Exception ex) { AddToLog("fetch failed: " + ex.Message); return 0; }
+            // Julia returns nothing (here ExcelEmpty) when no function is exposed. Anything else
+            // that isn't a table is a failure - an error text - so the version isn't recorded as
+            // registered, and the next check tries again.
+            if (list is ExcelEmpty)
+            {
+                AddToLog("nothing to register (" + version + ")");
+                registeredVersion = version;
+                return 0;
+            }
             var rows = list as object[,];
             if (rows == null)
             {
-                Log.Add("nothing to register: " + Convert.ToString(list));
-                registeredVersion = version;
+                AddToLog("fetch failed: " + Convert.ToString(list));
                 return 0;
             }
 
             var lambdas = new List<LambdaExpression>();
             var functionAttributes = new List<object>();
             var argumentAttributes = new List<List<object>>();
+            var newSignatures = new Dictionary<string, string>();
             for (int i = 0; i < rows.GetLength(0); i++)
             {
                 string excelName = Convert.ToString(rows[i, 0]);
@@ -91,6 +113,16 @@ namespace CallFromExcel.AddIn
                 string[] argNames = SplitList(rows[i, 3]);
                 string[] argDescriptions = SplitList(rows[i, 4]);
                 int nRequired = Convert.ToInt32(rows[i, 5]);
+
+                // Only what's new or changed. Each registration takes one of Excel-DNA's export
+                // slots, which aren't freed when a name is registered again: re-registering 50
+                // functions 300 times (15,000 registrations) left none for a new function, which
+                // then gave #NAME?, and each round got slower (checked 2026-11-25). The Julia
+                // name isn't part of it: calls are forwarded by Excel name.
+                string signature = string.Join("\x1e", description, Convert.ToString(rows[i, 3]),
+                    Convert.ToString(rows[i, 4]), nRequired.ToString());
+                if (registeredSignatures.TryGetValue(excelName, out string old) && old == signature) continue;
+                newSignatures[excelName] = signature;
 
                 lambdas.Add(Forwarder(excelName, juliaName, nRequired, argNames));
                 functionAttributes.Add(new ExcelFunctionAttribute
@@ -111,25 +143,40 @@ namespace CallFromExcel.AddIn
                     });
                 }
                 argumentAttributes.Add(args);
-                Log.Add("register " + excelName + "(" + string.Join(", ", argNames) + ") -> " + juliaName);
+                AddToLog("register " + excelName + "(" + string.Join(", ", argNames) + ") -> " + juliaName);
+            }
+            if (lambdas.Count == 0)
+            {
+                registeredVersion = version;
+                AddToLog("nothing new or changed (" + version + ")");
+                return 0;
             }
             ExcelIntegration.RegisterLambdaExpressions(lambdas, functionAttributes, argumentAttributes);
+            foreach (var kv in newSignatures) registeredSignatures[kv.Key] = kv.Value;
             // IntelliSense reads the registered functions when the add-in loads; without this it
             // doesn't show the arguments of functions registered later (the Function Wizard
             // and Ctrl+Shift+A, which ask Excel, do).
             ExcelDna.IntelliSense.IntelliSenseServer.Refresh();
             registeredVersion = version;
-            Log.Add("registered " + lambdas.Count + " (" + version + ")");
+            AddToLog("registered " + lambdas.Count + " (" + version + ")");
             // A saved workbook's cells that use a function show #NAME? after a full recalculation
             // before it is registered; registering doesn't recalculate them, but this does. Not
             // a formula TYPED while its function was unregistered: Excel keeps that #NAME?
             // through every kind of recalculation until it is re-entered (decided 2026-11-25:
-            // document it, don't re-enter cells for the user).
-            XlCall.Excel(XlCall.xlcCalculateNow);
+            // document it, don't re-enter cells for the user). Not in manual calculation mode,
+            // whose user chooses when to recalculate - such cells then recover at the next F9.
+            if (!CalculationIsManual()) XlCall.Excel(XlCall.xlcCalculateNow);
             return lambdas.Count;
         }
 
-        [ExcelFunction(Description = "SPIKE. Recent named-function registrations.", IsThreadSafe = false, IsVolatile = true)]
+        // GET.DOCUMENT(14): 1 automatic, 2 automatic except tables, 3 manual.
+        private static bool CalculationIsManual()
+        {
+            try { return Convert.ToInt32(XlCall.Excel(XlCall.xlfGetDocument, 14)) == 3; }
+            catch (Exception) { return false; }
+        }
+
+        [ExcelFunction(Description = "Recent registrations of named worksheet functions, for diagnostics.", IsThreadSafe = false, IsVolatile = true, IsHidden = true)]
         public static object JuliaRegisterLog()
         {
             if (Log.Count == 0) return "(none)";

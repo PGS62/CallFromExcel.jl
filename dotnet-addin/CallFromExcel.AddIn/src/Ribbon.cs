@@ -270,7 +270,8 @@ namespace CallFromExcel.AddIn
             ExcelAsyncUtil.QueueAsMacro(() =>
             {
                 int n = NamedFunctions.Register();
-                ShowBriefly(n == 1 ? "Registered 1 function" : "Registered " + n + " functions");
+                ShowBriefly(n == 0 ? "No new or changed functions to register" :
+                            n == 1 ? "Registered 1 function" : "Registered " + n + " functions");
             });
         }
 

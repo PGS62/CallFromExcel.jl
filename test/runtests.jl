@@ -933,6 +933,30 @@ end
     @test occursin("returns an array for each element", srv("jl.excel_test_pair", [1.0 2.0]))
     @test occursin("isn't exposed in this Julia session", srv("jl.nonesuch", 1.0))
 
+    # Code from JuliaEval is all at none:1, as Meta.parseall gives here. Which method @excel
+    # defined, and which arguments are optional, can't be judged by file and line.
+    jleval(code) = Main.eval(Meta.parseall(code))
+    jleval("excel_test_g(a) = a")
+    jleval("@excel excel_test_g(a, b) = a + b")
+    @test C._exposed["jl.excel_test_g"].nrequired == 2                  # b isn't optional
+    jleval("excel_test_h(x::Int) = 1")
+    jleval("@excel excel_test_h(x::AbstractVector) = sum(x)")
+    @test C._exposed["jl.excel_test_h"].asvector == [true]              # the method just defined
+    @test call("jl.excel_test_h", [1.0 2.0 3.0]) == 6.0
+    jleval("@excel excel_test_d(a, b=2, c=length(a)) = a")
+    @test C._exposed["jl.excel_test_d"].nrequired == 1
+    jleval("@excel excel_test_d(a, b=2, c=length(a)) = a")              # defined again, as re-including does
+    @test C._exposed["jl.excel_test_d"].nrequired == 1
+    jleval("excel_test_e(a) = excel_test_e(a, 5); excel_test_e(a, b) = a + b")
+    C.expose_to_excel("excel_test_e")                                   # a hand-written method isn't a default
+    @test C._exposed["jl.excel_test_e"].nrequired == 2
+
+    # An unnamed argument gets a name; more arguments from Excel than Julia now takes (an
+    # older registration) is an error saying what to do.
+    jleval("@excel excel_test_u(::Int, y) = y")
+    @test C._exposed["jl.excel_test_u"].argnames == ["arg1", "y"]
+    @test occursin("now takes 2 arguments in Julia, but Excel passed 3", msg(() -> call("jl.excel_test_g", 1, 2, 3)))
+
     # Bad uses of the macro.
     @test_throws Exception include_string(Main, "@excel nonsense=1 excel_test_bad(x) = x")
     @test_throws Exception include_string(Main, "@excel 42")

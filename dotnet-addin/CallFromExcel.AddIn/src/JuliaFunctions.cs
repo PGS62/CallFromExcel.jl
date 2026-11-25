@@ -188,6 +188,9 @@ namespace CallFromExcel.AddIn
                 // next recalculation, and reports "call JuliaLaunch" itself.
                 if (wantHandle)
                 {
+                    // The check is queued, so it runs after the handle's code has been
+                    // evaluated, in case that code exposed functions.
+                    NamedFunctions.AfterJuliaChange();
                     return JuliaHandles.EvalHandle(ConcatenateExpressions(juliaExpression));
                 }
 

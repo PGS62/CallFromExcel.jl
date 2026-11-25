@@ -1,8 +1,7 @@
 #=
-SPIKE (branch spike/named-functions): named worksheet functions, see "Named worksheet
-functions" in Enhancements.md.
+Named worksheet functions: see "Your own worksheet functions" in the README.
 
-expose_to_excel records a Julia function to be registered in Excel under its own name, by default
+expose_to_excel (and @excel) records a Julia function to be registered in Excel under its own name, by default
 "jl." followed by the Julia name. The add-in fetches the list with exposed_functions and
 registers each as a worksheet function that forwards to JuliaCall's code.
 =#
@@ -29,7 +28,7 @@ exposed_version() = _session_tag() * "#" * string(_exposed_count[])
     expose_to_excel(fn_name; name=nothing, description="", argdescriptions=String[], broadcast=false)
     expose_to_excel(f::Function; ...)
 
-SPIKE. Make a Julia function, named by `fn_name` (evaluated in `Main`) or given itself,
+Make a Julia function, named by `fn_name` (evaluated in `Main`) or given itself,
 callable from Excel as a worksheet function, by default `jl.<its name>`. Returns the Excel
 name. The add-in registers exposed functions after `JuliaLaunch`, `JuliaInclude` and
 `JuliaEval`, and when the ribbon's Register Functions button is clicked (for functions
@@ -72,7 +71,9 @@ end
 function _expose(f, julia_name::String, m::Method; name=nothing, description::AbstractString="",
                  argdescriptions=String[], broadcast=false)
     nrequired = _nrequired(f, m)
-    argnames = [string(a) for a in Base.method_argnames(m)[2:end]]
+    # An argument with no name (f(::Int, y)) is called #unused# by Julia: arg1, arg2... instead.
+    argnames = [startswith(string(a), "#") ? "arg$k" : string(a)
+                for (k, a) in enumerate(Base.method_argnames(m)[2:end])]
     excel_name = name === nothing ? "jl." * julia_name : String(name)
     _check_excel_name(excel_name, name === nothing)
 
@@ -118,18 +119,35 @@ function _pick_method(f)
 end
 
 # How many of m's arguments are required: the fewest among the methods its default values
-# generate - those share its file and line, and their argument names begin its own.
+# generate. Not judged by file and line, which all code from JuliaEval shares (none:1).
 function _nrequired(f, m::Method)
     names = Base.method_argnames(m)[2:end]
     nrequired = length(names)
     for other in methods(f)
         n = other.nargs - 1
-        if !other.isva && other.file == m.file && other.line == m.line && n < nrequired &&
-           Base.method_argnames(other)[2:end] == names[1:n]
+        if !other.isva && n < nrequired && Base.method_argnames(other)[2:end] == names[1:n] &&
+           _fills_defaults(other, m)
             nrequired = n
         end
     end
     nrequired
+end
+
+# Whether `other` is a method Julia generated for m's default values. For f(a, b=2, c=3),
+# Julia adds f(a) and f(a, b), whose bodies call the function itself (slot 1) with their own
+# arguments, then the defaults: f(a, 2, 3). A method written by hand, even one doing the
+# same (f(a) = f(a, 2, 3)), names the function rather than slot 1, and one that does
+# something else doesn't call it at all.
+function _fills_defaults(other::Method, m::Method)
+    code = try
+        Base.uncompressed_ast(other).code
+    catch
+        return false
+    end
+    any(code) do st
+        st isa Expr && st.head === :call && length(st.args) == m.nargs &&
+            all(st.args[k] == Core.SlotNumber(k) for k in 1:other.nargs)
+    end
 end
 
 # The declared type of each of m's arguments: a type parameter's bound (x::T where
@@ -151,12 +169,12 @@ before `@excel`, as before the function.
 
 ```julia
 \"\"\"
-    price_swap(notional, fixed_rate, years=10)
+    birthday(people, days=365)
 
-Toy swap price.
+The probability that, in a group of people, at least two share a birthday.
 \"\"\"
-@excel function price_swap(notional, fixed_rate, years=10)
-    notional * fixed_rate * years
+@excel broadcast=true function birthday(people, days=365)
+    1 - prod((days - k) / days for k in 0:people-1)
 end
 ```
 """
@@ -169,12 +187,20 @@ macro excel(exprs...)
         Expr(:kw, o.args[1], esc(o.args[2]))
     end
     fname, argnames = _def_signature(def)
-    file, line = string(__source__.file), __source__.line
     quote
+        $_methods_before[] = $_methods_now($__module__, $(QuoteNode(fname)))
         Base.@__doc__ $(esc(def))
-        $_expose_defined($(esc(fname)), $(string(fname)), $argnames, $file, $line; $(kw...))
+        $_expose_defined($(esc(fname)), $(string(fname)), $argnames; $(kw...))
     end
 end
+
+# The methods the function had before @excel's definition, so that _expose_defined can
+# tell which method the definition made. Kept here, not in a variable of the macro's
+# expansion, which at top level would be a global of the user's module.
+const _methods_before = Ref(Method[])
+
+_methods_now(mod::Module, name::Symbol) = isdefined(mod, name) ? collect(methods(getfield(mod, name))) : Method[]
+_methods_now(::Module, _) = Method[]                  # a qualified name: Base.f(...) = ...
 
 # The function name and positional argument names of a definition (nothing for an
 # argument with no name, f(::Int)).
@@ -193,17 +219,18 @@ function _def_signature(def)
     call.args[1], [argname(p) for p in params]
 end
 
-# Exposes the method of f just defined by @excel: the one with these argument names, from
-# this file at or after this line (the nearest).
-function _expose_defined(f, julia_name, argnames, file, line; kwargs...)
+# Exposes the method of f just defined by @excel: among the methods that weren't there
+# before (the definition's own, and those its default values generate), the one with the
+# definition's argument names. Not judged by file and line, which all code from JuliaEval
+# shares (none:1).
+function _expose_defined(f, julia_name, argnames; kwargs...)
+    before = _methods_before[]
+    _methods_before[] = Method[]
     matches(m) = m.nargs - 1 == length(argnames) &&
         all(a === nothing || a === b for (a, b) in zip(argnames, Base.method_argnames(m)[2:end]))
-    ms = filter(matches, collect(methods(f)))
-    here = filter(m -> string(m.file) == file && m.line >= line, ms)
-    isempty(here) || (ms = here)
-    isempty(ms) && throw(ArgumentError("@excel couldn't find the method of $julia_name it defined."))
-    m = ms[argmin([m.line for m in ms])]
-    _expose(f, julia_name, m; kwargs...)
+    ms = filter(m -> matches(m) && !any(b -> b === m, before), collect(methods(f)))
+    length(ms) == 1 || throw(ArgumentError("@excel couldn't tell which method of $julia_name it defined."))
+    _expose(f, julia_name, only(ms); kwargs...)
 end
 
 """
@@ -228,7 +255,9 @@ end
 # other argument wrapped in Ref - so that f.(xs...) (or f(xs...) when not broadcasting) makes
 # the call. The server keeps them in args_from_xl, so the REPL can repeat the call exactly.
 function _exposed_args(excel_name::String, e, args)
-    xs = Any[e.asvector[k] ? _as_vector(a) : a for (k, a) in enumerate(args)]
+    # Excel's registration is older than Julia's exposure, e.g. re-exposed from the REPL.
+    length(args) > length(e.argnames) && throw(ArgumentError("$excel_name now takes $(length(e.argnames)) argument$(length(e.argnames) == 1 ? "" : "s") in Julia, but Excel passed $(length(args)). Click Register Functions on the Julia ribbon tab, so that Excel registers the function as it is now."))
+    xs =Any[e.asvector[k] ? _as_vector(a) : a for (k, a) in enumerate(args)]
     ks = [k for k in eachindex(xs) if e.bcast[k] && xs[k] isa AbstractArray]
     isempty(ks) && return xs, false
     _check_shapes(excel_name, e.argnames, xs, ks)
@@ -367,7 +396,7 @@ end
 """
     exposed_functions()
 
-SPIKE. The exposed functions, for the add-in: one row per function, with columns Excel name,
+The exposed functions, for the add-in: one row per function, with columns Excel name,
 Julia name, description, argument names, argument descriptions (each joined by "\\x1f") and
 the number of required arguments. `nothing` when there are none: Excel has no empty
 arrays, so the add-in can't decode one.

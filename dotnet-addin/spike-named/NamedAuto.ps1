@@ -79,6 +79,18 @@ try {
 
     Write-Host "=== 6 re-entering the formulas typed in step 1 (expect 3 and 15)"
     foreach ($a in "A1", "A2") { $c = $ws.Range($a); Retry { $c.Formula2 = $c.Formula2 }; Show $ws $a }
+
+    Write-Host "=== 7 optional arguments (defaults years=10, spread=0)"
+    F $ws "Z5" '=JuliaEval("swap(notional, rate, years=10, spread=0) = notional * (rate + spread) * years; CallFromExcel.expose(""swap"")")'
+    Show $ws "Z5"
+    for ($i = 0; $i -lt 50 -and -not ((Retry { $excel.Evaluate("=jl.swap(1, 1)") }) -is [double]); $i++) { Start-Sleep -Milliseconds 200 }
+    F $ws "C1" '=jl.swap(100, 0.1)'           # expect 100
+    F $ws "C2" '=jl.swap(100, 0.1, 2)'        # expect 20
+    F $ws "C3" '=jl.swap(100, 0.1, 2, 0.4)'   # expect 100
+    F $ws "C4" '=jl.swap(100, 0.1, , 0.4)'    # expect "years can't be left out..."
+    F $ws "C5" '=jl.swap(100)'                # expect "needs at least 2 arguments"
+    F $ws "C6" '=jl.swap(100, )'              # expect "needs at least 2 arguments"
+    foreach ($a in "C1", "C2", "C3", "C4", "C5", "C6") { Show $ws $a }
     F $ws "Y1" '=JuliaEval("exit()")'
     Retry { $wb.Close($false) }
 } catch {

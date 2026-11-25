@@ -81,8 +81,9 @@ namespace CallFromExcel.AddIn
                 string description = Convert.ToString(rows[i, 2]);
                 string[] argNames = SplitList(rows[i, 3]);
                 string[] argDescriptions = SplitList(rows[i, 4]);
+                int nRequired = Convert.ToInt32(rows[i, 5]);
 
-                lambdas.Add(Forwarder(juliaName, argNames.Length));
+                lambdas.Add(Forwarder(excelName, juliaName, nRequired, argNames));
                 functionAttributes.Add(new ExcelFunctionAttribute
                 {
                     Name = excelName,
@@ -134,20 +135,44 @@ namespace CallFromExcel.AddIn
             return string.IsNullOrEmpty(s) ? new string[0] : s.Split(ArgSep);
         }
 
-        // (object a1, ..., object an) => Forward("<julia name>", new object[] { a1, ..., an })
-        private static LambdaExpression Forwarder(string juliaName, int n)
+        // (object a1, ..., object an) =>
+        //     Forward("<excel name>", "<julia name>", nRequired, argNames, new object[] { a1, ..., an })
+        private static LambdaExpression Forwarder(string excelName, string juliaName, int nRequired, string[] argNames)
         {
+            int n = argNames.Length;
             var parameters = new ParameterExpression[n];
             for (int k = 0; k < n; k++) parameters[k] = Expression.Parameter(typeof(object), "a" + k);
             Expression body = Expression.Call(
                 typeof(NamedFunctions).GetMethod(nameof(Forward), System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic),
+                Expression.Constant(excelName),
                 Expression.Constant(juliaName),
+                Expression.Constant(nRequired),
+                Expression.Constant(argNames),
                 Expression.NewArrayInit(typeof(object), parameters));
             return Expression.Lambda(body, parameters);
         }
 
-        private static object Forward(string juliaName, object[] args)
+        // Arguments left out at the end of the call are dropped, so Julia uses the defaults of
+        // optional ones. Any other argument left out is an error here: Julia would receive
+        // missing, which can give a wrong answer rather than an error (the spike's 0), and
+        // can't skip a positional argument to use its default. (An empty cell, as opposed to an
+        // argument left out, is passed as usual.)
+        private static object Forward(string excelName, string juliaName, int nRequired, string[] argNames, object[] args)
         {
+            int n = args.Length;
+            while (n > 0 && args[n - 1] is ExcelMissing) n--;
+            if (n < nRequired)
+            {
+                return "#" + excelName + " needs at least " + nRequired + (nRequired == 1 ? " argument" : " arguments") + "!";
+            }
+            for (int k = 0; k < n; k++)
+            {
+                if (args[k] is ExcelMissing)
+                {
+                    return "#" + excelName + ": " + argNames[k] + " can't be left out when a later argument is given!";
+                }
+            }
+            if (n < args.Length) Array.Resize(ref args, n);
             return JuliaFunctions.CallCore(juliaName, args, "/call");
         }
     }

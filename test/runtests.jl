@@ -786,6 +786,78 @@ end
     empty!(C._exposed)
 end
 
+@testset "expose reads docstrings and optional arguments" begin
+    C = CallFromExcel
+    include_string(Main, """
+        \"\"\"
+            expose_doc_swap(notional, fixed_rate, years=10, spread=0.0)
+
+        Price a toy swap, with **notional** in [USD](https://example.com)
+        and `years` whole.
+
+        More detail, not shown in Excel.
+
+        # Arguments
+        - `notional`: the notional amount.
+        - `fixed_rate::Float64`: the fixed rate,
+          as a decimal.
+        - `years=10` - the term.
+
+        # Examples
+        - `notanarg`: not an argument.
+        \"\"\"
+        expose_doc_swap(notional, fixed_rate, years=10, spread=0.0) = notional * (fixed_rate + spread) * years
+
+        \"\"\"
+        ```julia
+        expose_doc_fenced(x)
+        ```
+        Doubles x.
+        \"\"\"
+        expose_doc_fenced(x) = 2x
+
+        expose_doc_none(a, b) = a
+        expose_doc_methods(a) = 1
+        expose_doc_methods(a, b, c) = 3
+        expose_doc_methods(a, b) = 2
+        expose_doc_methods(a, b, c, d...) = 4
+        """)
+    rows() = Dict(r[1] => r for r in eachrow(C.exposed_functions()))
+    empty!(C._exposed)
+
+    C.expose("expose_doc_swap")
+    r = rows()["jl.expose_doc_swap"]
+    @test r[3] == "Price a toy swap, with notional in USD and years whole."
+    @test r[4] == join(["notional", "fixed_rate", "years", "spread"], "\x1f")
+    @test split(r[5], "\x1f") == ["the notional amount.", "the fixed rate, as a decimal.",
+                                  "Optional. The term.", "Optional."]
+    @test r[6] == 2
+
+    # Given descriptions win, position by position where not empty.
+    C.expose("expose_doc_swap"; description="Mine", argdescriptions=["", "Rate"])
+    r = rows()["jl.expose_doc_swap"]
+    @test r[3] == "Mine"
+    @test split(r[5], "\x1f")[1:3] == ["the notional amount.", "Rate", "Optional. The term."]
+    C.expose("expose_doc_swap"; argdescriptions=["", "", "Optional, default 10"])
+    @test split(rows()["jl.expose_doc_swap"][5], "\x1f")[3] == "Optional, default 10"
+
+    C.expose("expose_doc_fenced")
+    @test rows()["jl.expose_doc_fenced"][3] == "Doubles x."
+    C.expose("expose_doc_none")
+    r = rows()["jl.expose_doc_none"]
+    @test r[3] == "" && r[5] == "\x1f" && r[6] == 2
+
+    # Several methods: the non-varargs one with most arguments, all required (separate lines).
+    C.expose("expose_doc_methods")
+    r = rows()["jl.expose_doc_methods"]
+    @test r[4] == join(["a", "b", "c"], "\x1f") && r[6] == 3
+
+    # Long descriptions are cut to Excel's limit.
+    @test length(C._fit("x"^300)) == 253 && endswith(C._fit("x"^300), "...")
+    @test C._fit("short") == "short"
+    empty!(C._exposed)
+end
+
 @testset "Reminder to run installme()" begin
     mktempdir() do dir
         versionfile = joinpath(dir, "version.txt")

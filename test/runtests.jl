@@ -745,8 +745,15 @@ end
     Core.eval(Main, :(expose_test_f(a, b) = a + b; Expose_Test_F(x) = x; expose_test!(v) = v))
     msg(f) = try f(); "" catch e; e.msg end
     empty!(C._exposed)
+    @test C.exposed_functions() === nothing                        # Excel has no empty arrays
 
+    # The version the add-in compares: this session's tag, and a count every expose bumps.
+    v0 = C.exposed_version()
+    @test startswith(v0, C.handle_session() * "#")
     @test C.expose("expose_test_f") == "jl.expose_test_f"
+    @test C.exposed_version() != v0
+    v1 = C.exposed_version()
+    @test (try C.expose("expose_test!") catch end; C.exposed_version() == v1)   # a refusal doesn't
     @test C.exposed_functions()[1, 4] == "a\x1fb"
     @test C.expose("expose_test_f") == "jl.expose_test_f"           # exposing again replaces
     @test C.expose("expose_test_f"; name="PRICE_SWAP") == "PRICE_SWAP"

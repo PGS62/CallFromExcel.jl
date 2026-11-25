@@ -249,7 +249,7 @@ namespace CallFromExcel.AddIn
 
         public object JuliaInclude(string FileName)
         {
-            return CallCore("CallFromExcel.include", new object[] { FileName.Replace("\\", "/") }, "/call");
+            return CallCore("include", new object[] { FileName.Replace("\\", "/") }, "/call");
         }
 
         // Unlike the other migration wrappers above, this can't just delegate to

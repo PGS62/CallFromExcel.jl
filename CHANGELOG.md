@@ -17,6 +17,10 @@ Large or structured Julia objects - a big matrix, a fitted model, a DataFrame - 
 - 2,000 cells each creating a handle calculate in under a second (0.5 to 0.9 seconds in tests), and 2,000 `JuliaCall`s using them in about 0.3 seconds.
 - Any string of the form `jl:<label>#<id>@<session>` passed to a function is now taken to be a handle, so a string that merely looks like one gives a "not found" error rather than reaching Julia.
 
+### Fixes
+
+- `JuliaInclude` (worksheet, VBA and the ribbon's Include button) loaded the file into the `CallFromExcel` module instead of `Main`, so the functions it defined couldn't be called by name from `JuliaCall` or `JuliaEval`. It now loads into `Main`, as `include` at the REPL does.
+
 ## [0.1.7] - 2026-11-17
 
 ### Clearer guidance when Julia can't start

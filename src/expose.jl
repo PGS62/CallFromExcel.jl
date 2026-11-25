@@ -12,13 +12,26 @@ const _exposed = Dict{String,Any}()   # Excel name => (julia, description, argna
 # Separates the arguments' names, and their descriptions, in one string for the add-in.
 const _ARGSEP = "\x1f"
 
+# Counts calls to expose. The add-in compares exposed_version() with the version it last
+# registered after JuliaLaunch, JuliaInclude and JuliaEval, and registers again if it differs.
+const _exposed_count = Ref(0)
+
+"""
+    exposed_version()
+
+For the add-in: `"<session>#<count>"`, which changes whenever `expose` is called. The session
+tag (as in handles) tells a relaunched Julia apart, whose count could match the old one's.
+"""
+exposed_version() = _session_tag() * "#" * string(_exposed_count[])
+
 """
     expose(fn_name; name=nothing, description="", argdescriptions=String[])
 
 SPIKE. Make the Julia function named `fn_name` callable from Excel as a worksheet function,
 by default `jl.<fn_name>`. Its arguments are named as in the function's first method.
-Returns the Excel name. The add-in registers exposed functions when asked (spike: the
-JuliaRegisterFunctions command).
+Returns the Excel name. The add-in registers exposed functions after `JuliaLaunch`,
+`JuliaInclude` and `JuliaEval`, and when the ribbon's Register Functions button is clicked
+(for functions exposed from the REPL).
 """
 function expose(fn_name::AbstractString; name=nothing, description::AbstractString="",
                 argdescriptions=String[])
@@ -29,6 +42,7 @@ function expose(fn_name::AbstractString; name=nothing, description::AbstractStri
     _check_excel_name(excel_name, name === nothing)
     _exposed[excel_name] = (julia=String(fn_name), description=String(description),
         argnames=argnames, argdescriptions=collect(String, argdescriptions))
+    _exposed_count[] += 1
     excel_name
 end
 
@@ -66,8 +80,10 @@ end
 
 SPIKE. The exposed functions, for the add-in: one row per function, with columns Excel name,
 Julia name, description, argument names and argument descriptions (each joined by "\\x1f").
+`nothing` when there are none: Excel has no empty arrays, so the add-in can't decode one.
 """
 function exposed_functions()
+    isempty(_exposed) && return nothing
     names = sort!(collect(keys(_exposed)))
     result = Matrix{Any}(undef, length(names), 5)
     for (i, n) in enumerate(names)

@@ -56,6 +56,7 @@ namespace CallFromExcel.AddIn
                 int timeout = IsOmitted(timeOut) ? 30 : Convert.ToInt32(Convert.ToDouble(timeOut));
                 string message = CallFromExcel.AddIn.JuliaLaunch.Launch(useLinux: linux, minimiseWindow: minimise, commandLineOptions: cmdOpts, packages: pkgs, bashStatements: bash, timeoutSeconds: timeout);
                 JuliaHandles.AfterLaunch();
+                NamedFunctions.AfterJuliaChange();
                 return message;
             }
             catch (Exception ex)
@@ -114,7 +115,9 @@ namespace CallFromExcel.AddIn
         public static object JuliaInclude(
             [ExcelArgument(Name = "FileName", Description = "The full name of the file to be included.")] string fileName)
         {
-            return CallCore("CallFromExcel.include", new object[] { fileName.Replace("\\", "/") }, "/call");
+            object result = CallCore("include", new object[] { fileName.Replace("\\", "/") }, "/call");
+            NamedFunctions.AfterJuliaChange();
+            return result;
         }
 
         // Excel evaluates functions on every edit in the Insert Function (fx) dialog, to show
@@ -195,6 +198,7 @@ namespace CallFromExcel.AddIn
 
                 string expression = ConcatenateExpressions(juliaExpression);
                 string responseWire = JuliaHttpClient.Post(expression, "/eval");
+                NamedFunctions.AfterJuliaChange();
                 return DecodeForWorksheet(responseWire);
             }
             catch (Exception ex)

@@ -56,6 +56,9 @@ namespace CallFromExcel.AddIn
           <button id='IncludeFile' label='Include' imageMso='CodeEdit' getEnabled='GetIncludeEnabled'
                   onAction='OnIncludeFile'
                   supertip='Load the file in the box into Julia, as JuliaInclude does, making the functions it defines available to JuliaCall and JuliaEval. Does not trigger recalculation.' />
+          <button id='RegisterFunctions' label='Register Functions' imageMso='FunctionWizard'
+                  onAction='OnRegisterFunctions'
+                  supertip='Make the functions exposed in Julia with CallFromExcel.expose callable as worksheet functions. Done automatically after JuliaLaunch, JuliaInclude and JuliaEval; use this after exposing functions from the Julia REPL.' />
           <button id='CallFromExcelHelp' label='Help' size='large' imageMso='Help'
                   onAction='OnHelp'
                   supertip='Open the CallFromExcel.jl documentation on GitHub.' />
@@ -256,6 +259,21 @@ namespace CallFromExcel.AddIn
             ShowBriefly("Included " + Path.GetFileName(fileName));
         }
 
+        public void OnRegisterFunctions(IRibbonControl control)
+        {
+            if (!JuliaFunctions.JuliaIsRunning())
+            {
+                Inform("Julia isn't running. Use Launch Julia to start it first.");
+                return;
+            }
+            // Registering needs a macro context, which a ribbon callback doesn't have.
+            ExcelAsyncUtil.QueueAsMacro(() =>
+            {
+                int n = NamedFunctions.Register();
+                ShowBriefly(n == 1 ? "Registered 1 function" : "Registered " + n + " functions");
+            });
+        }
+
         public void OnCloseJulia(IRibbonControl control)
         {
             int port = JuliaPort.GetJuliaPortOrZero();
@@ -375,6 +393,7 @@ namespace CallFromExcel.AddIn
                     SetCursor(XlDefault);
                 }
                 JuliaHandles.AfterLaunch();
+                NamedFunctions.AfterJuliaChange();
                 ShowBriefly(message);
                 _ribbon?.InvalidateControl("DisplayResults");
             }

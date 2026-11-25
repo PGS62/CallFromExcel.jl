@@ -16,15 +16,60 @@ namespace CallFromExcel.AddIn
         // Recent registrations, for checking the spike from a sheet.
         private static readonly List<string> Log = new List<string>();
 
-        // Registration needs a macro context, so this is a command (Alt+F8, or Application.Run).
+        // Julia's exposed_version() when the add-in last registered: "<session>#<count>".
+        private static string registeredVersion = "";
+
+        // A registration is queued and hasn't started: several checks in one calculation (a
+        // JuliaLaunch and a JuliaEval cell, say) queue it once. Main thread only.
+        private static bool registrationQueued;
+
+        // Called after JuliaLaunch (worksheet and ribbon), JuliaInclude (worksheet and ribbon)
+        // and JuliaEval, which may have run code calling expose: if Julia's exposed_version()
+        // differs from the version last registered, queues the registration, which needs a
+        // macro context. One small call to Julia; nothing queued when nothing changed.
+        internal static void AfterJuliaChange()
+        {
+            string version = ExposedVersion();
+            if (version == null || version == registeredVersion || registrationQueued) return;
+            registrationQueued = true;
+            ExcelAsyncUtil.QueueAsMacro(RegisterAll);
+        }
+
+        // null when Julia gives no answer (not running, or an error).
+        private static string ExposedVersion()
+        {
+            object version;
+            try { version = JuliaFunctions.CallForHandles("CallFromExcel.exposed_version", new object[0]); }
+            catch (Exception) { return null; }
+            string s = version as string;
+            return string.IsNullOrEmpty(s) || s.StartsWith("#", StringComparison.Ordinal) ? null : s;
+        }
+
+        // Registration needs a macro context, so this is a command (Application.Run, or queued
+        // with ExcelAsyncUtil.QueueAsMacro).
         [ExcelCommand(Name = "JuliaRegisterFunctions")]
         public static void RegisterAll()
         {
+            Register();
+        }
+
+        // Registers every exposed function; returns how many. The version is read first, so an
+        // expose that runs while this does leaves the next check seeing a change.
+        internal static int Register()
+        {
+            registrationQueued = false;
+            string version = ExposedVersion();
+            if (version == null) { Log.Add("no answer from Julia"); return 0; }
             object list;
             try { list = JuliaFunctions.CallForHandles("CallFromExcel.exposed_functions", new object[0]); }
-            catch (Exception ex) { Log.Add("fetch failed: " + ex.Message); return; }
+            catch (Exception ex) { Log.Add("fetch failed: " + ex.Message); return 0; }
             var rows = list as object[,];
-            if (rows == null) { Log.Add("nothing to register: " + Convert.ToString(list)); return; }
+            if (rows == null)
+            {
+                Log.Add("nothing to register: " + Convert.ToString(list));
+                registeredVersion = version;
+                return 0;
+            }
 
             var lambdas = new List<LambdaExpression>();
             var functionAttributes = new List<object>();
@@ -63,7 +108,15 @@ namespace CallFromExcel.AddIn
             // doesn't show the arguments of functions registered later (the Function Wizard
             // and Ctrl+Shift+A, which ask Excel, do).
             ExcelDna.IntelliSense.IntelliSenseServer.Refresh();
-            Log.Add("registered " + lambdas.Count);
+            registeredVersion = version;
+            Log.Add("registered " + lambdas.Count + " (" + version + ")");
+            // A saved workbook's cells that use a function show #NAME? after a full recalculation
+            // before it is registered; registering doesn't recalculate them, but this does. Not
+            // a formula TYPED while its function was unregistered: Excel keeps that #NAME?
+            // through every kind of recalculation until it is re-entered (decided 2026-11-25:
+            // document it, don't re-enter cells for the user).
+            XlCall.Excel(XlCall.xlcCalculateNow);
+            return lambdas.Count;
         }
 
         [ExcelFunction(Description = "SPIKE. Recent named-function registrations.", IsThreadSafe = false, IsVolatile = true)]

@@ -4,7 +4,7 @@
 
 Call [Julia](https://julialang.org/) from Microsoft Excel worksheets and from VBA.  
 
-CallFromExcel is an Excel add-in that lets you use any Julia function in a worksheet formula. For example, `=JuliaEval("using LinearAlgebra")` loads one of Julia's standard libraries, then `=JuliaCall("eigvals", A1:J10)` passes a range to Julia as a matrix and returns its eigenvalues to the worksheet (as complex numbers, if the matrix isn't symmetric) - something Excel has no built-in function for. Keep your front end in Excel, and do the heavy computation in Julia. A Julia tab on Excel's ribbon starts Julia and loads your Julia files. Installation doesn't need admin rights.
+CallFromExcel is an Excel add-in that lets you use any Julia function in a worksheet formula. For example, `=JuliaEval("using LinearAlgebra")` makes the functions of one of Julia's standard libraries available, then `=JuliaCall("eigvals", A1:J10)` passes a range to Julia as a matrix and returns its eigenvalues to the worksheet (as complex numbers, if the matrix isn't symmetric) - something Excel has no built-in function for. Keep your front end in Excel, and do the heavy computation in Julia. A Julia tab on Excel's ribbon starts Julia and loads your Julia files. Installation doesn't need admin rights.
 
 CallFromExcel is compatible with Excel's [dynamic array formulas](https://support.microsoft.com/en-us/office/dynamic-array-formulas-and-spilled-array-behavior-205c6b06-03ba-4151-89a1-87a7eb36e531), and supports 64-bit Excel for Windows (not Mac, not 32-bit Excel). It works with Julia running under either Windows or Linux (via [WSL](https://docs.microsoft.com/en-us/windows/wsl/about)).
 
@@ -165,6 +165,8 @@ JuliaLaunch([UseLinux], [MinimiseWindow], [CommandLineOptions], [Packages], [Bas
 |`BashStatements`|Relevant only when `UseLinux` is TRUE. Bash statements executed prior to launching Julia, which can be used to set environment variables. Example: `export JULIA_PKG_DEVDIR=/mnt/c/Projects`. Delimit multiple statements with the line feed character.|
 |`TimeOut`|The number of seconds to wait for Julia to fully start (including any package precompilation) before `JuliaLaunch` gives up waiting and returns an informational message rather than an error - Julia is not killed, and calling `JuliaLaunch` or `JuliaEval` again once it has finished starting will work normally. If Julia exits during start-up, e.g. because of an invalid command line option, `JuliaLaunch` reports an error straight away. `TimeOut` is optional and defaults to 30.|
 
+**Example.** `=JuliaLaunch(, TRUE, "--threads=4,1")` launches Julia with its window minimised, four worker threads and one interactive thread; then `=JuliaEval("Threads.nthreads()")` returns 4.
+
 ### `JuliaInclude`
 Load a Julia source file into the Julia process, to make additional functions available via `JuliaEval` and `JuliaCall`.
 ```
@@ -177,6 +179,12 @@ JuliaInclude(FileName)
 
 The ribbon's Include button does the same for the file in its File box, without needing a formula.
 
+**Example.** If `C:\MyCode\collatz.jl` contains
+```julia
+collatz(n) = n == 1 ? 0 : 1 + collatz(iseven(n) ? n / 2 : 3n + 1)
+```
+then after `=JuliaInclude("C:\MyCode\collatz.jl")`, `=JuliaCall("collatz", 27)` returns 111: starting from 27, the Collatz sequence takes 111 steps to reach 1.
+
 ### `JuliaEval`
 Evaluate a Julia expression and return the result to an Excel worksheet, or with `ReturnHandle` TRUE, a [handle](#object-handles) to the result.
 ```
@@ -187,6 +195,8 @@ JuliaEval(JuliaExpression, [ReturnHandle])
 |:-------|:----------|
 |`JuliaExpression`|Any valid Julia code, as a string. Can also be a one-column range to evaluate multiple Julia statements.|
 |`ReturnHandle`|Optional, default FALSE. TRUE returns a handle to the result, which stays in Julia while a formula uses it. The code is evaluated again only when it changes. From VBA, use `JuliaEvalHandle` instead.|
+
+**Example.** `=JuliaEval("string(factorial(big(30)))")` returns 30! exactly, `265252859812191058636308480000000`, using Julia's arbitrary-precision integers. Excel's `=FACT(30)` shows only 15 significant digits.
 
 ### `JuliaCall`
 Call a named Julia function, passing in data from the worksheet. Returns an error string for results that cannot be displayed on a worksheet (nested arrays, dictionaries etc.). `JuliaCallVBA` lifts those restrictions.
@@ -199,6 +209,8 @@ JuliaCall(JuliaFunction, [Arg1], [Arg2], ...)
 |`JuliaFunction`|The name of a Julia function visible from the Julia REPL.|
 |`Args...`|Zero or more arguments. Each may be a number, string, Boolean, empty cell, array or range. A range's values are passed as Excel stores them (its `Value2`), so cells formatted as dates arrive as serial numbers, not as Julia `Date`s.|
 
+**Example.** With the coefficients of three linear equations in A1:C3 and their right-hand sides in D1:D3, `=JuliaCall("\", A1:C3, D1:D3)` solves them, returning the solution as a column. Julia's backslash operator solves the system directly, which is more accurate than Excel's `=MMULT(MINVERSE(A1:C3), D1:D3)`. A trailing `.` on the function name broadcasts: `=JuliaCall("bitstring.", H1:H3)` shows the 64 bits Julia stores for each number, which shows why 0.1 can't be stored exactly.
+
 ### `JuliaSetVar`
 Set a global variable in the Julia process.
 ```
@@ -210,6 +222,8 @@ JuliaSetVar(VariableName, RefersTo)
 |`VariableName`|The name of the variable to be set. Must follow Julia's [rules](https://docs.julialang.org/en/v1/manual/variables/#man-allowed-variable-names) for allowed variable names.|
 |`RefersTo`|A range, number, string, Boolean, empty cell or array of such types. As for `JuliaCall`, cells formatted as dates arrive as serial numbers. When called from VBA, nested arrays are supported.|
 
+**Example.** With prices in B1:B5, `=JuliaSetVar("prices", B1:B5)` makes them a Julia variable, and then `=JuliaEval("diff(log.(prices))")` returns their log returns as a column.
+
 ### `JuliaEvalVBA`
 Evaluate a Julia expression from VBA. Differs from `JuliaCall` in handling of 1-d arrays and strings longer than 32,767 characters. May return data of types that cannot be displayed on a worksheet, such as a dictionary or an array of arrays.
 ```
@@ -219,6 +233,8 @@ jl.JuliaEvalVBA(JuliaExpression)
 |Argument|Description|
 |:-------|:----------|
 |`JuliaExpression`|Any valid Julia code, as a string. Can also be a one-column range to evaluate multiple Julia statements.|
+
+**Example.** `Set d = jl.JuliaEvalVBA("Dict(w => length(w) for w in split(""the quick brown fox""))")` returns a `Scripting.Dictionary` mapping each word to its length, so `d("quick")` is 5. A dictionary can't be returned to a worksheet.
 
 ### `JuliaCallVBA`
 Call a named Julia function from VBA. Differs from `JuliaCall` in handling of 1-d arrays and strings longer than 32,767 characters. May return data of types that cannot be displayed on a worksheet, such as a dictionary, an array of arrays, or arrays of dimension up to 9.
@@ -230,6 +246,8 @@ jl.JuliaCallVBA(JuliaFunction, [Arg1], [Arg2], ...)
 |:-------|:----------|
 |`JuliaFunction`|The name of a Julia function visible from the Julia REPL.|
 |`Args...`|Zero or more arguments. Each may be a number, string, Boolean, empty cell, array or range. A range's values are passed as Excel stores them (its `Value2`), so cells formatted as dates arrive as serial numbers, not as Julia `Date`s.|
+
+**Example.** `words = jl.JuliaCallVBA("split", "the quick brown fox")` returns a one-dimensional VBA array, `words(1)` to `words(4)`.
 
 ### `JuliaCallNamedArgs`
 Call a named Julia function, passing positional and named arguments from the worksheet. The argument `";"` marks where the named arguments start, given as name-value pairs. A named argument whose value is `";"` must be the last pair.
@@ -258,6 +276,8 @@ jl.JuliaCallNamedArgsVBA(JuliaFunction, [Arg1], ..., ";", Name1, Value1, ...)
 |:-------|:----------|
 |`JuliaFunction`|The name of a Julia function visible from the Julia REPL.|
 |`Args...`|Zero or more positional arguments, then `";"`, then pairs of name and value, e.g. `"a",1,"b",2`. Names must be valid Julia identifiers. Each argument may be a number, string, Boolean, empty cell, array or range.|
+
+**Example.** `parts = jl.JuliaCallNamedArgsVBA("split", "a,b,,c", ",", ";", "keepempty", False)` returns `a`, `b` and `c`, without the empty string between the two commas.
 
 ### `JuliaIsRunning`
 Returns TRUE if an instance of Julia is running and "listening" to the current Excel session, or FALSE otherwise.
@@ -303,6 +323,8 @@ JuliaCallHandle(JuliaFunction, [Arg1], [Arg2], ..., [";", Name1, Value1, ...])
 |`JuliaFunction`|The name of a Julia function visible from the Julia REPL. A trailing `.` broadcasts, as for `JuliaCall`.|
 |`Args...`|Zero or more positional arguments, optionally followed by `";"` and pairs of name and value for named arguments, as for `JuliaCallNamedArgs`. Handles among them are replaced by their objects.|
 
+**Example.** With a list of values in G1:G20, `=JuliaCallHandle("Set", G1:G20)` in H1 builds a Julia `Set` once, and then `=JuliaCall("in", D1, H1)` tests whether D1's value is in the list, without searching it each time.
+
 Unlike `JuliaCallNamedArgs`, any `";"` argument starts the named arguments, so `";"` can't be passed as a positional argument.
 
 From VBA, `jl.JuliaCallHandle` takes at most 30 arguments after the function name, and raises an error, rather than returning an error string, if the call fails. The handle lasts until `JuliaHandleRelease` or `JuliaHandleReleaseAll` frees it.
@@ -316,6 +338,13 @@ jl.JuliaEvalHandle(JuliaExpression)
 |Argument|Description|
 |:-------|:----------|
 |`JuliaExpression`|Any valid Julia code, as a string. Can also be a one-column range to evaluate multiple Julia statements.|
+
+**Example.**
+```vba
+odds = jl.JuliaEvalHandle("Set(1:2:999)")
+Debug.Print jl.JuliaCall("in", 7, odds)   ' True
+jl.JuliaHandleRelease odds
+```
 
 ### `JuliaHandleRelease`
 Free the Julia object of a handle created from VBA. Returns TRUE if it freed one, and FALSE otherwise - when the handle was already freed, was created by a worksheet formula (which frees its own), or isn't a handle at all, such as an empty string. So it is always safe to call, for example from a class's `Class_Terminate` event.

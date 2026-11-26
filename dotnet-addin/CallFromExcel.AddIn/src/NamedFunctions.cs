@@ -113,6 +113,7 @@ namespace CallFromExcel.AddIn
                 string[] argNames = SplitList(rows[i, 3]);
                 string[] argDescriptions = SplitList(rows[i, 4]);
                 int nRequired = Convert.ToInt32(rows[i, 5]);
+                bool handle = Convert.ToBoolean(rows[i, 6]);
 
                 // Only what's new or changed. Each registration takes one of Excel-DNA's export
                 // slots, which aren't freed when a name is registered again: re-registering 50
@@ -120,11 +121,11 @@ namespace CallFromExcel.AddIn
                 // then gave #NAME?, and each round got slower (checked 2026-11-25). The Julia
                 // name isn't part of it: calls are forwarded by Excel name.
                 string signature = string.Join("\x1e", description, Convert.ToString(rows[i, 3]),
-                    Convert.ToString(rows[i, 4]), nRequired.ToString());
+                    Convert.ToString(rows[i, 4]), nRequired.ToString(), handle.ToString());
                 if (registeredSignatures.TryGetValue(excelName, out string old) && old == signature) continue;
                 newSignatures[excelName] = signature;
 
-                lambdas.Add(Forwarder(excelName, juliaName, nRequired, argNames));
+                lambdas.Add(Forwarder(excelName, juliaName, nRequired, argNames, handle));
                 functionAttributes.Add(new ExcelFunctionAttribute
                 {
                     Name = excelName,
@@ -143,7 +144,7 @@ namespace CallFromExcel.AddIn
                     });
                 }
                 argumentAttributes.Add(args);
-                AddToLog("register " + excelName + "(" + string.Join(", ", argNames) + ") -> " + juliaName);
+                AddToLog("register " + excelName + "(" + string.Join(", ", argNames) + ") -> " + juliaName + (handle ? ", returning a handle" : ""));
             }
             if (lambdas.Count == 0)
             {
@@ -192,8 +193,8 @@ namespace CallFromExcel.AddIn
         }
 
         // (object a1, ..., object an) =>
-        //     Forward("<excel name>", "<julia name>", nRequired, argNames, new object[] { a1, ..., an })
-        private static LambdaExpression Forwarder(string excelName, string juliaName, int nRequired, string[] argNames)
+        //     Forward("<excel name>", "<julia name>", nRequired, argNames, handle, new object[] { a1, ..., an })
+        private static LambdaExpression Forwarder(string excelName, string juliaName, int nRequired, string[] argNames, bool handle)
         {
             int n = argNames.Length;
             var parameters = new ParameterExpression[n];
@@ -204,6 +205,7 @@ namespace CallFromExcel.AddIn
                 Expression.Constant(juliaName),
                 Expression.Constant(nRequired),
                 Expression.Constant(argNames),
+                Expression.Constant(handle),
                 Expression.NewArrayInit(typeof(object), parameters));
             return Expression.Lambda(body, parameters);
         }
@@ -213,7 +215,7 @@ namespace CallFromExcel.AddIn
         // missing, which can give a wrong answer rather than an error (such as 0), and
         // can't skip a positional argument to use its default. (An empty cell, as opposed to an
         // argument left out, is passed as usual.)
-        private static object Forward(string excelName, string juliaName, int nRequired, string[] argNames, object[] args)
+        private static object Forward(string excelName, string juliaName, int nRequired, string[] argNames, bool handle, object[] args)
         {
             int n = args.Length;
             while (n > 0 && args[n - 1] is ExcelMissing) n--;
@@ -227,6 +229,13 @@ namespace CallFromExcel.AddIn
                 {
                     return "#" + excelName + ": " + argNames[k] + " can't be left out when a later argument is given!";
                 }
+            }
+            // handle=true: the result stays in Julia, as for JuliaCallHandle.
+            if (handle)
+            {
+                var given = new object[n];
+                Array.Copy(args, given, n);
+                return JuliaHandles.ExposedHandle(excelName, given);
             }
             // Julia's _call_exposed finds the function by its Excel name and broadcasts as
             // expose_to_excel says; juliaName is kept for this file's log.

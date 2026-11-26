@@ -957,6 +957,35 @@ end
     @test C._exposed["jl.excel_test_u"].argnames == ["arg1", "y"]
     @test occursin("now takes 2 arguments in Julia, but Excel passed 3", msg(() -> call("jl.excel_test_g", 1, 2, 3)))
 
+    # handle=true: the add-in calls handle_create_exposed, which stores the result (broadcast
+    # as exposed) and returns its handle. The description says so; ";" is just a string.
+    stored(h) = C._lookup_handle(split(h, "#")[2])
+    include_string(Main, """
+        \"\"\"
+            excel_test_square(n)
+
+        A square matrix.
+        \"\"\"
+        @excel handle=true excel_test_square(n) = reshape(1:Int(n)^2, Int(n), Int(n))
+        @excel handle=true broadcast=true excel_test_twice(x) = 2x
+        @excel handle=true excel_test_echo(a, b) = (a, b)
+        """)
+    r = Dict(r[1] => r for r in eachrow(C.exposed_functions()))
+    @test size(C.exposed_functions(), 2) == 7
+    @test r["jl.excel_test_square"][7] === true && r["jl.excel_test_scale"][7] === false
+    @test r["jl.excel_test_square"][3] == "A square matrix. Returns a handle."
+    @test r["jl.excel_test_echo"][3] == "Returns a handle."                  # no docstring
+    h = C.handle_create_exposed("jl.excel_test_square", 3.0)
+    @test startswith(h, "jl:ReshapedArray#") && stored(h) == reshape(1:9, 3, 3)
+    @test stored(C.handle_create_exposed("jl.excel_test_twice", [1.0; 2.0;;])) == [2.0; 4.0;;]   # one handle, whole result
+    @test stored(C.handle_create_exposed("jl.excel_test_echo", ";", 1.0)) == (";", 1.0)
+    C.expose_to_excel("excel_test_plain"; name="jl.plain_h", handle=true)
+    @test C._exposed["jl.plain_h"].handle && !C._exposed["jl.plain2"].handle
+    long = repeat("word ", 100)
+    C.expose_to_excel("excel_test_plain"; name="jl.plain_long", description=long, handle=true)
+    @test length(C._exposed["jl.plain_long"].description) <= 253 && endswith(C._exposed["jl.plain_long"].description, "... Returns a handle.")
+    @test occursin("isn't exposed in this Julia session", msg(() -> C.handle_create_exposed("jl.nonesuch", 1)))
+
     # Bad uses of the macro.
     @test_throws Exception include_string(Main, "@excel nonsense=1 excel_test_bad(x) = x")
     @test_throws Exception include_string(Main, "@excel 42")

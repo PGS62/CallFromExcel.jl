@@ -50,6 +50,9 @@ Multiplies x by factor.
 @excel broadcast=true scale(x, factor) = x * factor
 
 @excel broadcast=true wavg(x, w::AbstractVector) = x * sum(w) / length(w)
+
+@excel handle=true squarearray(n) = reshape(1:Int(n)^2, Int(n), Int(n))
+@excel handle=true broadcast=true twice(x) = 2x
 '@
 
 $ex = New-Excel; $excel = $ex[0]; $excelPid = $ex[1]
@@ -115,6 +118,22 @@ try {
     F $ws "M1" '=jl.wavg(2, 7)'                # expect 14
     Retry { $excel.Calculate() }
     foreach ($a in "H1", "H2", "H3", "I1", "J1", "I3", "J3", "K1", "L1", "L3", "M1") { Show $ws $a }
+    Write-Host "=== 9 handle=true: =jl.squarearray(n) returns a handle"
+    F $ws "N1" '=jl.squarearray(3)'            # expect jl:ReshapedArray#..@..
+    F $ws "N2" '=JuliaCall("sum", N1)'         # expect 45
+    F $ws "N3" '=jl.squarearray(3)'            # same arguments: the same handle as N1
+    F $ws "N4" '=jl.twice(E1:E3)'              # one handle to the broadcast column
+    F $ws "N5" '=JuliaCall("sum", N4)'         # expect 12
+    F $ws "N6" '=JuliaCall("identity", N1)'    # the matrix itself, spilled
+    F $ws "N9" '=jl.squarearray(#N/A)'         # an error argument passes through: #N/A
+    Retry { $excel.Calculate() }
+    foreach ($a in "N1", "N2", "N3", "N4", "N5", "N6", "O8", "N9") { Show $ws $a }
+    "  N1 = N3: " + ((Retry { $ws.Range("N1").Text }) -eq (Retry { $ws.Range("N3").Text })) | Write-Host
+    $before = Retry { $excel.Evaluate('JuliaHandleInfo("count")') }
+    Retry { $ws.Range("N1").ClearContents(); $ws.Range("N3").ClearContents() }
+    Retry { $excel.Calculate() }; Start-Sleep -Milliseconds 500; Retry { $excel.Calculate() }
+    "  handles before/after clearing N1 and N3: $before / " + (Retry { $excel.Evaluate('JuliaHandleInfo("count")') }) | Write-Host
+    Log $excel "register log"
     F $ws "Y1" '=JuliaEval("exit()")'
     Retry { $wb.Close($false) }
 } catch {

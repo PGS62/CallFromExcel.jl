@@ -181,7 +181,7 @@ namespace CallFromExcel.AddIn
             }
         }
 
-        private const string CallLoopError = "#JuliaCallHandle: its arguments change at every recalculation (RAND, NOW, OFFSET...?), so it can't keep a handle - see Help";
+        private static string CallLoopError(string function) => "#" + function + ": its arguments change at every recalculation (RAND, NOW, OFFSET...?), so it can't keep a handle - see Help";
         private const string EvalLoopError = "#JuliaEval: its expression changes at every recalculation (RAND, NOW, OFFSET...?), so it can't keep a handle - see Help";
 
         // Covers both JuliaCall and JuliaCallNamedArgs, so there is no JuliaCallNamedArgsHandle:
@@ -197,7 +197,7 @@ namespace CallFromExcel.AddIn
             // Excel functions, rather than creating an object from it.
             foreach (object arg in args) if (arg is ExcelError) return arg;
             string caller = CallerKey();
-            if (IsLooping(caller)) return CallLoopError;
+            if (IsLooping(caller)) return CallLoopError("JuliaCallHandle");
             var topic = new object[2 + args.Length];
             topic[0] = generation;
             topic[1] = juliaFunction;
@@ -208,6 +208,24 @@ namespace CallFromExcel.AddIn
             return ExcelAsyncUtil.Observe("JuliaCallHandle", topic,
                 () => new HandleObservable("JuliaCallHandle(" + juliaFunction + ")", "CallFromExcel.handle_create",
                     HandleCreateArgs(juliaFunction, args), caller));
+        }
+
+        // A named worksheet function exposed with handle=true (NamedFunctions.Forward, with the
+        // arguments left out at the end already dropped): as JuliaCallHandle, but Julia calls the
+        // function exposed under excelName, as _call_exposed does, broadcasting as exposed.
+        internal static object ExposedHandle(string excelName, object[] args)
+        {
+            if (ExcelDnaUtil.IsInFunctionWizard()) return "#Disabled in Function Wizard!";
+            foreach (object arg in args) if (arg is ExcelError) return arg;
+            string caller = CallerKey();
+            if (IsLooping(caller)) return CallLoopError(excelName);
+            var topic = new object[2 + args.Length];
+            topic[0] = generation;
+            topic[1] = excelName;
+            Array.Copy(args, 0, topic, 2, args.Length);
+            return ExcelAsyncUtil.Observe("JuliaExposedHandle", topic,
+                () => new HandleObservable(excelName, "CallFromExcel.handle_create_exposed",
+                    HandleCreateArgs(excelName, args), caller));
         }
 
         // Arguments for handle_create: the function name, then copies of the arguments. Copies,

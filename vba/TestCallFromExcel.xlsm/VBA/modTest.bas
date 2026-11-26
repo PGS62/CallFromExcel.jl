@@ -165,6 +165,7 @@ Function RunTests(Optional SilentMode As Boolean = False, Optional CommandLineOp
           AccResult "TestInvalidCharactersInArray", TestInvalidCharactersInArray, NumPassed, NumFailed
           AccResult "WsTest_JuliaIncludeIntoMain", WsTest_JuliaIncludeIntoMain, NumPassed, NumFailed
           AccResult "WsTest_NamedFunctionBroadcast", WsTest_NamedFunctionBroadcast, NumPassed, NumFailed
+          AccResult "WsTest_NamedFunctionHandle", WsTest_NamedFunctionHandle, NumPassed, NumFailed
           AccResult "WsTest_NamedFunctionOptionalArgs", WsTest_NamedFunctionOptionalArgs, NumPassed, NumFailed
           AccResult "WsTest_NamedFunctionNameChecks", WsTest_NamedFunctionNameChecks, NumPassed, NumFailed
           AccResult "WsTest_NamedFunctionRedefined", WsTest_NamedFunctionRedefined, NumPassed, NumFailed
@@ -1706,7 +1707,7 @@ End Function
 
 ' Named worksheet functions (@excel / expose_to_excel). JuliaInclude and JuliaEval queue
 ' their registration to run when Excel is next idle - after this macro - so these tests
-' register with the JuliaRegisterFunctions command, as the README tells VBA code to.
+' register with the JuliaRegisterFunctions command, as the documentation tells VBA code to.
 Function WsTest_NamedFunctionBroadcast() As Boolean
           Dim ws As Worksheet
 1         On Error GoTo ErrHandler
@@ -1730,6 +1731,33 @@ Function WsTest_NamedFunctionBroadcast() As Boolean
 ErrHandler:
 14        PrintTwice ReThrow("WsTest_NamedFunctionBroadcast", Err, True)
 15        WsTest_NamedFunctionBroadcast = False
+End Function
+
+' handle=true: the named function returns a handle, which other functions take in place of
+' the object. The same arguments give the same handle; broadcasting gives one handle to the
+' whole result.
+Function WsTest_NamedFunctionHandle() As Boolean
+          Dim ws As Worksheet
+1         On Error GoTo ErrHandler
+2         Set ws = ScratchSheet()
+3         CallFromExcel.JuliaEval "@excel handle=true vba_test_square(n) = reshape(1:Int(n)^2, Int(n), Int(n))"
+4         CallFromExcel.JuliaEval "@excel handle=true broadcast=true vba_test_twice(x) = 2x"
+5         Application.Run "JuliaRegisterFunctions"
+6         ws.Range("A1:A3").Value2 = Application.WorksheetFunction.Transpose(Array(1, 2, 3))
+7         ws.Range("B1").Formula2 = "=jl.vba_test_square(3)"
+8         ws.Range("B2").Formula2 = "=jl.vba_test_square(3)"
+9         ws.Range("C1").Formula2 = "=JuliaCall(""sum"", B1)"
+10        ws.Range("D1").Formula2 = "=jl.vba_test_twice(A1:A3)"
+11        ws.Range("E1").Formula2 = "=JuliaCall(""sum"", D1)"
+12        WsTest_NamedFunctionHandle = Left$(ws.Range("B1").Value2, 3) = "jl:" And _
+              ws.Range("B2").Value2 = ws.Range("B1").Value2 And _
+              ws.Range("C1").Value2 = 45 And _
+              Left$(ws.Range("D1").Value2, 9) = "jl:Array#" And _
+              ws.Range("E1").Value2 = 12
+13        Exit Function
+ErrHandler:
+14        PrintTwice ReThrow("WsTest_NamedFunctionHandle", Err, True)
+15        WsTest_NamedFunctionHandle = False
 End Function
 
 ' Arguments with default values are optional; a left-out required argument, or a gap before

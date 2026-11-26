@@ -6,7 +6,8 @@ expose_to_excel (and @excel) records a Julia function to be registered in Excel 
 registers each as a worksheet function that forwards to JuliaCall's code.
 =#
 
-# Excel name => (f, julia, description, argnames, argdescriptions, nrequired, bcast, asvector)
+# Excel name => (f, julia, description, argnames, argdescriptions, nrequired, bcast, asvector,
+# handle)
 const _exposed = Dict{String,Any}()
 
 # Separates the arguments' names, and their descriptions, in one string for the add-in.
@@ -25,7 +26,7 @@ tag (as in handles) tells a relaunched Julia apart, whose count could match the 
 exposed_version() = _session_tag() * "#" * string(_exposed_count[])
 
 """
-    expose_to_excel(fn_name; name=nothing, description="", argdescriptions=String[], broadcast=false)
+    expose_to_excel(fn_name; name=nothing, description="", argdescriptions=String[], broadcast=false, handle=false)
     expose_to_excel(f::Function; ...)
 
 Make a Julia function, named by `fn_name` (evaluated in `Main`) or given itself,
@@ -58,6 +59,14 @@ arguments are passed whole to every call. Which arguments broadcast:
 An argument declared `::AbstractVector` gets a vector from a single cell, row or column.
 Ranges broadcast together must have the same number of rows, or one of them a single row
 (and likewise columns); a column against a row gives a table, as in Excel.
+
+# Handles
+
+With `handle=true`, the Excel function returns a handle to the result, which stays in
+Julia, as `JuliaCallHandle` does: for a fitted model, a large matrix or anything else that
+belongs in Julia rather than on the sheet. The same arguments give the same object, built
+once. With broadcasting, the handle is to the whole broadcast result. The description shown
+in Excel ends "Returns a handle."
 """
 function expose_to_excel(fn_name::AbstractString; name=nothing, kwargs...)
     f = Main.eval(Meta.parse(fn_name))
@@ -69,7 +78,7 @@ function expose_to_excel(f::Function; name=nothing, kwargs...)
 end
 
 function _expose(f, julia_name::String, m::Method; name=nothing, description::AbstractString="",
-                 argdescriptions=String[], broadcast=false)
+                 argdescriptions=String[], broadcast=false, handle::Bool=false)
     nrequired = _nrequired(f, m)
     # An argument with no name (f(::Int, y)) is called #unused# by Julia: arg1, arg2... instead.
     argnames = [startswith(string(a), "#") ? "arg$k" : string(a)
@@ -95,6 +104,11 @@ function _expose(f, julia_name::String, m::Method; name=nothing, description::Ab
 
     doc = _docstring(f, m)
     desc = isempty(description) ? _doc_description(doc) : String(description)
+    if handle
+        # Kept within Excel's limit, and the note kept whole, however long the description.
+        note = "Returns a handle."
+        desc = isempty(desc) ? note : _fit(desc, 253 - length(note) - 1) * " " * note
+    end
     docargs = _doc_arguments(doc)
     argdescs = map(enumerate(argnames)) do (k, a)
         d = k <= length(argdescriptions) && !isempty(argdescriptions[k]) ? String(argdescriptions[k]) :
@@ -103,7 +117,7 @@ function _expose(f, julia_name::String, m::Method; name=nothing, description::Ab
         _fit(d)
     end
     _exposed[excel_name] = (f=f, julia=julia_name, description=_fit(desc), argnames=argnames,
-        argdescriptions=argdescs, nrequired=nrequired, bcast=bcast, asvector=asvector)
+        argdescriptions=argdescs, nrequired=nrequired, bcast=bcast, asvector=asvector, handle=handle)
     _exposed_count[] += 1
     excel_name
 end
@@ -160,7 +174,7 @@ function _declared_types(m::Method)
 end
 
 """
-    @excel [name="..."] [description="..."] [argdescriptions=[...]] [broadcast=...] function f(...) ... end
+    @excel [name="..."] [description="..."] [argdescriptions=[...]] [broadcast=...] [handle=...] function f(...) ... end
 
 Define a function and make it callable from Excel, as `jl.f` by default, following the
 method defined here (rather than the one with the most arguments). Options are as for
@@ -182,8 +196,8 @@ macro excel(exprs...)
     isempty(exprs) && throw(ArgumentError("@excel needs a function definition."))
     def = exprs[end]
     kw = map(exprs[1:end-1]) do o
-        (o isa Expr && o.head === :(=) && o.args[1] in (:name, :description, :argdescriptions, :broadcast)) ||
-            throw(ArgumentError("@excel's options are name=..., description=..., argdescriptions=... and broadcast=...; not `$o`."))
+        (o isa Expr && o.head === :(=) && o.args[1] in (:name, :description, :argdescriptions, :broadcast, :handle)) ||
+            throw(ArgumentError("@excel's options are name=..., description=..., argdescriptions=..., broadcast=... and handle=...; not `$o`."))
         Expr(:kw, o.args[1], esc(o.args[2]))
     end
     fname, argnames = _def_signature(def)
@@ -243,6 +257,16 @@ function _call_exposed(excel_name::String, args...)
     xs, broadcasting = _exposed_args(excel_name, e, args)
     broadcasting ? _check_broadcast_result(excel_name, broadcast(e.f, xs...)) : e.f(xs...)
 end
+
+"""
+    handle_create_exposed(excel_name, args...)
+
+For the add-in: calls the function exposed as `excel_name` with `handle=true`, as
+`_call_exposed` does, stores the result and returns its handle. Unlike `handle_create`, an
+argument `";"` is just a string: exposed functions have no named arguments.
+"""
+handle_create_exposed(excel_name::String, args...) =
+    _store_handle(Base.invokelatest(_call_exposed, excel_name, args...))
 
 function _exposed_entry(excel_name::String)
     e = get(_exposed, excel_name, nothing)
@@ -362,7 +386,7 @@ end
 
 # Excel-DNA's limit for descriptions is 255 characters; 253 as for the add-in's own (see
 # the test "Function and argument descriptions fit Excel's limit").
-_fit(s::AbstractString) = length(s) <= 253 ? String(s) : first(s, 250) * "..."
+_fit(s::AbstractString, limit::Int=253) = length(s) <= limit ? String(s) : first(s, limit - 3) * "..."
 
 # Excel's rules for a function name, as for a defined name: a letter, _ or \ first, then
 # letters, digits, _ and . (any script's letters: jl.σ registers).
@@ -397,17 +421,17 @@ end
     exposed_functions()
 
 The exposed functions, for the add-in: one row per function, with columns Excel name,
-Julia name, description, argument names, argument descriptions (each joined by "\\x1f") and
-the number of required arguments. `nothing` when there are none: Excel has no empty
-arrays, so the add-in can't decode one.
+Julia name, description, argument names, argument descriptions (each joined by "\\x1f"),
+the number of required arguments, and whether it returns a handle. `nothing` when there are
+none: Excel has no empty arrays, so the add-in can't decode one.
 """
 function exposed_functions()
     isempty(_exposed) && return nothing
     names = sort!(collect(keys(_exposed)))
-    result = Matrix{Any}(undef, length(names), 6)
+    result = Matrix{Any}(undef, length(names), 7)
     for (i, n) in enumerate(names)
         e = _exposed[n]
-        result[i, :] = [n, e.julia, e.description, join(e.argnames, _ARGSEP), join(e.argdescriptions, _ARGSEP), e.nrequired]
+        result[i, :] = [n, e.julia, e.description, join(e.argnames, _ARGSEP), join(e.argdescriptions, _ARGSEP), e.nrequired, e.handle]
     end
     result
 end

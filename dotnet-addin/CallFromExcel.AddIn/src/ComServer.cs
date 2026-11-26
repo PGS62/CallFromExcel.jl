@@ -80,7 +80,7 @@ namespace CallFromExcel.AddIn
         object JuliaSetVar(string VariableName, object RefersTo);
         object JuliaInclude(string FileName);
 
-        // SPIKE (branch spike/object-handles): object handles created from VBA. Added at the
+        // Object handles created from VBA (README, "Object handles"). Added at the
         // end of the interface so code compiled against the earlier type library is unaffected.
         // A worksheet handle's lifetime comes from Excel's RTD machinery (it lives while a
         // formula uses it); a COM call has no calling cell, so a handle created here lives
@@ -267,7 +267,7 @@ namespace CallFromExcel.AddIn
             }
         }
 
-        // SPIKE: handles created by JuliaCallHandle/JuliaEvalHandle and not yet released. Only
+        // Handles created by JuliaCallHandle/JuliaEvalHandle and not yet released. Only
         // these can be released from VBA: a worksheet handle is released by Excel when no
         // formula uses it, and freeing it here would break the cells using it. Shared by every
         // ComServer instance in this Excel (it's static), but not with the worksheet functions,

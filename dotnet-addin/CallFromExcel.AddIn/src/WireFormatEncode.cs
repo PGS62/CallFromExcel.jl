@@ -55,7 +55,7 @@ namespace CallFromExcel.AddIn
             if (value is byte) return "B" + ((byte)value).ToString(CultureInfo.InvariantCulture);
             if (value is float) return "S" + Hex.SingleToHex((float)value);
             if (value is long) return "^" + ((long)value).ToString(CultureInfo.InvariantCulture);
-            if (value is JuliaHandleRef) return "O" + ((JuliaHandleRef)value).Key;   // SPIKE: object handle
+            if (value is JuliaHandleRef) return "O" + ((JuliaHandleRef)value).Key;   // object handle
             if (value is ExcelErrorValue) return "!" + ((ExcelErrorValue)value).Code.ToString(CultureInfo.InvariantCulture);
             if (value is JuliaDictionary) return EncodeDictionary((JuliaDictionary)value);
             if (value is DateTime)

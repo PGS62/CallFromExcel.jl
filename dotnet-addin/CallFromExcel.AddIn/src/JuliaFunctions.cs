@@ -150,7 +150,7 @@ namespace CallFromExcel.AddIn
             }
         }
 
-        // SPIKE: used by JuliaHandles to create, count and free handles.
+        // Used by JuliaHandles to create, count and free handles, and by NamedFunctions.
         internal static object CallForHandles(string juliaFunction, object[] args, bool mapHandles = true)
         {
             if (JuliaPort.GetJuliaPortOrZero() == 0)
@@ -265,7 +265,7 @@ namespace CallFromExcel.AddIn
         {
             if (value is ExcelEmpty || value is ExcelMissing) return null;
             if (value is ExcelError error) return new ExcelErrorValue(2000 + (int)error);
-            // SPIKE: a handle is sent as a reference to its Julia object.
+            // A handle is sent as a reference to its Julia object.
             if (value is string s && HandlePattern.TryGetKey(s, out string key)) return new JuliaHandleRef(key);
             return value;
         }

@@ -74,7 +74,7 @@ function decode_from_xl(s::String)
         decode_xl_array_v(s)
     elseif c == 'L'                #Array of LongLongs (compact) -> Array{Int64,N}
         decode_xl_array_l(s)
-    elseif c == 'O'                #Object handle (spike) -> the stored object
+    elseif c == 'O'                #Object handle -> the stored object
         _lookup_handle(s[2:end])
     else
         error("decode_from_xl: unknown type indicator $(repr(c)) in '$(first(s, 50))'")

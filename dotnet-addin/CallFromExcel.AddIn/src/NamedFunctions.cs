@@ -210,7 +210,7 @@ namespace CallFromExcel.AddIn
 
         // Arguments left out at the end of the call are dropped, so Julia uses the defaults of
         // optional ones. Any other argument left out is an error here: Julia would receive
-        // missing, which can give a wrong answer rather than an error (the spike's 0), and
+        // missing, which can give a wrong answer rather than an error (such as 0), and
         // can't skip a positional argument to use its default. (An empty cell, as opposed to an
         // argument left out, is passed as usual.)
         private static object Forward(string excelName, string juliaName, int nRequired, string[] argNames, object[] args)

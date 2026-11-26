@@ -4,8 +4,7 @@ using ExcelDna.Integration;
 
 namespace CallFromExcel.AddIn
 {
-    // SPIKE (branch spike/object-handles): object handles, see "Object handles" in
-    // Enhancements.md and src/handles.jl.
+    // Object handles (README, "Object handles"; Julia side in src/handles.jl).
     //
     // Lifetime rests on Excel-DNA's RTD-based ExcelAsyncUtil.Observe - the same mechanism its
     // built-in [ExcelHandle] uses (Excel-DNA 1.9.0's ObjectHandler.GetHandle is a thin layer
@@ -32,11 +31,11 @@ namespace CallFromExcel.AddIn
         // a new topic, which creates its object in the new Julia.
         private static int generation;
 
-        // SPIKE: what to do when Julia restarts. Every live handle names an object that no
+        // What to do when Julia restarts. Every live handle names an object that no
         // longer exists, and its topic would otherwise keep that dead handle for as long as its
         // arguments are unchanged. Completing the topic now doesn't help: once a topic has
         // delivered a value, Excel-DNA keeps it and returns its final value for as long as the
-        // arguments are unchanged (tested in the spike). That differs from a failed create in
+        // arguments are unchanged (checked 2026-11-23). That differs from a failed create in
         // Subscribe below, which completes before the first value is returned, so Excel-DNA
         // keeps no topic and the next recalculation tries again. So: new generation, and
         // push #N/A into each old topic. The RTD update makes Excel recalculate each such cell,
@@ -82,7 +81,7 @@ namespace CallFromExcel.AddIn
             }
         }
 
-        // Create/release events, for checking the spike's scenarios from a sheet.
+        // Create/release events, for diagnostics and the drivers in dotnet-addin/spike-handles.
         private static readonly List<string> Events = new List<string>();
         private static int eventCount;
 
@@ -163,7 +162,7 @@ namespace CallFromExcel.AddIn
         }
 
         // Hidden: a worksheet function that changes state is a poor fit for the documented set,
-        // but the spike's test scripts use it to see each step's events on their own.
+        // but the drivers in dotnet-addin/spike-handles use it to see each step's events on their own.
         [ExcelFunction(Description = "Clears the log of handle events that JuliaHandleInfo(\"events\") shows.", IsThreadSafe = false, IsHidden = true)]
         public static object JuliaHandleEventsClear()
         {

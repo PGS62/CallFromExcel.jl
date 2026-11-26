@@ -18,10 +18,17 @@ namespace CallFromExcel.AddIn
         // capped strings in an array at 255 characters.)
         private const int StringLengthLimit = 32768;
 
-        // Each function's HelpTopic is its section of the README. Excel opens it from "Help on
-        // this function" in the Insert Function dialog, and IntelliSense makes the function's
-        // name in its pop-up a link to it.
-        internal const string HelpRoot = "https://github.com/PGS62/CallFromExcel.jl#";
+        // The documentation site (docs/ in the repository), for the ribbon's Help button, the
+        // About dialog and error messages.
+        internal const string DocsUrl = "https://pgs62.github.io/CallFromExcel.jl/stable/";
+
+        // Each function's HelpTopic is its section of the documentation's Worksheet functions
+        // page, whose anchors are the function's name in lower case. Excel opens it from "Help
+        // on this function" in the Insert Function dialog, and IntelliSense makes the
+        // function's name in its pop-up a link to it. (Add-ins up to 0.1.8 link to the README's
+        // anchors instead, https://github.com/PGS62/CallFromExcel.jl#juliacall etc., which the
+        // README keeps.)
+        internal const string HelpRoot = DocsUrl + "functions/#";
 
         // Parameter order (UseLinux, MinimiseWindow, CommandLineOptions, Packages,
         // BashStatements, TimeOut) deliberately matches the old VBA worksheet function

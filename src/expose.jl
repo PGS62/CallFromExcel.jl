@@ -1,5 +1,5 @@
 #=
-Named worksheet functions: see "Your own worksheet functions" in the README.
+Named worksheet functions: see "Your own worksheet functions" in the documentation.
 
 expose_to_excel (and @excel) records a Julia function to be registered in Excel under its own name, by default
 "jl." followed by the Julia name. The add-in fetches the list with exposed_functions and

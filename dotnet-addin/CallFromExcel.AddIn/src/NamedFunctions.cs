@@ -5,7 +5,7 @@ using ExcelDna.Integration;
 
 namespace CallFromExcel.AddIn
 {
-    // Named worksheet functions (README, "Your own worksheet functions"; Julia side in
+    // Named worksheet functions (documentation, "Your own worksheet functions"; Julia side in
     // src/expose.jl). Fetches the functions Julia has exposed with @excel or expose_to_excel
     // and registers each as a worksheet function - by default named "jl.<julia name>" - that
     // forwards its arguments to Julia's CallFromExcel._call_exposed.

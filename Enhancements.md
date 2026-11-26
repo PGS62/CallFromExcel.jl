@@ -4,7 +4,7 @@ Ideas considered but not yet scheduled, each with a sketch of how it might be im
 
 ## Named worksheet functions: follow-ups
 
-Named worksheet functions are built (README, "Your own worksheet functions"). The design, the spike's results and the decisions taken - the `jl.` prefix, the name checks, when to register, no broadcasting by default, why a formula typed before registration isn't re-entered for the user - are in this file's history up to commit b6b56aa. Still open:
+Named worksheet functions are built (documentation, "Your own worksheet functions"). The design, the spike's results and the decisions taken - the `jl.` prefix, the name checks, when to register, no broadcasting by default, why a formula typed before registration isn't re-entered for the user - are in this file's history up to commit b6b56aa. Still open:
 
 - **Keyword arguments.** Not exposed as worksheet arguments; `JuliaCallNamedArgs` covers them. One option: trailing worksheet arguments for the keywords, named as in the method.
 - **`::AbstractMatrix` from a single cell.** An argument declared `::AbstractVector` gets a vector from a cell, row or column; one declared `::AbstractMatrix` gets a single cell as a bare value, so the method doesn't match. Wrap it as a 1x1 matrix.
@@ -15,7 +15,7 @@ Named worksheet functions are built (README, "Your own worksheet functions"). Th
 
 ## Object handles: follow-ups
 
-Object handles are built (README, "Object handles"). The design discussion, the spike's results and the decisions taken - including why handles are keyed by their inputs rather than by cell - are in this file's history up to commit 7a6e44f. Still open:
+Object handles are built (documentation, "Object handles"). The design discussion, the spike's results and the decisions taken - including why handles are keyed by their inputs rather than by cell - are in this file's history up to commit 7a6e44f. Still open:
 
 - **VBA conveniences.** A handle scope (`jl.HandleScopeBegin`/`End`, releasing every handle created in between). An importable VBA class module whose `Class_Terminate` calls `JuliaHandleRelease`, shipped with a standard module holding `JuliaServer()` (a cached `CreateObject("CallFromExcel.ComServer")`) and a `NewJuliaHandle` factory: VBA frees objects deterministically, so this gives automatic cleanup, except after `End`, a project reset or "End" on an error dialog, which skip `Class_Terminate` (`JuliaHandleReleaseAll` is the safety net). Rejected: a .NET proxy object freed when VBA drops it - .NET learns of that only at a garbage collection, which may be much later.
 - **Separate objects for the same inputs.** Today: make the inputs differ. If needed often, a reserved named argument that `handle_create` uses in the key and drops before the call. Only if asked for.
@@ -52,5 +52,5 @@ Object handles are built (README, "Object handles"). The design discussion, the 
 
 **Sketches:**
 
-- **README section** "Corporate and locked-down machines": worksheet functions work in an elevated Excel but VBA's `CreateObject` doesn't (don't run Excel elevated, or install as that account); and, for when the installer fails under CLM, what it does - copy the add-in files to `%APPDATA%\Microsoft\AddIns\CallFromExcel` and set the listed registry values - so IT can apply it by hand.
+- **Documentation section** "Corporate and locked-down machines": worksheet functions work in an elevated Excel but VBA's `CreateObject` doesn't (don't run Excel elevated, or install as that account); and, for when the installer fails under CLM, what it does - copy the add-in files to `%APPDATA%\Microsoft\AddIns\CallFromExcel` and set the listed registry values - so IT can apply it by hand.
 - **Make Install.ps1 CLM-safe:** use only cmdlets - read Office's version and Excel's bitness from the registry rather than via COM and the executable's header. A moderate rewrite of the installer; testing needs CLM enabled on a machine (e.g. `__PSLockdownPolicy` or a WDAC policy in a VM).

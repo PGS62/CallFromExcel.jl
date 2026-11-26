@@ -1,5 +1,5 @@
 #=
-Object handles - see "Object handles" in the README.
+Object handles - see "Object handles" in the documentation.
 
 The add-in's JuliaCallHandle and JuliaEval(..., TRUE) call handle_create/handle_eval, which store the
 result here and return a handle string "jl:<label>#<id>@<session>". The add-in recognises a

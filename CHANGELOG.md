@@ -6,7 +6,7 @@ CallFromExcel is the successor to [JuliaExcel](https://github.com/PGS62/JuliaExc
 
 ### Object handles
 
-Large or structured Julia objects - a big matrix, a fitted model, a DataFrame - can now stay in Julia, with Excel holding a short string naming each one, a _handle_ such as `jl:Array#17@k3x9`. See [Object handles](README.md#object-handles) in the README.
+Large or structured Julia objects - a big matrix, a fitted model, a DataFrame - can now stay in Julia, with Excel holding a short string naming each one, a _handle_ such as `jl:Array#17@k3x9`. See [Object handles](https://pgs62.github.io/CallFromExcel.jl/stable/handles/) in the documentation.
 
 - `JuliaCallHandle` calls a Julia function and returns a handle to the result. Named arguments follow `";"`, as in `JuliaCallNamedArgs`, and a trailing `.` on the function name broadcasts, as for `JuliaCall`. `JuliaEval` has a new optional argument, `ReturnHandle`, which does the same for an expression.
 - A handle can be passed to `JuliaCall` and the other functions in place of its object, alone or in a range or array, and Julia receives the object itself.
@@ -19,7 +19,7 @@ Large or structured Julia objects - a big matrix, a fitted model, a DataFrame - 
 
 ### Your own worksheet functions
 
-A Julia function can now be a worksheet function of its own, `=jl.birthday(A1)` rather than `=JuliaCall("birthday", A1)`. See [Your own worksheet functions](README.md#your-own-worksheet-functions) in the README.
+A Julia function can now be a worksheet function of its own, `=jl.birthday(A1)` rather than `=JuliaCall("birthday", A1)`. See [Your own worksheet functions](https://pgs62.github.io/CallFromExcel.jl/stable/own_functions/) in the documentation.
 
 - Mark a function with `@excel`, or make an existing one available with `expose_to_excel`. Its Excel name is `jl.` followed by its Julia name unless you choose another, and its description and arguments' descriptions, shown by the Insert Function dialog and the tooltips as you type, come from its docstring.
 - Arguments with default values are optional in Excel. Leaving out a required argument is an error naming it.
@@ -108,7 +108,7 @@ When launching Julia from Excel fails because something it needs is missing, the
 
 ## [0.1.0] - 2026-11-12
 
-First release of CallFromExcel. If you're upgrading from JuliaExcel, see [Upgrading from JuliaExcel](README.md#upgrading-from-juliaexcel).
+First release of CallFromExcel. If you're upgrading from JuliaExcel, see [Upgrading from JuliaExcel](https://pgs62.github.io/CallFromExcel.jl/stable/installation/#upgrading-from-juliaexcel).
 
 ### Changes
 
@@ -116,7 +116,7 @@ First release of CallFromExcel. If you're upgrading from JuliaExcel, see [Upgrad
 - From VBA, functions are called through an object created with `CreateObject("CallFromExcel.ComServer")`, rather than through a reference to the add-in.
 - The Julia package is renamed `CallFromExcel`, so for example `JuliaExcel.serve_xl()` becomes `CallFromExcel.serve_xl()`.
 - Installing the package doesn't install the Excel add-in: install it with `using CallFromExcel; CallFromExcel.installme()`, after installing and after each update. Installation shows no dialogs, needs no admin rights, and uninstalls `JuliaExcel.xlam` if present. The add-in checks that it's the same version as the Julia package it talks to, and if not, says so and how to fix it.
-- A Julia tab on Excel's ribbon launches Julia (with saved settings, including a project folder), shows or closes its window, switches `display_results` on and off, and includes Julia files chosen in a file box with a list of recent files. See [The Julia ribbon tab](README.md#the-julia-ribbon-tab).
+- A Julia tab on Excel's ribbon launches Julia (with saved settings, including a project folder), shows or closes its window, switches `display_results` on and off, and includes Julia files chosen in a file box with a list of recent files. See [The Julia ribbon tab](https://pgs62.github.io/CallFromExcel.jl/stable/ribbon/).
 - `JuliaLaunch` opens Julia in a classic console window showing the Julia logo, in its title bar and taskbar button, rather than in Windows Terminal (where the default terminal is Windows Terminal, as on Windows 11).
 - "Help on this function" in Excel's Insert Function dialog now opens the function's documentation on GitHub, as does clicking the function's name in its IntelliSense pop-up.
 - CallFromExcel requires 64-bit Excel. JuliaExcel also supported 32-bit Excel.
@@ -157,7 +157,7 @@ Released as [JuliaExcel.jl](https://github.com/PGS62/JuliaExcel.jl).
 
 ### Changes
 
-- Complex numbers now return to Excel as text in the format of Excel's `COMPLEX` function, e.g. `"3+4i"`, so that Excel's `IMREAL`, `IMSUM` etc. can work with them. Previously they returned as Julia's display text, e.g. `"3 + 4im"`, which those functions don't accept. Details [here](README.md#complex-numbers-return-as-text).
+- Complex numbers now return to Excel as text in the format of Excel's `COMPLEX` function, e.g. `"3+4i"`, so that Excel's `IMREAL`, `IMSUM` etc. can work with them. Previously they returned as Julia's display text, e.g. `"3 + 4im"`, which those functions don't accept. Details [here](https://pgs62.github.io/CallFromExcel.jl/stable/marshalling/#Complex-numbers-return-as-text).
 
 ## [JuliaExcel 2.3.1] - 2026-11-01
 
@@ -181,7 +181,7 @@ Released as [JuliaExcel.jl](https://github.com/PGS62/JuliaExcel.jl).
 
 ### New features
 
-- New worksheet function `JuliaCallNamedArgs`, and VBA function `JuliaCallNamedArgsVBA`, for calling Julia functions that take named (keyword) arguments. The argument `";"` marks where the named arguments start, mirroring Julia's own call syntax, and they're given as name-value pairs: `=JuliaCallNamedArgs("sort", A1:A10, ";", "rev", TRUE)` calls `sort(A1:A10; rev=true)`. Julia finds the `";"` by searching backwards from the end of the arguments, so a `";"` among the positional arguments is never mistaken for it. A named argument whose value is `";"` must therefore be the last pair. Example [here](README.md#juliacallnamedargs).
+- New worksheet function `JuliaCallNamedArgs`, and VBA function `JuliaCallNamedArgsVBA`, for calling Julia functions that take named (keyword) arguments. The argument `";"` marks where the named arguments start, mirroring Julia's own call syntax, and they're given as name-value pairs: `=JuliaCallNamedArgs("sort", A1:A10, ";", "rev", TRUE)` calls `sort(A1:A10; rev=true)`. Julia finds the `";"` by searching backwards from the end of the arguments, so a `";"` among the positional arguments is never mistaken for it. A named argument whose value is `";"` must therefore be the last pair. Example [here](https://pgs62.github.io/CallFromExcel.jl/stable/functions/#juliacallnamedargs).
 - New `JuliaExcel.kwargs_from_xl`, holding the named arguments most recently passed to `JuliaCallNamedArgs`/`JuliaCallNamedArgsVBA`, alongside `args_from_xl` for the positional ones.
 
 ## [JuliaExcel 2.1.3] - 2026-10-17
@@ -206,7 +206,7 @@ Released as [JuliaExcel.jl](https://github.com/PGS62/JuliaExcel.jl).
 
 ### New features
 
-- New `display_results` function: switch it on to echo, in the Julia console, both the expression or function call arriving from Excel (`question>`) and the value being returned to it (`answer>`) - useful for seeing exactly what `JuliaCall`/`JuliaEval` are doing. Example [here](README.md#demo).
+- New `display_results` function: switch it on to echo, in the Julia console, both the expression or function call arriving from Excel (`question>`) and the value being returned to it (`answer>`) - useful for seeing exactly what `JuliaCall`/`JuliaEval` are doing. Example [here](https://pgs62.github.io/CallFromExcel.jl/stable/#Demo).
 - Clearer Julia console output when a `JuliaCall`/`JuliaEval` call fails: the error and the expression that caused it are now shown in colour, making them easier to spot among other console output.
 - `JuliaExcel.last_question` and `JuliaExcel.last_answer` record the most recent expression or function call from Excel and the value returned to it, whichever of `JuliaCall`/`JuliaEval` was used. A new `JuliaExcel.answer_again()` re-evaluates `last_question`, and you can wrap it with `@enter` or your own debugging tools.
 - New `JuliaExcel.serve_xl` function: attaches a Julia session that's already running (e.g. one open in VS Code) to Excel, instead of always launching a fresh process via `JuliaLaunch`. Call `JuliaExcel.serve_xl()` to attach to the single running Excel process automatically, or give the process id explicitly if more than one is running - get it from Excel's new `JuliaExcelPID()` worksheet function. Also adds `JuliaExcel.stop_server()` and `JuliaExcel.server_status()` for managing a session attached this way.

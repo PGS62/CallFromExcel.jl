@@ -1,6 +1,6 @@
 # CallFromExcel's Excel add-in
 
-The C# source of CallFromExcel's Excel add-in, built with [Excel-DNA](https://excel-dna.net/). Users never build this: `Pkg.add` installs the ready-built copy in `dist\`. This page is for anyone changing the add-in. See the [main README](../README.md) for how CallFromExcel is used and how it works.
+The C# source of CallFromExcel's Excel add-in, built with [Excel-DNA](https://excel-dna.net/). Users never build this: `Pkg.add` installs the ready-built copy in `dist\`. This page is for anyone changing the add-in. See the [documentation](https://pgs62.github.io/CallFromExcel.jl/stable/) for how CallFromExcel is used and how it works.
 
 ## Folders
 

@@ -61,7 +61,7 @@ namespace CallFromExcel.AddIn
                   supertip='Make the Julia functions marked with @excel or expose_to_excel callable as worksheet functions. This happens automatically after JuliaLaunch, JuliaInclude and JuliaEval; use this button for functions exposed from the Julia REPL or from VBA.' />
           <button id='CallFromExcelHelp' label='Help' size='large' imageMso='Help'
                   onAction='OnHelp'
-                  supertip='Open the CallFromExcel.jl documentation on GitHub.' />
+                  supertip='Open the CallFromExcel.jl documentation in your browser.' />
           <button id='CallFromExcelAbout' label='About' size='large' imageMso='Info'
                   onAction='OnAbout'
                   supertip='Show the version of the CallFromExcel add-in, and of the CallFromExcel package and Julia in the Julia session it is connected to.' />
@@ -352,13 +352,8 @@ namespace CallFromExcel.AddIn
 
         public void OnHelp(IRibbonControl control)
         {
-            WebPage.Open(ReadmeUrl, new ExcelWindow());
+            WebPage.Open(JuliaFunctions.DocsUrl, new ExcelWindow());
         }
-
-        // The README's title, for Help and the About dialog's link: the README itself, not the
-        // repository's file list above it. The anchor follows the title's wording, so keep the
-        // two in step.
-        internal const string ReadmeUrl = JuliaFunctions.HelpRoot + "callfromexceljl---call-julia-from-excel";
 
         public void OnAbout(IRibbonControl control)
         {

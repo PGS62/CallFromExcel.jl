@@ -80,7 +80,7 @@ namespace CallFromExcel.AddIn
         object JuliaSetVar(string VariableName, object RefersTo);
         object JuliaInclude(string FileName);
 
-        // Object handles created from VBA (README, "Object handles"). Added at the
+        // Object handles created from VBA (documentation, "Object handles"). Added at the
         // end of the interface so code compiled against the earlier type library is unaffected.
         // A worksheet handle's lifetime comes from Excel's RTD machinery (it lives while a
         // formula uses it); a COM call has no calling cell, so a handle created here lives

@@ -4,7 +4,7 @@ using ExcelDna.Integration;
 
 namespace CallFromExcel.AddIn
 {
-    // Object handles (README, "Object handles"; Julia side in src/handles.jl).
+    // Object handles (documentation, "Object handles"; Julia side in src/handles.jl).
     //
     // Lifetime rests on Excel-DNA's RTD-based ExcelAsyncUtil.Observe - the same mechanism its
     // built-in [ExcelHandle] uses (Excel-DNA 1.9.0's ObjectHandler.GetHandle is a thin layer

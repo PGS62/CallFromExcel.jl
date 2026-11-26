@@ -10,8 +10,6 @@ namespace CallFromExcel.AddIn
     // font, and sizes in multiples of its height, so it scales with the display.
     internal sealed class AboutForm : Form
     {
-        private const string RepositoryUrl = "https://github.com/PGS62/CallFromExcel.jl";
-
         public AboutForm()
         {
             Text = "About " + Ribbon.DialogTitle;
@@ -60,9 +58,9 @@ namespace CallFromExcel.AddIn
             grid.Controls.Add(Line("Call Julia from Excel worksheets and VBA.", em), 1, 1);
             grid.Controls.Add(Line("Excel add-in: version " + JuliaPort.AddInVersion + "\n" + JuliaSessionText(), em), 1, 2);
 
-            var link = new LinkLabel { Text = RepositoryUrl, AutoSize = true, Margin = new Padding(0, em / 2, 0, 0) };
-            // Shows the repository's address, but opens the README at its title (as Help does).
-            link.LinkClicked += (sender, e) => WebPage.Open(Ribbon.ReadmeUrl, this);
+            var link = new LinkLabel { Text = JuliaFunctions.DocsUrl, AutoSize = true, Margin = new Padding(0, em / 2, 0, 0) };
+            // The documentation, as the ribbon's Help button opens.
+            link.LinkClicked += (sender, e) => WebPage.Open(JuliaFunctions.DocsUrl, this);
             grid.Controls.Add(link, 1, 3);
             grid.Controls.Add(Line("Copyright (c) 2021-2026 Philip Swannell. MIT License.", em), 1, 4);
 

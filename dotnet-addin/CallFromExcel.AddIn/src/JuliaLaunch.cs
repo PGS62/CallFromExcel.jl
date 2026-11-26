@@ -431,8 +431,8 @@ namespace CallFromExcel.AddIn
             if (JuliaPort.GetJuliaPort() == 0)
             {
                 throw new InvalidOperationException(
-                    "Failed to establish connection between Julia and Excel. Is CallFromExcel installed correctly. " +
-                    "See https://github.com/PGS62/CallFromExcel.jl#installation");
+                    "Failed to establish connection between Julia and Excel. Is CallFromExcel installed correctly? " +
+                    "See " + JuliaFunctions.DocsUrl + "installation/");
             }
 
             // Best-effort only: the window is found now that Julia runs in conhost (see above),

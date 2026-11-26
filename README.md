@@ -1,6 +1,6 @@
 # CallFromExcel.jl - call Julia from Excel
 
-[![Runtests](https://github.com/PGS62/CallFromExcel.jl/actions/workflows/Runtests.yml/badge.svg)](https://github.com/PGS62/CallFromExcel.jl/actions/workflows/Runtests.yml) [![codecov](https://codecov.io/gh/PGS62/CallFromExcel.jl/graph/badge.svg)](https://codecov.io/gh/PGS62/CallFromExcel.jl)
+[![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://pgs62.github.io/CallFromExcel.jl/stable/) [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://pgs62.github.io/CallFromExcel.jl/dev/) [![Runtests](https://github.com/PGS62/CallFromExcel.jl/actions/workflows/Runtests.yml/badge.svg)](https://github.com/PGS62/CallFromExcel.jl/actions/workflows/Runtests.yml) [![codecov](https://codecov.io/gh/PGS62/CallFromExcel.jl/graph/badge.svg)](https://codecov.io/gh/PGS62/CallFromExcel.jl)
 
 Call [Julia](https://julialang.org/) from Microsoft Excel worksheets and from VBA.  
 

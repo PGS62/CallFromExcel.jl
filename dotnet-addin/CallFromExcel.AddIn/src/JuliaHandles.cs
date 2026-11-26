@@ -92,6 +92,98 @@ namespace CallFromExcel.AddIn
             if (Events.Count > 500) Events.RemoveAt(0);
         }
 
+        // Handle formulas whose arguments change at every calculation - volatile functions such
+        // as RANDARRAY, NOW or OFFSET, directly or in cells they depend on. Each new handle's
+        // topic posts an RTD update as it connects (Excel-DNA's ExcelRtdServer.ConnectData does
+        // so whenever the topic has a value), which in automatic calculation recalculates the
+        // cell; its arguments are then new, so another handle is created, and so on for ever.
+        // An observable that fails also posts that update, so the loop is stopped by returning an
+        // error WITHOUT calling Observe: with no topic, there is no update.
+        //
+        // A loop is recognised per calling cell: LoopRepeats new handles in a row, each created
+        // within one RTD throttle interval (plus a second) of the previous one finishing - the
+        // time the update takes to come back. Manual calculation never loops (an RTD update
+        // doesn't recalculate), so its recalculations, however quick, aren't counted.
+        private sealed class CreateHistory
+        {
+            internal DateTime LastEnd;      // when this cell's last handle was created
+            internal int QuickRepeats;      // new handles in a row, each soon after the last
+            internal DateTime LoopSeen;     // when the error was last returned; MinValue if never
+        }
+        private static readonly Dictionary<string, CreateHistory> History = new Dictionary<string, CreateHistory>();
+        private const int LoopRepeats = 3;
+
+        // The calling cell, e.g. "123!4,5" (sheet id, row, column); null if not called from a cell.
+        private static string CallerKey()
+        {
+            try
+            {
+                return XlCall.Excel(XlCall.xlfCaller) is ExcelReference r
+                    ? r.SheetId.ToString() + "!" + r.RowFirst + "," + r.ColumnFirst
+                    : null;
+            }
+            catch (Exception) { return null; }
+        }
+
+        // How soon after a handle is created a looping cell asks for the next one, at most.
+        private static double QuickGapMs()
+        {
+            try
+            {
+                const System.Reflection.BindingFlags get = System.Reflection.BindingFlags.GetProperty;
+                object app = ExcelDnaUtil.Application;
+                int calculation = Convert.ToInt32(app.GetType().InvokeMember("Calculation", get, null, app, null));
+                if (calculation == -4135) return -1;   // xlCalculationManual: never quick
+                object rtd = app.GetType().InvokeMember("RTD", get, null, app, null);
+                int throttle = Convert.ToInt32(rtd.GetType().InvokeMember("ThrottleInterval", get, null, rtd, null));
+                return Math.Max(0, throttle) + 1000;
+            }
+            catch (Exception) { return 3000; }
+        }
+
+        // Before Observe: true while the caller is looping, so the function returns an error.
+        // Stays true while the cell keeps being recalculated soon after each error; once that
+        // stops (e.g. the formula no longer uses a volatile function, or the next recalculation
+        // is a while later), handles are created again.
+        private static bool IsLooping(string caller)
+        {
+            if (caller == null || !History.TryGetValue(caller, out CreateHistory h) || h.LoopSeen == DateTime.MinValue) return false;
+            DateTime now = DateTime.UtcNow;
+            double quick = QuickGapMs();
+            if (quick >= 0 && (now - h.LoopSeen).TotalMilliseconds < quick)
+            {
+                h.LoopSeen = now;
+                return true;
+            }
+            History.Remove(caller);
+            return false;
+        }
+
+        // In Subscribe, after a new handle is created for the caller.
+        private static void NoteCreate(string caller, DateTime started)
+        {
+            if (caller == null) return;
+            if (!History.TryGetValue(caller, out CreateHistory h))
+            {
+                History[caller] = h = new CreateHistory { LoopSeen = DateTime.MinValue };
+                if (History.Count > 10000) History.Clear();   // cells deleted or moved; keep it bounded
+            }
+            else
+            {
+                double quick = QuickGapMs();
+                h.QuickRepeats = quick >= 0 && (started - h.LastEnd).TotalMilliseconds < quick ? h.QuickRepeats + 1 : 0;
+            }
+            h.LastEnd = DateTime.UtcNow;
+            if (h.QuickRepeats >= LoopRepeats)
+            {
+                h.LoopSeen = h.LastEnd;
+                Log("loop: " + caller + " creates a new handle at every recalculation");
+            }
+        }
+
+        private const string CallLoopError = "#JuliaCallHandle: its arguments change at every recalculation (RAND, NOW, OFFSET...?), so it can't keep a handle - see Help";
+        private const string EvalLoopError = "#JuliaEval: its expression changes at every recalculation (RAND, NOW, OFFSET...?), so it can't keep a handle - see Help";
+
         // Covers both JuliaCall and JuliaCallNamedArgs, so there is no JuliaCallNamedArgsHandle:
         // handle_create treats the arguments as JuliaCallNamedArgs does if one of them is ";",
         // else as JuliaCall does. The cost: a positional argument can't be the string ";".
@@ -104,6 +196,8 @@ namespace CallFromExcel.AddIn
             // An error argument (e.g. an invalidated handle upstream) propagates, as in most
             // Excel functions, rather than creating an object from it.
             foreach (object arg in args) if (arg is ExcelError) return arg;
+            string caller = CallerKey();
+            if (IsLooping(caller)) return CallLoopError;
             var topic = new object[2 + args.Length];
             topic[0] = generation;
             topic[1] = juliaFunction;
@@ -113,7 +207,7 @@ namespace CallFromExcel.AddIn
             // recalculation that reuses an existing handle.
             return ExcelAsyncUtil.Observe("JuliaCallHandle", topic,
                 () => new HandleObservable("JuliaCallHandle(" + juliaFunction + ")", "CallFromExcel.handle_create",
-                    HandleCreateArgs(juliaFunction, args)));
+                    HandleCreateArgs(juliaFunction, args), caller));
         }
 
         // Arguments for handle_create: the function name, then copies of the arguments. Copies,
@@ -131,8 +225,10 @@ namespace CallFromExcel.AddIn
         // JuliaEval has joined a range of cells into one string.
         internal static object EvalHandle(string expression)
         {
+            string caller = CallerKey();
+            if (IsLooping(caller)) return EvalLoopError;
             return ExcelAsyncUtil.Observe("JuliaEvalHandle", new object[] { generation, expression },
-                () => new HandleObservable("JuliaEval(ReturnHandle)", "CallFromExcel.handle_eval", new object[] { expression }, mapHandles: false));
+                () => new HandleObservable("JuliaEval(ReturnHandle)", "CallFromExcel.handle_eval", new object[] { expression }, caller, mapHandles: false));
         }
 
         // Info types JuliaHandleInfo recognises, as listed in its error for any other.
@@ -172,22 +268,24 @@ namespace CallFromExcel.AddIn
 
         private sealed class HandleObservable : IExcelObservable
         {
-            private readonly string description, juliaFunction;
+            private readonly string description, juliaFunction, caller;
             private readonly object[] args;
             // False for code to evaluate, which must reach Julia as text even if it looks like
             // a handle.
             private readonly bool mapHandles;
 
-            internal HandleObservable(string description, string juliaFunction, object[] args, bool mapHandles = true)
+            internal HandleObservable(string description, string juliaFunction, object[] args, string caller, bool mapHandles = true)
             {
                 this.description = description;
                 this.juliaFunction = juliaFunction;
                 this.args = args;
+                this.caller = caller;
                 this.mapHandles = mapHandles;
             }
 
             public IDisposable Subscribe(IExcelObserver observer)
             {
+                DateTime started = DateTime.UtcNow;
                 object result;
                 try { result = JuliaFunctions.CallForHandles(juliaFunction, args, mapHandles); }
                 catch (Exception ex) { result = "#" + ex.Message; }
@@ -197,6 +295,7 @@ namespace CallFromExcel.AddIn
                 {
                     Observers[handle] = observer;
                     Log("create " + handle + " for " + description);
+                    NoteCreate(caller, started);
                     observer.OnNext(handle);
                     return new Release(handle, key);
                 }

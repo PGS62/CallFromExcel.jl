@@ -12,6 +12,7 @@ Large or structured Julia objects - a big matrix, a fitted model, a DataFrame - 
 - A handle can be passed to `JuliaCall` and the other functions in place of its object, alone or in a range or array, and Julia receives the object itself.
 - Handles use Excel's RTD (real-time data) mechanism, so an object lives while a formula that creates it exists, and is freed when that formula is edited or deleted, or its inputs change. The same function with the same arguments gives the same object, built once, however many cells use it and however often they recalculate.
 - When `JuliaLaunch`, or the ribbon's Launch Julia button, finds a new Julia session, every handle's object is rebuilt in it.
+- A handle formula whose arguments change at every recalculation, such as `=JuliaCallHandle("sum", RANDARRAY(1000))`, gives an error saying so, rather than making Excel recalculate it, and create a new object, over and over in automatic calculation.
 - From VBA, handles from cells can be passed to `jl.JuliaCall` etc., and `jl.JuliaCallHandle` and `jl.JuliaEvalHandle` create handles that last until `jl.JuliaHandleRelease` or `jl.JuliaHandleReleaseAll` frees them. These methods are at the end of the COM interface, so VBA code compiled against the earlier type library is unaffected.
 - `JuliaHandleInfo("count")` shows how many handles are live, and `JuliaHandleInfo("events")` recent activity.
 - 2,000 cells each creating a handle calculate in under a second (0.5 to 0.9 seconds in tests), and 2,000 `JuliaCall`s using them in about 0.3 seconds.

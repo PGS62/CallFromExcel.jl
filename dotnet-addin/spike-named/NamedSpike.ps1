@@ -46,6 +46,8 @@ $define = $define.Replace("SIGMA", [string][char]0x3C3)
 
 $ex = New-Excel; $excel = $ex[0]; $excelPid = $ex[1]
 try {
+    # Excel saves this for the user, so it is put back in finally.
+    if ($null -eq $originalThrottle) { $originalThrottle = $excel.RTD.ThrottleInterval }
     $excel.RTD.ThrottleInterval = 0
     $wb = $excel.Workbooks.Add()
     $ws = $wb.Worksheets.Item(1)
@@ -105,12 +107,15 @@ try {
 } catch {
     Write-Host "SCRIPT ERROR: $($_.Exception.Message) at line $($_.InvocationInfo.ScriptLineNumber)"
 } finally {
+    try { if ($null -ne $originalThrottle) { $excel.RTD.ThrottleInterval = $originalThrottle } } catch {}
     Close-Excel $excel $excelPid
 }
 
 Write-Host "=== 7 reopen it in a new Excel, before Julia is launched"
 $ex = New-Excel; $excel = $ex[0]; $excelPid = $ex[1]
 try {
+    # Excel saves this for the user, so it is put back in finally.
+    if ($null -eq $originalThrottle) { $originalThrottle = $excel.RTD.ThrottleInterval }
     $excel.RTD.ThrottleInterval = 0
     $wb2 = Retry { $excel.Workbooks.Open($saved) }
     $ws2 = $wb2.Worksheets.Item(1)
@@ -136,5 +141,6 @@ try {
 } catch {
     Write-Host "SCRIPT ERROR: $($_.Exception.Message) at line $($_.InvocationInfo.ScriptLineNumber)"
 } finally {
+    try { if ($null -ne $originalThrottle) { $excel.RTD.ThrottleInterval = $originalThrottle } } catch {}
     Close-Excel $excel $excelPid
 }

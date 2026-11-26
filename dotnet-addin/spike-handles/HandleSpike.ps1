@@ -32,6 +32,8 @@ function Show($ws, $addr) { Retry { $c = $ws.Range($addr); "{0} {1} -> {2}" -f $
 
 try {
     if (-not $excel.RegisterXLL($xll)) { throw "RegisterXLL failed" }
+    # Excel saves this for the user, so it is put back in finally.
+    if ($null -eq $originalThrottle) { $originalThrottle = $excel.RTD.ThrottleInterval }
     $excel.RTD.ThrottleInterval = 0
     $wb = $excel.Workbooks.Add()
     $ws = $wb.Worksheets.Item(1)
@@ -220,6 +222,7 @@ try {
 } catch {
     Write-Host "SCRIPT ERROR: $($_.Exception.Message) at line $($_.InvocationInfo.ScriptLineNumber)"
 } finally {
+    try { if ($null -ne $originalThrottle) { $excel.RTD.ThrottleInterval = $originalThrottle } } catch {}
     try { $excel.Quit() } catch { Write-Host "Quit failed: $($_.Exception.Message)" }
     [System.Runtime.InteropServices.Marshal]::ReleaseComObject($excel) | Out-Null
     if ($excelPid -ne 0) {

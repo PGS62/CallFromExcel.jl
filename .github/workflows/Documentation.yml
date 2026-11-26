@@ -1,0 +1,26 @@
+name: Documentation
+# Builds the documentation site (docs/make.jl) and publishes it to the gh-pages branch:
+# pushes to dev update https://pgs62.github.io/CallFromExcel.jl/dev/, release tags update
+# /stable. Tags are made by TagBot with the DOCUMENTER_KEY deploy key (TagBot.yml), since
+# tags pushed with GITHUB_TOKEN don't trigger workflows.
+on:
+  push:
+    branches: [dev]
+    tags: ['*']
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: write    # push to gh-pages
+  statuses: write
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: julia-actions/setup-julia@v3
+        with:
+          version: '1'
+      - uses: julia-actions/julia-docdeploy@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}

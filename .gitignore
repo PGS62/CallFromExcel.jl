@@ -8,3 +8,6 @@
 /dotnet-addin/**/bin/
 /dotnet-addin/**/obj/
 /dotnet-addin/**/harness_out.txt
+/docs/build/
+/docs/Manifest.toml
+/docs/src/assets/images/

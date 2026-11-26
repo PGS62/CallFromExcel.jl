@@ -12,9 +12,7 @@ Sub Demo()
 
     ResultFromJulia = jl.JuliaEvalVBA("(1:10).^(1:10)'")
 
-    Set PasteHere = Application.Workbooks.Add.Worksheets(1) _
-        .Cells(1, 1).Resize(UBound(ResultFromJulia, 1), _
-        UBound(ResultFromJulia, 2))
+    Set PasteHere = Application.Workbooks.Add.Worksheets(1).Range("A1:J10")
 
     PasteHere.Value = ResultFromJulia
 

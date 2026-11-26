@@ -2,6 +2,12 @@
 
 CallFromExcel is the successor to [JuliaExcel](https://github.com/PGS62/JuliaExcel.jl), and its version numbers start again at 0.1.0. The entries from JuliaExcel 2.4.1 down are JuliaExcel's, kept for the record of how it evolved, including its performance.
 
+## [0.1.8] - 2026-11-26
+
+### Fixes
+
+- `JuliaInclude` (worksheet, VBA and the ribbon's Include button) loaded the file into the `CallFromExcel` module instead of `Main`, so the functions it defined couldn't be called by name from `JuliaCall` or `JuliaEval`. It now loads into `Main`, as `include` at the REPL does. Present since 0.1.5.
+
 ## [0.1.7] - 2026-11-17
 
 ### Clearer guidance when Julia can't start

@@ -112,7 +112,9 @@ namespace CallFromExcel.AddIn
         public static object JuliaInclude(
             [ExcelArgument(Name = "FileName", Description = "The full name of the file to be included.")] string fileName)
         {
-            return CallCore("CallFromExcel.include", new object[] { fileName.Replace("\\", "/") }, "/call");
+            // Main's include, so the file's definitions are in Main, as at the REPL, where
+            // JuliaCall and JuliaEval find them (not CallFromExcel.include, the module's own).
+            return CallCore("include", new object[] { fileName.Replace("\\", "/") }, "/call");
         }
 
         // Excel evaluates functions on every edit in the Insert Function (fx) dialog, to show

@@ -1516,7 +1516,7 @@ Function WsTest_ErrorString() As Boolean
 1         On Error GoTo ErrHandler
 2         Set ws = ScratchSheet()
 3         ws.Range("A1").Formula2 = "=JuliaCall(""thisFunctionDoesNotExist12345"")"
-4         WsTest_ErrorString = Left$(ws.Range("A1").Value2, 1) = "#"
+4         WsTest_ErrorString = Left$(ws.Range("A1").Value2, 1) = "#" And Right$(ws.Range("A1").Value2, 1) = "!"
 5         Exit Function
 ErrHandler:
 6         PrintTwice ReThrow("WsTest_ErrorString", Err, True)

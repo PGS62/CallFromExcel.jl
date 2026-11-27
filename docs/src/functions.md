@@ -1,6 +1,6 @@
 # Worksheet functions
 
-These functions can be used in worksheet formulas. All of them except `JuliaHandleInfo` can also be called from VBA, as for example `jl.JuliaCall(...)` - see [Calling from VBA](vba.md). For the functions that can only be called from VBA, see [VBA functions](vba_functions.md).
+These functions can be used in worksheet formulas. A call that fails returns a string describing the failure, starting with `#` and ending with `!`. All of them except `JuliaHandleInfo` can also be called from VBA, as for example `jl.JuliaCall(...)`, where a failure instead raises an [error](vba.md#Errors) - see [Calling from VBA](vba.md). For the functions that can only be called from VBA, see [VBA functions](vba_functions.md).
 
 |Name|Description|
 |:---|:----------|
@@ -135,7 +135,7 @@ Unlike `JuliaCallNamedArgs`, any `";"` argument starts the named arguments, so `
 
 Unlike `JuliaCall`, an error value as an argument, such as `#N/A`, is returned rather than passed to Julia: see [errors pass through](handles.md).
 
-From VBA, `jl.JuliaCallHandle` takes at most 30 arguments after the function name, and, as every function called from VBA, raises an [error](vba.md#Errors) if the call fails. The handle lasts until `JuliaHandleRelease` or `JuliaHandleReleaseAll` frees it.
+From VBA, `jl.JuliaCallHandle` takes at most 30 arguments after the function name. The handle lasts until `JuliaHandleRelease` or `JuliaHandleReleaseAll` frees it.
 
 ## [`JuliaHandleInfo`](@id juliahandleinfo)
 Information about object handles: how many are live, or recent events.

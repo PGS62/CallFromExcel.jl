@@ -181,8 +181,8 @@ namespace CallFromExcel.AddIn
             }
         }
 
-        private static string CallLoopError(string function) => "#" + function + ": its arguments change at every recalculation (RAND, NOW, OFFSET...?), so it can't keep a handle - see Help";
-        private const string EvalLoopError = "#JuliaEval: its expression changes at every recalculation (RAND, NOW, OFFSET...?), so it can't keep a handle - see Help";
+        private static string CallLoopError(string function) => "#" + function + ": its arguments change at every recalculation (RAND, NOW, OFFSET...?), so it can't keep a handle - see Help!";
+        private const string EvalLoopError = "#JuliaEval: its expression changes at every recalculation (RAND, NOW, OFFSET...?), so it can't keep a handle - see Help!";
 
         // Covers both JuliaCall and JuliaCallNamedArgs, so there is no JuliaCallNamedArgsHandle:
         // handle_create treats the arguments as JuliaCallNamedArgs does if one of them is ";",
@@ -267,7 +267,7 @@ namespace CallFromExcel.AddIn
             {
                 object julia;
                 try { julia = JuliaFunctions.CallForHandles("CallFromExcel.handle_count", new object[0]); }
-                catch (Exception ex) { julia = "#" + ex.Message; }
+                catch (Exception ex) { julia = JuliaFunctions.ErrorText(ex.Message); }
                 return "worksheet handles " + Observers.Count + ", julia stored " + Convert.ToString(julia);
             }
             if (t == "events")
@@ -277,7 +277,7 @@ namespace CallFromExcel.AddIn
                 for (int i = 0; i < Events.Count; i++) result[i, 0] = Events[i];
                 return result;
             }
-            return "#Type must be one of: \"" + string.Join("\", \"", InfoTypes) + "\"";
+            return "#Type must be one of: \"" + string.Join("\", \"", InfoTypes) + "\"!";
         }
 
         // Hidden: a worksheet function that changes state is a poor fit for the documented set,
@@ -311,7 +311,7 @@ namespace CallFromExcel.AddIn
                 DateTime started = DateTime.UtcNow;
                 object result;
                 try { result = JuliaFunctions.CallForHandles(juliaFunction, args, mapHandles); }
-                catch (Exception ex) { result = "#" + ex.Message; }
+                catch (Exception ex) { result = JuliaFunctions.ErrorText(ex.Message); }
 
                 string handle = result as string;
                 if (HandlePattern.TryGetKey(handle, out string key))

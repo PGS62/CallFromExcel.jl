@@ -68,7 +68,7 @@ namespace CallFromExcel.AddIn
             }
             catch (Exception ex)
             {
-                return "#" + ex.Message;
+                return ErrorText(ex.Message);
             }
         }
 
@@ -132,6 +132,17 @@ namespace CallFromExcel.AddIn
         // variables, running partly-typed code), so they do nothing there - as in JuliaExcel.
         private const string FunctionWizardMessage = "#Disabled in Function Wizard!";
 
+        // A failure as a worksheet function returns it: "#<message>!", whatever the message
+        // already starts or ends with (some exception messages start with "#" or end with "."),
+        // so that "#...!" reliably tells a failure apart from Excel's own error text, such as
+        // "#N/A". Every failure string from a worksheet function is made here or written in
+        // that form.
+        internal static string ErrorText(string message)
+        {
+            string m = (message ?? "").Trim().TrimStart('#').TrimEnd('.', '!', ' ');
+            return "#" + m + "!";
+        }
+
         private static bool IsOmitted(object arg)
         {
             return arg is ExcelMissing || arg is ExcelEmpty;
@@ -153,7 +164,7 @@ namespace CallFromExcel.AddIn
             }
             catch (Exception ex)
             {
-                return "#" + ex.Message;
+                return ErrorText(ex.Message);
             }
         }
 
@@ -172,7 +183,7 @@ namespace CallFromExcel.AddIn
         private static object DecodeForWorksheet(string responseWire)
         {
             string failure = WireFormatDecode.FailureMessage(responseWire);
-            if (failure != null) return "#" + failure + "!";
+            if (failure != null) return ErrorText(failure);
             object result = WireFormatDecode.Decode(responseWire, allowNesting: false, stringLengthLimit: StringLengthLimit, vectorToColumn: true, forWorksheet: true);
             return WireFormatDecode.MapLeaves(result, v => v is ExcelErrorValue ev ? MapToExcelDnaError(ev.Code) : v ?? ExcelEmpty.Value);
         }
@@ -215,7 +226,7 @@ namespace CallFromExcel.AddIn
             }
             catch (Exception ex)
             {
-                return "#" + ex.Message;
+                return ErrorText(ex.Message);
             }
         }
 

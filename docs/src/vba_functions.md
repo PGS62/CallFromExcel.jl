@@ -1,10 +1,10 @@
 # VBA functions
 
-These functions can only be called from VBA, through the object described in [Calling from VBA](vba.md), as for example `jl.JuliaCallVBA(...)`. VBA can also call the [worksheet functions](functions.md), all except `JuliaHandleInfo`.
+These functions can only be called from VBA, through the object described in [Calling from VBA](vba.md), as for example `jl.JuliaCallVBA(...)`. VBA can also call the [worksheet functions](functions.md), all except `JuliaHandleInfo`. A call that fails raises an [error](vba.md#Errors).
 
 |Name|Description|
 |:---|:----------|
-|[JuliaEvalVBA](@ref juliaevalvba)|Evaluate a Julia expression from VBA. Differs from `JuliaCall` in handling of 1-d arrays and strings longer than 32,767 characters. May return data of types that cannot be displayed on a worksheet, such as a dictionary or an array of arrays.|
+|[JuliaEvalVBA](@ref juliaevalvba)|Evaluate a Julia expression from VBA. Differs from `JuliaEval` in handling of 1-d arrays and strings longer than 32,767 characters. May return data of types that cannot be displayed on a worksheet, such as a dictionary or an array of arrays.|
 |[JuliaCallVBA](@ref juliacallvba)|Call a named Julia function from VBA. Differs from `JuliaCall` in handling of 1-d arrays and strings longer than 32,767 characters. May return data of types that cannot be displayed on a worksheet, such as a dictionary, an array of arrays, or arrays of dimension up to 9.|
 |[JuliaCallNamedArgsVBA](@ref juliacallnamedargsvba)|Call a named Julia function from VBA, passing positional and named arguments, with `";"` marking where the named arguments start. Differs from `JuliaCallNamedArgs` in the same ways that `JuliaCallVBA` differs from `JuliaCall`.|
 |[JuliaEvalHandle](@ref juliaevalhandle)|Evaluate a Julia expression from VBA and return a handle to the result. The VBA counterpart of `JuliaEval(JuliaExpression, TRUE)`.|
@@ -12,7 +12,7 @@ These functions can only be called from VBA, through the object described in [Ca
 |[JuliaHandleReleaseAll](@ref juliahandlereleaseall)|Free the Julia objects of all handles created from VBA.|
 
 ## [`JuliaEvalVBA`](@id juliaevalvba)
-Evaluate a Julia expression from VBA. Differs from `JuliaCall` in handling of 1-d arrays and strings longer than 32,767 characters. May return data of types that cannot be displayed on a worksheet, such as a dictionary or an array of arrays.
+Evaluate a Julia expression from VBA. Differs from `JuliaEval` in handling of 1-d arrays and strings longer than 32,767 characters. May return data of types that cannot be displayed on a worksheet, such as a dictionary or an array of arrays.
 ```
 jl.JuliaEvalVBA(JuliaExpression)
 ```
@@ -50,7 +50,7 @@ jl.JuliaCallNamedArgsVBA(JuliaFunction, [Arg1], ..., ";", Name1, Value1, ...)
 **Example.** `parts = jl.JuliaCallNamedArgsVBA("split", "a,b,,c", ",", ";", "keepempty", False)` returns `a`, `b` and `c`, without the empty string between the two commas.
 
 ## [`JuliaEvalHandle`](@id juliaevalhandle)
-Evaluate a Julia expression from VBA and return a handle to the result. The VBA counterpart of `JuliaEval(JuliaExpression, TRUE)`. Raises an error if the evaluation fails. The handle lasts until `JuliaHandleRelease` or `JuliaHandleReleaseAll` frees it.
+Evaluate a Julia expression from VBA and return a handle to the result. The VBA counterpart of `JuliaEval(JuliaExpression, TRUE)`. The handle lasts until `JuliaHandleRelease` or `JuliaHandleReleaseAll` frees it.
 ```
 jl.JuliaEvalHandle(JuliaExpression)
 ```

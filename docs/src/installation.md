@@ -35,6 +35,7 @@ CallFromExcel replaces [JuliaExcel](https://github.com/PGS62/JuliaExcel.jl). Its
    Dim jl As New CallFromExcel.ComServer
    ```
  * From VBA, `JuliaCall`, `JuliaCallVBA`, `JuliaCallNamedArgs` and `JuliaCallNamedArgsVBA` take at most 30 arguments after the function name.
+ * A call that fails raises an error, rather than returning a string starting with `#` as JuliaExcel's functions did. Code that tests results for that, such as `If Left(Result, 1) = "#" Then`, no longer catches anything: use `On Error` instead - see [Errors](vba.md#Errors).
 
 **Julia.** Functions and variables formerly accessed as `JuliaExcel.xxx`, such as `JuliaExcel.serve_xl()` and `JuliaExcel.last_answer`, are now `CallFromExcel.xxx`, after `using CallFromExcel`.
 

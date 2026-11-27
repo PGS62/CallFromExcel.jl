@@ -193,8 +193,13 @@ namespace CallFromExcel.AddIn
             [ExcelArgument(Name = "Args", Description = "Positional arguments, optionally followed by \";\" and name/value pairs for named arguments. Handles among them are replaced by their objects.")] params object[] args)
         {
             if (ExcelDnaUtil.IsInFunctionWizard()) return "#Disabled in Function Wizard!";
-            // An error argument (e.g. an invalidated handle upstream) propagates, as in most
-            // Excel functions, rather than creating an object from it.
+            // An error argument is returned, not passed to Julia as JuliaCall would, because
+            // #N/A is how a handle cell says its object isn't there yet: Observe gives #N/A
+            // while Julia builds it, and InvalidateAll gives #N/A until it is rebuilt after a
+            // restart. Passing that on would run the function on an error, possibly at length,
+            // and create a stray object at each step of a chain of handles, all replaced as
+            // soon as the upstream handle arrives. Only top-level arguments are checked: a
+            // handle is a single cell, so an error inside an array is data, not a handle.
             foreach (object arg in args) if (arg is ExcelError) return arg;
             string caller = CallerKey();
             if (IsLooping(caller)) return CallLoopError("JuliaCallHandle");
@@ -216,7 +221,7 @@ namespace CallFromExcel.AddIn
         internal static object ExposedHandle(string excelName, object[] args)
         {
             if (ExcelDnaUtil.IsInFunctionWizard()) return "#Disabled in Function Wizard!";
-            foreach (object arg in args) if (arg is ExcelError) return arg;
+            foreach (object arg in args) if (arg is ExcelError) return arg;   // as JuliaCallHandle, for the same reason
             string caller = CallerKey();
             if (IsLooping(caller)) return CallLoopError(excelName);
             var topic = new object[2 + args.Length];

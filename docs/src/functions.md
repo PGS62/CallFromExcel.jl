@@ -133,6 +133,8 @@ JuliaCallHandle(JuliaFunction, [Arg1], [Arg2], ..., [";", Name1, Value1, ...])
 
 Unlike `JuliaCallNamedArgs`, any `";"` argument starts the named arguments, so `";"` can't be passed as a positional argument.
 
+Unlike `JuliaCall`, an error value as an argument, such as `#N/A`, is returned rather than passed to Julia: see [errors pass through](handles.md).
+
 From VBA, `jl.JuliaCallHandle` takes at most 30 arguments after the function name, and raises an error, rather than returning an error string, if the call fails. The handle lasts until `JuliaHandleRelease` or `JuliaHandleReleaseAll` frees it.
 
 ## [`JuliaHandleInfo`](@id juliahandleinfo)

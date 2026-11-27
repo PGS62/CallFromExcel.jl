@@ -53,7 +53,13 @@ Multiplies x by factor.
 
 @excel handle=true squarearray(n) = reshape(1:Int(n)^2, Int(n), Int(n))
 @excel handle=true broadcast=true twice(x) = 2x
+
+const ticks = Ref(0)
+@excel volatile=true tick() = (ticks[] += 1)
+@excel tock() = (ticks[] += 1)
 '@
+$inc3 = Join-Path $env:TEMP "NamedAuto3.jl"
+Set-Content -Path $inc3 -Encoding utf8 -Value '@excel volatile=true tock() = (ticks[] += 1)'
 
 $ex = New-Excel; $excel = $ex[0]; $excelPid = $ex[1]
 try {
@@ -133,6 +139,25 @@ try {
     Retry { $ws.Range("N1").ClearContents(); $ws.Range("N3").ClearContents() }
     Retry { $excel.Calculate() }; Start-Sleep -Milliseconds 500; Retry { $excel.Calculate() }
     "  handles before/after clearing N1 and N3: $before / " + (Retry { $excel.Evaluate('JuliaHandleInfo("count")') }) | Write-Host
+    Write-Host "=== 10 volatile=true: =jl.tick() recalculates at every calculation, =jl.tock() doesn't"
+    F $ws "P1" '=jl.tick()'
+    F $ws "P2" '=jl.tock()'
+    $t1 = Retry { $ws.Range("P1").Value2 }; $u1 = Retry { $ws.Range("P2").Value2 }
+    Retry { $excel.Calculate() }; Retry { $excel.Calculate() }
+    $t2 = Retry { $ws.Range("P1").Value2 }; $u2 = Retry { $ws.Range("P2").Value2 }
+    "  tick $t1 -> $t2 (expect it to grow), tock $u1 -> $u2 (expect unchanged)" | Write-Host
+    Write-Host "=== 11 tock re-exposed with volatile=true: does the existing cell P2 become volatile?"
+    F $ws "Z7" ('=JuliaInclude("' + $inc3 + '")')
+    Start-Sleep -Milliseconds 1500
+    $u3 = Retry { $ws.Range("P2").Value2 }
+    Retry { $excel.Calculate() }; Retry { $excel.Calculate() }
+    $u4 = Retry { $ws.Range("P2").Value2 }
+    "  existing P2: $u3 -> $u4 after two calculations (grows if the cell became volatile)" | Write-Host
+    F $ws "P3" '=jl.tock()'
+    $v1 = Retry { $ws.Range("P3").Value2 }
+    Retry { $excel.Calculate() }
+    $v2 = Retry { $ws.Range("P3").Value2 }
+    "  new P3: $v1 -> $v2 (expect it to grow)" | Write-Host
     Log $excel "register log"
     F $ws "Y1" '=JuliaEval("exit()")'
     Retry { $wb.Close($false) }

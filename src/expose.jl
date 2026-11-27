@@ -7,7 +7,7 @@ registers each as a worksheet function that forwards to JuliaCall's code.
 =#
 
 # Excel name => (f, julia, description, argnames, argdescriptions, nrequired, bcast, asvector,
-# handle)
+# handle, volatile)
 const _exposed = Dict{String,Any}()
 
 # Separates the arguments' names, and their descriptions, in one string for the add-in.
@@ -26,7 +26,7 @@ tag (as in handles) tells a relaunched Julia apart, whose count could match the 
 exposed_version() = _session_tag() * "#" * string(_exposed_count[])
 
 """
-    expose_to_excel(fn_name; name=nothing, description="", argdescriptions=String[], broadcast=false, handle=false)
+    expose_to_excel(fn_name; name=nothing, description="", argdescriptions=String[], broadcast=false, handle=false, volatile=false)
     expose_to_excel(f::Function; ...)
 
 Make a Julia function, named by `fn_name` (evaluated in `Main`) or given itself,
@@ -67,6 +67,16 @@ Julia, as `JuliaCallHandle` does: for a fitted model, a large matrix or anything
 belongs in Julia rather than on the sheet. The same arguments give the same object, built
 once. With broadcasting, the handle is to the whole broadcast result. The description shown
 in Excel ends "Returns a handle."
+
+# Volatile functions
+
+With `volatile=true`, Excel recalculates the function at every calculation, as it does
+`NOW` and `RAND`, rather than only when its arguments change: for a function that reads
+something Excel can't see, such as a Julia global set by `JuliaSetVar` or `JuliaEval`, a
+file, a database, the clock or a random number generator. Use it sparingly: every
+calculation calls Julia for every cell using the function, and recalculates the cells that
+depend on them. `volatile=true` can't be combined with `handle=true`, since a handle keeps
+its object while the arguments are unchanged.
 """
 function expose_to_excel(fn_name::AbstractString; name=nothing, kwargs...)
     f = Main.eval(Meta.parse(fn_name))
@@ -78,7 +88,10 @@ function expose_to_excel(f::Function; name=nothing, kwargs...)
 end
 
 function _expose(f, julia_name::String, m::Method; name=nothing, description::AbstractString="",
-                 argdescriptions=String[], broadcast=false, handle::Bool=false)
+                 argdescriptions=String[], broadcast=false, handle::Bool=false, volatile::Bool=false)
+    # A handle keeps its object while the arguments are unchanged, so volatility would do
+    # nothing - or, if it rebuilt the object, set off the add-in's recalculation loop.
+    handle && volatile && throw(ArgumentError("`volatile=true` can't be combined with `handle=true`: a handle keeps its object while the arguments are unchanged, so recalculating it at every calculation would do nothing."))
     nrequired = _nrequired(f, m)
     # An argument with no name (f(::Int, y)) is called #unused# by Julia: arg1, arg2... instead.
     argnames = [startswith(string(a), "#") ? "arg$k" : string(a)
@@ -117,7 +130,8 @@ function _expose(f, julia_name::String, m::Method; name=nothing, description::Ab
         _fit(d)
     end
     _exposed[excel_name] = (f=f, julia=julia_name, description=_fit(desc), argnames=argnames,
-        argdescriptions=argdescs, nrequired=nrequired, bcast=bcast, asvector=asvector, handle=handle)
+        argdescriptions=argdescs, nrequired=nrequired, bcast=bcast, asvector=asvector, handle=handle,
+        volatile=volatile)
     _exposed_count[] += 1
     excel_name
 end
@@ -174,7 +188,7 @@ function _declared_types(m::Method)
 end
 
 """
-    @excel [name="..."] [description="..."] [argdescriptions=[...]] [broadcast=...] [handle=...] function f(...) ... end
+    @excel [name="..."] [description="..."] [argdescriptions=[...]] [broadcast=...] [handle=...] [volatile=...] function f(...) ... end
 
 Define a function and make it callable from Excel, as `jl.f` by default, following the
 method defined here (rather than the one with the most arguments). Options are as for
@@ -196,8 +210,8 @@ macro excel(exprs...)
     isempty(exprs) && throw(ArgumentError("@excel needs a function definition."))
     def = exprs[end]
     kw = map(exprs[1:end-1]) do o
-        (o isa Expr && o.head === :(=) && o.args[1] in (:name, :description, :argdescriptions, :broadcast, :handle)) ||
-            throw(ArgumentError("@excel's options are name=..., description=..., argdescriptions=..., broadcast=... and handle=...; not `$o`."))
+        (o isa Expr && o.head === :(=) && o.args[1] in (:name, :description, :argdescriptions, :broadcast, :handle, :volatile)) ||
+            throw(ArgumentError("@excel's options are name=..., description=..., argdescriptions=..., broadcast=..., handle=... and volatile=...; not `$o`."))
         Expr(:kw, o.args[1], esc(o.args[2]))
     end
     fname, argnames = _def_signature(def)
@@ -422,16 +436,17 @@ end
 
 The exposed functions, for the add-in: one row per function, with columns Excel name,
 Julia name, description, argument names, argument descriptions (each joined by "\\x1f"),
-the number of required arguments, and whether it returns a handle. `nothing` when there are
+the number of required arguments, whether it returns a handle, and whether it is volatile.
+`nothing` when there are
 none: Excel has no empty arrays, so the add-in can't decode one.
 """
 function exposed_functions()
     isempty(_exposed) && return nothing
     names = sort!(collect(keys(_exposed)))
-    result = Matrix{Any}(undef, length(names), 7)
+    result = Matrix{Any}(undef, length(names), 8)
     for (i, n) in enumerate(names)
         e = _exposed[n]
-        result[i, :] = [n, e.julia, e.description, join(e.argnames, _ARGSEP), join(e.argdescriptions, _ARGSEP), e.nrequired, e.handle]
+        result[i, :] = [n, e.julia, e.description, join(e.argnames, _ARGSEP), join(e.argdescriptions, _ARGSEP), e.nrequired, e.handle, e.volatile]
     end
     result
 end

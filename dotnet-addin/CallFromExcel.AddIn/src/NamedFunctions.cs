@@ -28,7 +28,8 @@ namespace CallFromExcel.AddIn
         private static string registeredVersion = "";
 
         // What each Excel name was last registered with in this Excel session (descriptions,
-        // argument names and descriptions, number required), so Register skips the unchanged.
+        // argument names and descriptions, number required, handle, volatile), so Register
+        // skips the unchanged.
         private static readonly Dictionary<string, string> registeredSignatures = new Dictionary<string, string>();
 
         // A registration is queued and hasn't started: several checks in one calculation (a
@@ -114,6 +115,7 @@ namespace CallFromExcel.AddIn
                 string[] argDescriptions = SplitList(rows[i, 4]);
                 int nRequired = Convert.ToInt32(rows[i, 5]);
                 bool handle = Convert.ToBoolean(rows[i, 6]);
+                bool isVolatile = Convert.ToBoolean(rows[i, 7]);
 
                 // Only what's new or changed. Each registration takes one of Excel-DNA's export
                 // slots, which aren't freed when a name is registered again: re-registering 50
@@ -121,7 +123,7 @@ namespace CallFromExcel.AddIn
                 // then gave #NAME?, and each round got slower (checked 2026-11-25). The Julia
                 // name isn't part of it: calls are forwarded by Excel name.
                 string signature = string.Join("\x1e", description, Convert.ToString(rows[i, 3]),
-                    Convert.ToString(rows[i, 4]), nRequired.ToString(), handle.ToString());
+                    Convert.ToString(rows[i, 4]), nRequired.ToString(), handle.ToString(), isVolatile.ToString());
                 if (registeredSignatures.TryGetValue(excelName, out string old) && old == signature) continue;
                 newSignatures[excelName] = signature;
 
@@ -132,6 +134,7 @@ namespace CallFromExcel.AddIn
                     Description = description,
                     Category = "Julia",
                     IsThreadSafe = false,
+                    IsVolatile = isVolatile,
                     SuppressOverwriteError = true,
                 });
                 var args = new List<object>();
@@ -144,7 +147,7 @@ namespace CallFromExcel.AddIn
                     });
                 }
                 argumentAttributes.Add(args);
-                AddToLog("register " + excelName + "(" + string.Join(", ", argNames) + ") -> " + juliaName + (handle ? ", returning a handle" : ""));
+                AddToLog("register " + excelName + "(" + string.Join(", ", argNames) + ") -> " + juliaName + (handle ? ", returning a handle" : "") + (isVolatile ? ", volatile" : ""));
             }
             if (lambdas.Count == 0)
             {

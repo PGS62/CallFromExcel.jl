@@ -971,7 +971,7 @@ end
         @excel handle=true excel_test_echo(a, b) = (a, b)
         """)
     r = Dict(r[1] => r for r in eachrow(C.exposed_functions()))
-    @test size(C.exposed_functions(), 2) == 7
+    @test size(C.exposed_functions(), 2) == 8
     @test r["jl.excel_test_square"][7] === true && r["jl.excel_test_scale"][7] === false
     @test r["jl.excel_test_square"][3] == "A square matrix. Returns a handle."
     @test r["jl.excel_test_echo"][3] == "Returns a handle."                  # no docstring
@@ -985,6 +985,18 @@ end
     C.expose_to_excel("excel_test_plain"; name="jl.plain_long", description=long, handle=true)
     @test length(C._exposed["jl.plain_long"].description) <= 253 && endswith(C._exposed["jl.plain_long"].description, "... Returns a handle.")
     @test occursin("isn't exposed in this Julia session", msg(() -> C.handle_create_exposed("jl.nonesuch", 1)))
+
+    # volatile=true: the eighth column tells the add-in to register the function as volatile.
+    # Not with handle=true, which keeps its object while the arguments are unchanged.
+    include_string(Main, "@excel volatile=true excel_test_now() = time()")
+    r = Dict(r[1] => r for r in eachrow(C.exposed_functions()))
+    @test r["jl.excel_test_now"][8] === true && r["jl.excel_test_square"][8] === false
+    @test call("jl.excel_test_now") isa Float64
+    C.expose_to_excel("excel_test_plain"; name="jl.plain_v", volatile=true)
+    @test C._exposed["jl.plain_v"].volatile && !C._exposed["jl.plain2"].volatile
+    @test occursin("can't be combined with `handle=true`",
+                   msg(() -> C.expose_to_excel("excel_test_plain"; name="jl.plain_hv", handle=true, volatile=true)))
+    @test !haskey(C._exposed, "jl.plain_hv")
 
     # Bad uses of the macro.
     @test_throws Exception include_string(Main, "@excel nonsense=1 excel_test_bad(x) = x")

@@ -26,6 +26,7 @@ A Julia function can now be a worksheet function of its own, `=jl.birthday(A1)` 
 - Mark a function with `@excel`, or make an existing one available with `expose_to_excel`. Its Excel name is `jl.` followed by its Julia name unless you choose another, and its description and arguments' descriptions, shown by the Insert Function dialog and the tooltips as you type, come from its docstring.
 - Arguments with default values are optional in Excel. Leaving out a required argument is an error naming it.
 - Ranges are passed whole by default. With `broadcast=true`, or `broadcast=(:x, :y)` for some arguments, a function written for single values is broadcast over ranges in one call, and its results spill.
+- With `volatile=true`, Excel recalculates the function at every calculation, as it does `NOW` and `RAND`: for functions that read state Excel can't see, such as Julia globals, files or the clock.
 - The add-in registers exposed functions after `JuliaLaunch`, `JuliaInclude` and `JuliaEval`. A new ribbon button, Register Functions, does it for functions exposed from the Julia REPL, and VBA can run `Application.Run "JuliaRegisterFunctions"`.
 
 ### Fixes

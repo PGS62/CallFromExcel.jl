@@ -21,6 +21,19 @@ Object handles are built (documentation, "Object handles"). The design discussio
 - **Separate objects for the same inputs.** Today: make the inputs differ. If needed often, a reserved named argument that `handle_create` uses in the key and drops before the call. Only if asked for.
 - **"Rebuild all objects".** The macro `JuliaHandleInvalidateAll` does it; a ribbon button, or a friendlier name, would make it findable.
 - **Not tested.** A spilled range of handles; thousands of handles over hours of editing; Excel-DNA issue #209 (RTD functions recalculated on cut and paste anywhere in a sheet).
+
+## VBA methods should raise errors (agreed in principle 2026-11-27, breaking)
+
+**Problem.** The COM methods VBA calls (`jl.JuliaCallVBA`, `jl.JuliaEvalVBA`, `jl.JuliaCallNamedArgsVBA`, and the migration methods `jl.JuliaCall`, `jl.JuliaEval`, `jl.JuliaCallNamedArgs`, `jl.JuliaSetVar`, `jl.JuliaInclude`) report a failure - a Julia exception, Julia not running, a timeout - by returning a string such as `"#MethodError: ... Julia REPL has more details and stacktrace!"`. Robust VBA code must test every result for that pattern, and can't tell a failure from a Julia function that legitimately returns such a string. Only `jl.JuliaCallHandle` and `jl.JuliaEvalHandle` raise. The user's view: raising is an improvement worth breaking backward compatibility for; a pre-1.0 minor release, ideally the coming 0.2.0, is the time.
+
+**Sketch.**
+- **Tell failure from a string result on the wire, not by pattern.** `srv_call_inner`/`srv_eval_inner` know `success`; today they encode a failure as an ordinary string (comms.jl, `"#$error_desc Julia REPL has more details..."`). Mark it instead - e.g. a distinct wire tag for "call failed" carrying the message, or a header/status on the HTTP response. The worksheet path turns it into the same `#...!` string as now (cells can't raise); the COM path throws. `ComServer.CreateHandle`'s `TrimStart('#')` guess goes away too.
+- **Failures on the C# side** (Julia not launched, no answer, timeout, a bad argument such as a 2-D `JuliaExpression`) throw as well, so every failure reaches `On Error`.
+- **Err.Number.** A .NET exception reaches VBA with its HRESULT (`InvalidOperationException` gives -2146233079), which says nothing useful. Use one documented number, or a few (Julia exception / Julia not running / timeout), via `COMException` with `vbObjectError + n`, and the message without the leading `#` and trailing `!` as `Err.Description`. Perhaps the Julia exception type at its start, as now (`MethodError: ...`), so code can test it.
+- **Excel error values are data, not failures.** A result that is, or contains, `#N/A` etc. stays a `CVErr` value.
+- **Which methods.** All the COM methods, for consistency, including the migration methods - which exist so old JuliaExcel code keeps working, and that code tests for `#` strings. Alternative: only the `*VBA` methods, keeping the migration ones as they are. Decide when implementing.
+- **Breaking change.** CHANGELOG entry with a before/after VBA example (`If Left(r, 1) = "#" Then` -> `On Error GoTo`); docs `vba.md`/`vba_functions.md`; VBA test suite (tests that expect `#` strings); `Application.Run` of worksheet functions is unaffected.
+
 ## Untrusted workbooks can run Julia code
 
 **Problem.** CallFromExcel's worksheet functions run arbitrary Julia code, but a workbook that uses them needs no macros, so Excel opens it without any macro-security warning. A workbook received from someone else containing `=JuliaLaunch()` and `=JuliaEval("...")` runs that code, with the user's permissions, as soon as it calculates (once the user clicks "Enable Editing", if it opened in Protected View). This is inherent to any add-in whose functions execute code, and JuliaExcel has the same exposure.

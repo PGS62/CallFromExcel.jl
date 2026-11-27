@@ -9,6 +9,7 @@ Installation does not require admin rights on the PC.
    Pkg.add("CallFromExcel")
    using CallFromExcel
    CallFromExcel.installme()
+   
    ```
    `Pkg.add` installs the Julia package, and `installme()` installs the Excel add-in.
  * Launch Excel. Check that it shows a Julia tab on the ribbon, and that typing `=Julia` into a worksheet cell makes the auto-complete offer `JuliaCall`, `JuliaEval`, `JuliaInclude` etc.

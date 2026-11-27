@@ -28,6 +28,7 @@ using Pkg
 Pkg.add("CallFromExcel")
 using CallFromExcel
 CallFromExcel.installme()
+
 ```
 `Pkg.add` installs the Julia package, and `installme()` installs the Excel add-in. After updating CallFromExcel, close Excel and run `installme()` again. See [Installation](https://pgs62.github.io/CallFromExcel.jl/stable/installation/) in the documentation for more, including running Julia under Linux (WSL), and uninstalling.
 

@@ -70,14 +70,28 @@ namespace CallFromExcel.AddIn
                 case '!': return new ExcelErrorValue(int.Parse(wire.Substring(1), CultureInfo.InvariantCulture));
                 case '*': return DecodeArray(wire, allowNesting, stringLengthLimit, vectorToColumn, forWorksheet, depth);
                 case 'H': return DecodeDictionary(wire, allowNesting, stringLengthLimit, vectorToColumn, forWorksheet, depth);
-                case 'V': return DecodeV(wire, vectorToColumn);
-                case 'L': return DecodeL(wire, allowNesting, vectorToColumn, forWorksheet);
-                case 'R': return DecodeRange(wire, vectorToColumn, forWorksheet);
+                // Arrays in compact form are arrays too: as an element, they need allowNesting,
+                // as DecodeArray checks for '*'. Julia sends [[1], [2]] as '*' of two 'L's.
+                case 'V':
+                    CheckNesting(allowNesting, depth);
+                    return DecodeV(wire, vectorToColumn);
+                case 'L':
+                    CheckNesting(allowNesting, depth);
+                    return DecodeL(wire, allowNesting, vectorToColumn, forWorksheet);
+                case 'R':
+                    CheckNesting(allowNesting, depth);
+                    return DecodeRange(wire, vectorToColumn, forWorksheet);
                 case 'X':
                     if (depth == 1) throw new JuliaException(wire.Substring(1));
                     throw new FormatException("A failure (X) can only be a whole response, not an element");
                 default: throw new FormatException("Character '" + tag + "' is not recognised as a type identifier");
             }
+        }
+
+        // An array (of any form) inside an array or dictionary, where nesting isn't allowed.
+        private static void CheckNesting(bool allowNesting, int depth)
+        {
+            if (depth > 1 && !allowNesting) throw new InvalidOperationException("Excel cannot display arrays containing arrays");
         }
 
         // The message of a failed call or evaluation (a response "X<message>"), else null.
@@ -108,7 +122,7 @@ namespace CallFromExcel.AddIn
 
         private static object DecodeArray(string wire, bool allowNesting, int stringLengthLimit, bool vectorToColumn, bool forWorksheet, int depth)
         {
-            if (depth > 1 && !allowNesting) throw new InvalidOperationException("Excel cannot display arrays containing arrays");
+            CheckNesting(allowNesting, depth);
 
             int p1 = wire.IndexOf(';');
             int p2 = wire.IndexOf(';', p1 + 1);

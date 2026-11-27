@@ -1123,13 +1123,13 @@ End Function
 
 ' Checks that the COM methods raise failures as VBA errors rather than returning "#...!"
 ' strings: Err.Number is vbObjectError + 1001 for an exception in Julia, + 1003 for a result
-' that can't be returned, and Err.Source is "CallFromExcel". A string result that merely looks
-' like an error is returned as it is.
+' that can't be returned (a dictionary, or nested arrays, from JuliaEval), and Err.Source is
+' "CallFromExcel". A string result that merely looks like an error is returned as it is.
 Function TestErrorsRaised() As Boolean
           Dim OK As Boolean
           Dim x As Variant
-          Dim N1 As Long, N2 As Long, N3 As Long, N4 As Long, N5 As Long
-          Dim D1 As String, D2 As String, D3 As String, D4 As String
+          Dim N1 As Long, N2 As Long, N3 As Long, N4 As Long, N5 As Long, N6 As Long
+          Dim D1 As String, D2 As String, D3 As String, D4 As String, D6 As String
           Dim S1 As String
 
 1         On Error GoTo ErrHandler
@@ -1147,6 +1147,9 @@ Function TestErrorsRaised() As Boolean
 12        N4 = Err.Number: D4 = Err.Description: Err.Clear
 13        x = CallFromExcel.JuliaCallHandle("thisFunctionDoesNotExist12345")
 14        N5 = Err.Number: Err.Clear
+          ' Arrays of integer vectors travel in compact form, which once bypassed the nesting check.
+          x = CallFromExcel.JuliaEval("[[1], [2]]")
+          N6 = Err.Number: D6 = Err.Description: Err.Clear
 15        On Error GoTo ErrHandler
 
 16        OK = OK And N1 = vbObjectError + 1001 And Left$(D1, 13) = "UndefVarError" And S1 = "CallFromExcel"
@@ -1154,10 +1157,14 @@ Function TestErrorsRaised() As Boolean
 18        OK = OK And N3 = vbObjectError + 1001 And Left$(D3, 13) = "ArgumentError"
 19        OK = OK And N4 = vbObjectError + 1003 And D4 = "Excel cannot display variables of type Dictionary"
 20        OK = OK And N5 = vbObjectError + 1001
+          OK = OK And N6 = vbObjectError + 1003 And D6 = "Excel cannot display arrays containing arrays"
+          x = CallFromExcel.JuliaEvalVBA("[[1], [2]]")
+          OK = OK And x(1)(1) = 1 And x(2)(1) = 2
           If Not OK Then
               PrintTwice "TestErrorsRaised got (Err.Number - vbObjectError, Err.Description):" & vbLf & _
                   N1 - vbObjectError & " " & D1 & " [" & S1 & "]" & vbLf & N2 - vbObjectError & " " & D2 & vbLf & _
-                  N3 - vbObjectError & " " & D3 & vbLf & N4 - vbObjectError & " " & D4 & vbLf & N5 - vbObjectError
+                  N3 - vbObjectError & " " & D3 & vbLf & N4 - vbObjectError & " " & D4 & vbLf & N5 - vbObjectError & vbLf & _
+                  N6 - vbObjectError & " " & D6
           End If
 21        TestErrorsRaised = OK
 22        Exit Function

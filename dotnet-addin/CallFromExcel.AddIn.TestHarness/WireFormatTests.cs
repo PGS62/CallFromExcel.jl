@@ -92,6 +92,8 @@ namespace CallFromExcel.AddIn.TestHarness
             TestDictionaryRoundTrip();
             TestRangeDecode();
             TestLFormatDecode();
+            TestNestedCompactArrays();
+            TestFailure();
 
             Console.WriteLine();
             Console.WriteLine(_pass + " passed, " + _fail + " failed.");
@@ -234,6 +236,46 @@ namespace CallFromExcel.AddIn.TestHarness
             bool threw = false;
             try { WireFormatDecode.Decode("L1,3;" + Hex64(1), allowNesting: true); } catch (FormatException) { threw = true; }
             CheckTrue("L with too few hex characters is rejected", threw);
+        }
+
+        // Julia sends [[1], [2]] as a '*' array of 'L' arrays ([[1.0], [2.0]] of 'V' arrays,
+        // [1:2, 3:4] of 'R' ranges). Where nesting isn't allowed (JuliaCall, JuliaEval) these
+        // must be refused, as a '*' array of '*' arrays is - they once got through.
+        private static void TestNestedCompactArrays()
+        {
+            string l = "L1,1;" + Hex64(1), v = "V1,1;" + Hex.DoubleToHex(1.0), r = "RI,2,1,1;";
+            foreach (string inner in new[] { l, v, r })
+            {
+                string wire = "*1,2;" + inner.Length + "," + inner.Length + ",;" + inner + inner;
+                string what = "array of '" + inner[0] + "' arrays";
+                bool refused = false;
+                try { WireFormatDecode.Decode(wire, allowNesting: false, vectorToColumn: true); }
+                catch (InvalidOperationException ex) { refused = ex.Message == "Excel cannot display arrays containing arrays"; }
+                CheckTrue(what + " refused without nesting", refused);
+                bool refusedOnSheet = false;
+                try { WireFormatDecode.Decode(wire, allowNesting: false, vectorToColumn: true, forWorksheet: true); }
+                catch (InvalidOperationException) { refusedOnSheet = true; }
+                CheckTrue(what + " refused for a worksheet", refusedOnSheet);
+                var nested = WireFormatDecode.Decode(wire, allowNesting: true) as object[];
+                CheckTrue(what + " decodes with nesting", nested != null && nested.Length == 2 && nested[0] is Array);
+            }
+            // At the top level, compact arrays are fine without nesting.
+            CheckTrue("top-level 'L' array without nesting", WireFormatDecode.Decode(l, allowNesting: false) is Array);
+        }
+
+        // A failed call ("X<message>") is raised by Decode, and recognised by FailureMessage.
+        private static void TestFailure()
+        {
+            string message = null;
+            try { WireFormatDecode.Decode("XMethodError: oops"); }
+            catch (JuliaException ex) { message = ex.Message; }
+            Check("X raises JuliaException with the message", message, "MethodError: oops");
+            Check("FailureMessage of X", WireFormatDecode.FailureMessage("XMethodError: oops"), "MethodError: oops");
+            Check("FailureMessage of a string", WireFormatDecode.FailureMessage((char)163 + "#Looks like an error!"), null);
+            bool refused = false;
+            try { WireFormatDecode.Decode("*1,1;3,;Xab", allowNesting: true); }
+            catch (FormatException) { refused = true; }
+            CheckTrue("X as an array element is refused", refused);
         }
 
         private static string Hex64(long v)

@@ -1,8 +1,9 @@
 ﻿,"Audit",,,,
 ,,,,,
-,"All 4 rows shown.",,,,
+,"All 5 rows shown.",,,,
 ,"Dbl-click","Double-click","Dbl-click","Double-click","Double-click to filter"
 ,"Version","Date","Time","Author","Comment"
+,5,2026-11-27,0.508402777777519,"Philip Swannell","Reset line numbers, indentation and Declare statements via MZTools and AmendVBA - Claude does not do the equivalent after its edits."
 ,4,2026-11-10,0.462002314816345,"Philip Swannell","Re-ran methods of modPerformance after optimisation to Julia method decode_xl_array_v ."
 ,3,2026-11-08,0.720081018516794,"Philip Swannell","Deleted unused code."
 ,2,2026-11-08,0.633020833331102,"Philip Swannell","Copied across the performance measuring code from JuliaExcel.xlam."

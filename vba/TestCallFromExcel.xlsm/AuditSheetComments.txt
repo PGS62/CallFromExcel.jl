@@ -1,4 +1,5 @@
 ﻿Version	Date	Time	Author	Comment
+5	27-Nov-2026	12:12	Philip Swannell	Reset line numbers, indentation and Declare statements via MZTools and AmendVBA - Claude does not do the equivalent after its edits.
 4	10-Nov-2026	11:05	Philip Swannell	Re-ran methods of modPerformance after optimisation to Julia method decode_xl_array_v .
 3	08-Nov-2026	17:16	Philip Swannell	Deleted unused code.
 2	08-Nov-2026	15:11	Philip Swannell	Copied across the performance measuring code from JuliaExcel.xlam.

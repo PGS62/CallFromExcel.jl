@@ -21,102 +21,108 @@ Attribute VB_Name = "modSoak"
 Option Explicit
 
 Public Sub RunSoakTest(Optional Batches As Long = 20, Optional IterationsPerBatch As Long = 1000)
-    Dim CFE As Object
-    Dim Arr() As Double
-    Dim i As Long, B As Long, k As Long
-    Dim wb As Workbook, wsOut As Worksheet, wsCalc As Worksheet
-    Dim Formulas As Range
-    Dim ExcelPID As Long, JuliaPID As Long
-    Dim t As Double
-    Dim Res As Variant
-    Dim OldCalc As XlCalculation
+          Dim Arr() As Double
+          Dim B As Long
+          Dim CFE As Object
+          Dim ExcelPID As Long
+          Dim Formulas As Range
+          Dim i As Long
+          Dim JuliaPID As Long
+          Dim k As Long
+          Dim OldCalc As XlCalculation
+          Dim Res As Variant
+          Dim t As Double
+          Dim wb As Workbook
+          Dim wsCalc As Worksheet
+          Dim wsOut As Worksheet
 
-    Set CFE = CreateObject("CallFromExcel.ComServer")
-    Res = CFE.JuliaLaunch
-    ExcelPID = CFE.JuliaExcelPID
-    JuliaPID = CFE.JuliaEvalVBA("Int(getpid())")
+1         Set CFE = CreateObject("CallFromExcel.ComServer")
+2         Res = CFE.JuliaLaunch
+3         ExcelPID = CFE.JuliaExcelPID
+4         JuliaPID = CFE.JuliaEvalVBA("Int(getpid())")
 
-    ReDim Arr(1 To 1000)
-    For k = 1 To 1000
-        Arr(k) = Rnd()
-    Next k
+5         ReDim Arr(1 To 1000)
+6         For k = 1 To 1000
+7             Arr(k) = Rnd()
+8         Next k
 
-    Set wb = Application.Workbooks.Add
-    Set wsOut = wb.Worksheets(1)
-    wsOut.Name = "Soak"
-    Set wsCalc = wb.Worksheets.Add(After:=wsOut)
-    wsCalc.Name = "Formulas"
+9         Set wb = Application.Workbooks.Add
+10        Set wsOut = wb.Worksheets(1)
+11        wsOut.Name = "Soak"
+12        Set wsCalc = wb.Worksheets.Add(After:=wsOut)
+13        wsCalc.Name = "Formulas"
 
-    ' Inputs for the worksheet formulas: 1,000 random numbers in column A.
-    wsCalc.Range("A1:A1000").Value = Application.WorksheetFunction.Transpose(Arr)
-    ' One column each, so the spilling results (sort: C1:C1000, rand: H1:Q100) don't collide.
-    wsCalc.Range("C1").Formula2 = "=JuliaCall(""sort"",A1:A1000)"
-    wsCalc.Range("E1").Formula2 = "=JuliaCall(""+"",1,2)"
-    wsCalc.Range("F1").Formula2 = "=JuliaEval(""repeat(""""abc"""",100)"")"
-    wsCalc.Range("G1").Formula2 = "=JuliaEval(""error(""""soak"""")"")"
-    wsCalc.Range("H1").Formula2 = "=JuliaEval(""rand(100,10)"")"
-    Set Formulas = wsCalc.Range("C1,E1:H1")
+          ' Inputs for the worksheet formulas: 1,000 random numbers in column A.
+14        wsCalc.Range("A1:A1000").Value = Application.WorksheetFunction.Transpose(Arr)
+          ' One column each, so the spilling results (sort: C1:C1000, rand: H1:Q100) don't collide.
+15        wsCalc.Range("C1").Formula2 = "=JuliaCall(""sort"",A1:A1000)"
+16        wsCalc.Range("E1").Formula2 = "=JuliaCall(""+"",1,2)"
+17        wsCalc.Range("F1").Formula2 = "=JuliaEval(""repeat(""""abc"""",100)"")"
+18        wsCalc.Range("G1").Formula2 = "=JuliaEval(""error(""""soak"""")"")"
+19        wsCalc.Range("H1").Formula2 = "=JuliaEval(""rand(100,10)"")"
+20        Set Formulas = wsCalc.Range("C1,E1:H1")
 
-    wsOut.Range("A1:G1").Value = Array("Batch", "Iterations", "Seconds", "Excel MB", _
-        "Julia live MB", "Julia private MB", "Excel PID / Julia PID: " & ExcelPID & " / " & JuliaPID)
+21        wsOut.Range("A1:G1").Value = Array("Batch", "Iterations", "Seconds", "Excel MB", _
+              "Julia live MB", "Julia private MB", "Excel PID / Julia PID: " & ExcelPID & " / " & JuliaPID)
 
-    OldCalc = Application.Calculation
-    Application.Calculation = xlCalculationManual
-    Application.ScreenUpdating = False
+22        OldCalc = Application.Calculation
+23        Application.Calculation = xlCalculationManual
+24        Application.ScreenUpdating = False
 
-    ' Batch 0 is the warm-up: JIT, Julia method compilation and the connection pool settle.
-    For B = 0 To Batches
-        t = Timer
-        For i = 1 To IterationsPerBatch
-            Res = CFE.JuliaCallVBA("+", 1, 2)
-            Res = CFE.JuliaCallVBA("identity", Arr)
-            Res = CFE.JuliaEvalVBA("repeat(""abc"", 100)")
-            Res = CFE.JuliaCall("sum", Arr)
-            Res = CFE.JuliaEvalVBA("error(""soak"")")
-            Formulas.Calculate
-        Next i
-        t = Timer - t
+          ' Batch 0 is the warm-up: JIT, Julia method compilation and the connection pool settle.
+25        For B = 0 To Batches
+26            t = Timer
+27            For i = 1 To IterationsPerBatch
+28                Res = CFE.JuliaCallVBA("+", 1, 2)
+29                Res = CFE.JuliaCallVBA("identity", Arr)
+30                Res = CFE.JuliaEvalVBA("repeat(""abc"", 100)")
+31                Res = CFE.JuliaCall("sum", Arr)
+32                Res = CFE.JuliaEvalVBA("error(""soak"")")
+33                Formulas.Calculate
+34            Next i
+35            t = Timer - t
 
-        wsOut.Cells(B + 2, 1).Value = B
-        wsOut.Cells(B + 2, 2).Value = CDbl(B) * IterationsPerBatch
-        wsOut.Cells(B + 2, 3).Value = t
-        wsOut.Cells(B + 2, 4).Value = PrivateMB(ExcelPID)
-        wsOut.Cells(B + 2, 5).Value = CFE.JuliaEvalVBA("GC.gc(); Base.gc_live_bytes() / 2^20")
-        wsOut.Cells(B + 2, 6).Value = PrivateMB(JuliaPID)
-        Application.StatusBar = "Soak test: batch " & B & " of " & Batches
-        DoEvents
-    Next B
+36            wsOut.Cells(B + 2, 1).Value = B
+37            wsOut.Cells(B + 2, 2).Value = CDbl(B) * IterationsPerBatch
+38            wsOut.Cells(B + 2, 3).Value = t
+39            wsOut.Cells(B + 2, 4).Value = PrivateMB(ExcelPID)
+40            wsOut.Cells(B + 2, 5).Value = CFE.JuliaEvalVBA("GC.gc(); Base.gc_live_bytes() / 2^20")
+41            wsOut.Cells(B + 2, 6).Value = PrivateMB(JuliaPID)
+42            Application.StatusBar = "Soak test: batch " & B & " of " & Batches
+43            DoEvents
+44        Next B
 
-    Application.StatusBar = False
-    Application.ScreenUpdating = True
-    Application.Calculation = OldCalc
+45        Application.StatusBar = False
+46        Application.ScreenUpdating = True
+47        Application.Calculation = OldCalc
 
-    ' Chart the three memory series against the number of iterations, skipping the warm-up row.
-    With wsOut.ChartObjects.Add(wsOut.Range("I2").Left, wsOut.Range("I2").Top, 600, 350).Chart
-        .ChartType = xlXYScatterLines
-        Do While .SeriesCollection.Count > 0
-            .SeriesCollection(1).Delete
-        Loop
-        For k = 4 To 6
-            With .SeriesCollection.NewSeries
-                .Name = "='Soak'!" & wsOut.Cells(1, k).Address
-                .XValues = wsOut.Range(wsOut.Cells(3, 2), wsOut.Cells(Batches + 2, 2))
-                .Values = wsOut.Range(wsOut.Cells(3, k), wsOut.Cells(Batches + 2, k))
-            End With
-        Next k
-        .HasTitle = True
-        .ChartTitle.Text = "Memory (MB) vs iterations"
-    End With
-    wsOut.Activate
+          ' Chart the three memory series against the number of iterations, skipping the warm-up row.
+48        With wsOut.ChartObjects.Add(wsOut.Range("I2").Left, wsOut.Range("I2").Top, 600, 350).Chart
+49            .ChartType = xlXYScatterLines
+50            Do While .SeriesCollection.Count > 0
+51                .SeriesCollection(1).Delete
+52            Loop
+53            For k = 4 To 6
+54                With .SeriesCollection.NewSeries
+55                    .Name = "='Soak'!" & wsOut.Cells(1, k).Address
+56                    .XValues = wsOut.Range(wsOut.Cells(3, 2), wsOut.Cells(Batches + 2, 2))
+57                    .Values = wsOut.Range(wsOut.Cells(3, k), wsOut.Cells(Batches + 2, k))
+58                End With
+59            Next k
+60            .HasTitle = True
+61            .ChartTitle.Text = "Memory (MB) vs iterations"
+62        End With
+63        wsOut.Activate
 End Sub
 
 ' Private bytes of a process in MB, or Empty if there's no such Windows process.
 Private Function PrivateMB(PID As Long) As Variant
-    Dim Proc As Object
-    On Error GoTo ErrHandler
-    Set Proc = GetObject("winmgmts:").Get("Win32_Process.Handle=""" & PID & """")
-    PrivateMB = CDbl(Proc.PrivatePageCount) / 2 ^ 20
-    Exit Function
+          Dim Proc As Object
+1         On Error GoTo ErrHandler
+2         Set Proc = GetObject("winmgmts:").Get("Win32_Process.Handle=""" & PID & """")
+3         PrivateMB = CDbl(Proc.PrivatePageCount) / 2 ^ 20
+4         Exit Function
 ErrHandler:
-    PrivateMB = Empty
+5         PrivateMB = Empty
 End Function
+

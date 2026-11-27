@@ -61,8 +61,8 @@ End Function
 ' Shuts Julia down if it's running. JuliaEval("exit()") raises an error - Julia exits
 ' without answering, or isn't running - which is expected here.
 Sub ExitJulia()
-          On Error Resume Next
-          CallFromExcel.JuliaEval "exit()"
+1         On Error Resume Next
+2         CallFromExcel.JuliaEval "exit()"
 End Sub
 
 ' -----------------------------------------------------------------------------------------------------------------------
@@ -88,123 +88,123 @@ Function RunTests(Optional SilentMode As Boolean = False, Optional CommandLineOp
 3         ExitJulia
 4         Sleep 1000 'Give time to shut down properly, otherwise launch can fail thinking Julia still running but unresponsive
 5         ThrowIfError CallFromExcel.JuliaLaunch(, , CommandLineOptions)
-          TestCommandLineOptions = CommandLineOptions
+6         TestCommandLineOptions = CommandLineOptions
 
-6         PrintTwice vbLf & String(80, "=")
-7         PrintTwice "CallFromExcel RunTests (C#/Excel-DNA add-in)"
-8         PrintTwice Format(Now, "yyyy-mm-dd hh:mm:ss")
-9         PrintTwice "ComputerName = " & Environ("ComputerName")
+7         PrintTwice vbLf & String(80, "=")
+8         PrintTwice "CallFromExcel RunTests (C#/Excel-DNA add-in)"
+9         PrintTwice Format(Now, "yyyy-mm-dd hh:mm:ss")
+10        PrintTwice "ComputerName = " & Environ("ComputerName")
 
           'Tests ported from vba\JuliaExcel.xlam\VBA\modTest.bas - the CallFromExcel.<Name>/COM surface.
-10        AccResult "TestEmpty", TestEmpty, NumPassed, NumFailed
-11        AccResult "TestBoolean", TestBoolean, NumPassed, NumFailed
-12        AccResult "TestDouble", TestDouble, NumPassed, NumFailed
-13        AccResult "TestString", TestString, NumPassed, NumFailed
-14        AccResult "TestWideString", TestWideString, NumPassed, NumFailed
-15        AccResult "TestLong", TestLong, NumPassed, NumFailed
-16        AccResult "TestLongLong", TestLongLong, NumPassed, NumFailed
-17        AccResult "TestSingle", TestSingle, NumPassed, NumFailed
-18        AccResult "TestDate", TestDate, NumPassed, NumFailed
-19        AccResult "TestDateTime", TestDateTime, NumPassed, NumFailed
-20        AccResult "TestByte", TestByte, NumPassed, NumFailed
-21        AccResult "Test1DArrayOfDoubles", Test1DArrayOfDoubles, NumPassed, NumFailed
-22        AccResult "Test2DArrayOfMixedType", Test2DArrayOfMixedType, NumPassed, NumFailed
-23        AccResult "Test3DArray", Test3DArray, NumPassed, NumFailed
-24        AccResult "Test4DArray", Test4DArray, NumPassed, NumFailed
-25        AccResult "TestDictionary", TestDictionary, NumPassed, NumFailed
-26        AccResult "TestExactRoundTripping", TestExactRoundTripping, NumPassed, NumFailed
-27        AccResult "TestArrayOfDictionaries", TestArrayOfDictionaries, NumPassed, NumFailed
-28        AccResult "TestDictionaryOfArrays", TestDictionaryOfArrays, NumPassed, NumFailed
-29        AccResult "TestDictionaryOfTypes", TestDictionaryOfTypes, NumPassed, NumFailed
-30        AccResult "TestDictionaryIsScriptingDictionary", TestDictionaryIsScriptingDictionary, NumPassed, NumFailed
-31        AccResult "TestIntegerArrayIsLongLong", TestIntegerArrayIsLongLong, NumPassed, NumFailed
-32        AccResult "TestOneDArraysDisplayAsOneColumnOnSheet", TestOneDArraysDisplayAsOneColumnOnSheet, NumPassed, NumFailed
-33        AccResult "TestElType", TestElType, NumPassed, NumFailed
-34        AccResult "TestBroadcasting", TestBroadcasting, NumPassed, NumFailed
-35        AccResult "TestNaNFallback", TestNaNFallback, NumPassed, NumFailed
-36        AccResult "TestInfFallback", TestInfFallback, NumPassed, NumFailed
-37        AccResult "TestVFormatVectorColumn", TestVFormatVectorColumn, NumPassed, NumFailed
-38        AccResult "TestVFormatMatrixNonSquare", TestVFormatMatrixNonSquare, NumPassed, NumFailed
-39        AccResult "TestMatrixNaNFallback", TestMatrixNaNFallback, NumPassed, NumFailed
-40        AccResult "TestVFormatEmptyArrayFallback", TestVFormatEmptyArrayFallback, NumPassed, NumFailed
-41        AccResult "TestVEncodeFromVariantArray", TestVEncodeFromVariantArray, NumPassed, NumFailed
-42        AccResult "TestVFormat3DArray", TestVFormat3DArray, NumPassed, NumFailed
-43        AccResult "TestRangeIntegerVsCollect", TestRangeIntegerVsCollect, NumPassed, NumFailed
-44        AccResult "TestRangeStepVsCollect", TestRangeStepVsCollect, NumPassed, NumFailed
-45        AccResult "TestRangeFloatVsCollect", TestRangeFloatVsCollect, NumPassed, NumFailed
-46        AccResult "TestRangeJuliaEvalVBAIsOneD", TestRangeJuliaEvalVBAIsOneD, NumPassed, NumFailed
-47        AccResult "TestRangeJuliaEvalIsColumn", TestRangeJuliaEvalIsColumn, NumPassed, NumFailed
-48        AccResult "TestRangeWireFormat", TestRangeWireFormat, NumPassed, NumFailed
-49        AccResult "TestNaNInfRoundTripViaV", TestNaNInfRoundTripViaV, NumPassed, NumFailed
-50        AccResult "TestExcelErrorRoundTrip", TestExcelErrorRoundTrip, NumPassed, NumFailed
-51        AccResult "TestArrayOfSingleCharacters", TestArrayOfSingleCharacters, NumPassed, NumFailed
-52        AccResult "TestNamedArgs", TestNamedArgs, NumPassed, NumFailed
-53        AccResult "TestNamedArgsVBA", TestNamedArgsVBA, NumPassed, NumFailed
-          AccResult "TestErrorsRaised", TestErrorsRaised, NumPassed, NumFailed
-54        AccResult "TestVFormatBoundarySizes", TestVFormatBoundarySizes, NumPassed, NumFailed
-55        AccResult "TestJuliaEvalMultiLineWithComment", TestJuliaEvalMultiLineWithComment, NumPassed, NumFailed
+11        AccResult "TestEmpty", TestEmpty, NumPassed, NumFailed
+12        AccResult "TestBoolean", TestBoolean, NumPassed, NumFailed
+13        AccResult "TestDouble", TestDouble, NumPassed, NumFailed
+14        AccResult "TestString", TestString, NumPassed, NumFailed
+15        AccResult "TestWideString", TestWideString, NumPassed, NumFailed
+16        AccResult "TestLong", TestLong, NumPassed, NumFailed
+17        AccResult "TestLongLong", TestLongLong, NumPassed, NumFailed
+18        AccResult "TestSingle", TestSingle, NumPassed, NumFailed
+19        AccResult "TestDate", TestDate, NumPassed, NumFailed
+20        AccResult "TestDateTime", TestDateTime, NumPassed, NumFailed
+21        AccResult "TestByte", TestByte, NumPassed, NumFailed
+22        AccResult "Test1DArrayOfDoubles", Test1DArrayOfDoubles, NumPassed, NumFailed
+23        AccResult "Test2DArrayOfMixedType", Test2DArrayOfMixedType, NumPassed, NumFailed
+24        AccResult "Test3DArray", Test3DArray, NumPassed, NumFailed
+25        AccResult "Test4DArray", Test4DArray, NumPassed, NumFailed
+26        AccResult "TestDictionary", TestDictionary, NumPassed, NumFailed
+27        AccResult "TestExactRoundTripping", TestExactRoundTripping, NumPassed, NumFailed
+28        AccResult "TestArrayOfDictionaries", TestArrayOfDictionaries, NumPassed, NumFailed
+29        AccResult "TestDictionaryOfArrays", TestDictionaryOfArrays, NumPassed, NumFailed
+30        AccResult "TestDictionaryOfTypes", TestDictionaryOfTypes, NumPassed, NumFailed
+31        AccResult "TestDictionaryIsScriptingDictionary", TestDictionaryIsScriptingDictionary, NumPassed, NumFailed
+32        AccResult "TestIntegerArrayIsLongLong", TestIntegerArrayIsLongLong, NumPassed, NumFailed
+33        AccResult "TestOneDArraysDisplayAsOneColumnOnSheet", TestOneDArraysDisplayAsOneColumnOnSheet, NumPassed, NumFailed
+34        AccResult "TestElType", TestElType, NumPassed, NumFailed
+35        AccResult "TestBroadcasting", TestBroadcasting, NumPassed, NumFailed
+36        AccResult "TestNaNFallback", TestNaNFallback, NumPassed, NumFailed
+37        AccResult "TestInfFallback", TestInfFallback, NumPassed, NumFailed
+38        AccResult "TestVFormatVectorColumn", TestVFormatVectorColumn, NumPassed, NumFailed
+39        AccResult "TestVFormatMatrixNonSquare", TestVFormatMatrixNonSquare, NumPassed, NumFailed
+40        AccResult "TestMatrixNaNFallback", TestMatrixNaNFallback, NumPassed, NumFailed
+41        AccResult "TestVFormatEmptyArrayFallback", TestVFormatEmptyArrayFallback, NumPassed, NumFailed
+42        AccResult "TestVEncodeFromVariantArray", TestVEncodeFromVariantArray, NumPassed, NumFailed
+43        AccResult "TestVFormat3DArray", TestVFormat3DArray, NumPassed, NumFailed
+44        AccResult "TestRangeIntegerVsCollect", TestRangeIntegerVsCollect, NumPassed, NumFailed
+45        AccResult "TestRangeStepVsCollect", TestRangeStepVsCollect, NumPassed, NumFailed
+46        AccResult "TestRangeFloatVsCollect", TestRangeFloatVsCollect, NumPassed, NumFailed
+47        AccResult "TestRangeJuliaEvalVBAIsOneD", TestRangeJuliaEvalVBAIsOneD, NumPassed, NumFailed
+48        AccResult "TestRangeJuliaEvalIsColumn", TestRangeJuliaEvalIsColumn, NumPassed, NumFailed
+49        AccResult "TestRangeWireFormat", TestRangeWireFormat, NumPassed, NumFailed
+50        AccResult "TestNaNInfRoundTripViaV", TestNaNInfRoundTripViaV, NumPassed, NumFailed
+51        AccResult "TestExcelErrorRoundTrip", TestExcelErrorRoundTrip, NumPassed, NumFailed
+52        AccResult "TestArrayOfSingleCharacters", TestArrayOfSingleCharacters, NumPassed, NumFailed
+53        AccResult "TestNamedArgs", TestNamedArgs, NumPassed, NumFailed
+54        AccResult "TestNamedArgsVBA", TestNamedArgsVBA, NumPassed, NumFailed
+55        AccResult "TestErrorsRaised", TestErrorsRaised, NumPassed, NumFailed
+56        AccResult "TestVFormatBoundarySizes", TestVFormatBoundarySizes, NumPassed, NumFailed
+57        AccResult "TestJuliaEvalMultiLineWithComment", TestJuliaEvalMultiLineWithComment, NumPassed, NumFailed
 
           'New: tests of the real worksheet-formula / XLL surface. No equivalent existed in the
           'old suite - a bare JuliaCall behaved identically whether called from a cell or a
           'macro, but the XLL and the COM migration methods above are now separate
           'implementations that can diverge, so this surface needs its own coverage.
-56        AccResult "WsTest_Scalar", WsTest_Scalar, NumPassed, NumFailed
-57        AccResult "WsTest_String", WsTest_String, NumPassed, NumFailed
-58        AccResult "WsTest_OneDArrayBecomesColumn", WsTest_OneDArrayBecomesColumn, NumPassed, NumFailed
-59        AccResult "WsTest_TwoDArray", WsTest_TwoDArray, NumPassed, NumFailed
-60        AccResult "WsTest_IntegerArrays", WsTest_IntegerArrays, NumPassed, NumFailed
-61        AccResult "WsTest_JuliaEvalScalar", WsTest_JuliaEvalScalar, NumPassed, NumFailed
-62        AccResult "WsTest_EmptyResult", WsTest_EmptyResult, NumPassed, NumFailed
-63        AccResult "WsTest_JuliaLaunchArgOrder", WsTest_JuliaLaunchArgOrder, NumPassed, NumFailed
-64        AccResult "WsTest_RelaunchAfterExit", WsTest_RelaunchAfterExit, NumPassed, NumFailed
-65        AccResult "WsTest_JuliaIsRunningAndPID", WsTest_JuliaIsRunningAndPID, NumPassed, NumFailed
-66        AccResult "WsTest_ErrorString", WsTest_ErrorString, NumPassed, NumFailed
-67        AccResult "WsTest_SortRoundTrip", WsTest_SortRoundTrip, NumPassed, NumFailed
-          AccResult "WsTest_ErrorArguments", WsTest_ErrorArguments, NumPassed, NumFailed
-          AccResult "WsTest_RangeWithBlanksAndErrors", WsTest_RangeWithBlanksAndErrors, NumPassed, NumFailed
-          AccResult "WsTest_JuliaSetVar", WsTest_JuliaSetVar, NumPassed, NumFailed
-          AccResult "WsTest_JuliaEvalRangeWithBlankLine", WsTest_JuliaEvalRangeWithBlankLine, NumPassed, NumFailed
-          AccResult "TestRangeArgumentsVBA", TestRangeArgumentsVBA, NumPassed, NumFailed
-          AccResult "WsTest_JuliaLaunchBlankArgs", WsTest_JuliaLaunchBlankArgs, NumPassed, NumFailed
-          AccResult "WsTest_JuliaEvalBlankOrErrorCell", WsTest_JuliaEvalBlankOrErrorCell, NumPassed, NumFailed
-          AccResult "WsTest_FloatRangeVsCollect", WsTest_FloatRangeVsCollect, NumPassed, NumFailed
-          AccResult "TestBigIntegerRangeVsCollect", TestBigIntegerRangeVsCollect, NumPassed, NumFailed
-          AccResult "TestDateBefore1900WithTime", TestDateBefore1900WithTime, NumPassed, NumFailed
-          AccResult "TestInvalidCharactersInArray", TestInvalidCharactersInArray, NumPassed, NumFailed
-          AccResult "WsTest_JuliaIncludeIntoMain", WsTest_JuliaIncludeIntoMain, NumPassed, NumFailed
-          AccResult "WsTest_NamedFunctionBroadcast", WsTest_NamedFunctionBroadcast, NumPassed, NumFailed
-          AccResult "WsTest_NamedFunctionHandle", WsTest_NamedFunctionHandle, NumPassed, NumFailed
-          AccResult "WsTest_NamedFunctionOptionalArgs", WsTest_NamedFunctionOptionalArgs, NumPassed, NumFailed
-          AccResult "WsTest_NamedFunctionNameChecks", WsTest_NamedFunctionNameChecks, NumPassed, NumFailed
-          AccResult "WsTest_NamedFunctionRedefined", WsTest_NamedFunctionRedefined, NumPassed, NumFailed
+58        AccResult "WsTest_Scalar", WsTest_Scalar, NumPassed, NumFailed
+59        AccResult "WsTest_String", WsTest_String, NumPassed, NumFailed
+60        AccResult "WsTest_OneDArrayBecomesColumn", WsTest_OneDArrayBecomesColumn, NumPassed, NumFailed
+61        AccResult "WsTest_TwoDArray", WsTest_TwoDArray, NumPassed, NumFailed
+62        AccResult "WsTest_IntegerArrays", WsTest_IntegerArrays, NumPassed, NumFailed
+63        AccResult "WsTest_JuliaEvalScalar", WsTest_JuliaEvalScalar, NumPassed, NumFailed
+64        AccResult "WsTest_EmptyResult", WsTest_EmptyResult, NumPassed, NumFailed
+65        AccResult "WsTest_JuliaLaunchArgOrder", WsTest_JuliaLaunchArgOrder, NumPassed, NumFailed
+66        AccResult "WsTest_RelaunchAfterExit", WsTest_RelaunchAfterExit, NumPassed, NumFailed
+67        AccResult "WsTest_JuliaIsRunningAndPID", WsTest_JuliaIsRunningAndPID, NumPassed, NumFailed
+68        AccResult "WsTest_ErrorString", WsTest_ErrorString, NumPassed, NumFailed
+69        AccResult "WsTest_SortRoundTrip", WsTest_SortRoundTrip, NumPassed, NumFailed
+70        AccResult "WsTest_ErrorArguments", WsTest_ErrorArguments, NumPassed, NumFailed
+71        AccResult "WsTest_RangeWithBlanksAndErrors", WsTest_RangeWithBlanksAndErrors, NumPassed, NumFailed
+72        AccResult "WsTest_JuliaSetVar", WsTest_JuliaSetVar, NumPassed, NumFailed
+73        AccResult "WsTest_JuliaEvalRangeWithBlankLine", WsTest_JuliaEvalRangeWithBlankLine, NumPassed, NumFailed
+74        AccResult "TestRangeArgumentsVBA", TestRangeArgumentsVBA, NumPassed, NumFailed
+75        AccResult "WsTest_JuliaLaunchBlankArgs", WsTest_JuliaLaunchBlankArgs, NumPassed, NumFailed
+76        AccResult "WsTest_JuliaEvalBlankOrErrorCell", WsTest_JuliaEvalBlankOrErrorCell, NumPassed, NumFailed
+77        AccResult "WsTest_FloatRangeVsCollect", WsTest_FloatRangeVsCollect, NumPassed, NumFailed
+78        AccResult "TestBigIntegerRangeVsCollect", TestBigIntegerRangeVsCollect, NumPassed, NumFailed
+79        AccResult "TestDateBefore1900WithTime", TestDateBefore1900WithTime, NumPassed, NumFailed
+80        AccResult "TestInvalidCharactersInArray", TestInvalidCharactersInArray, NumPassed, NumFailed
+81        AccResult "WsTest_JuliaIncludeIntoMain", WsTest_JuliaIncludeIntoMain, NumPassed, NumFailed
+82        AccResult "WsTest_NamedFunctionBroadcast", WsTest_NamedFunctionBroadcast, NumPassed, NumFailed
+83        AccResult "WsTest_NamedFunctionHandle", WsTest_NamedFunctionHandle, NumPassed, NumFailed
+84        AccResult "WsTest_NamedFunctionOptionalArgs", WsTest_NamedFunctionOptionalArgs, NumPassed, NumFailed
+85        AccResult "WsTest_NamedFunctionNameChecks", WsTest_NamedFunctionNameChecks, NumPassed, NumFailed
+86        AccResult "WsTest_NamedFunctionRedefined", WsTest_NamedFunctionRedefined, NumPassed, NumFailed
 
-68        Prompt = NumPassed & " test(s) passed" & vbLf & _
+87        Prompt = NumPassed & " test(s) passed" & vbLf & _
               NumFailed & " test(s) failed"
 
-69        If NumFailed > 0 Then
-70            Prompt = Prompt & vbLf & vbLf & "See VBA Immediate window for details"
-71        End If
+88        If NumFailed > 0 Then
+89            Prompt = Prompt & vbLf & vbLf & "See VBA Immediate window for details"
+90        End If
 
-72        PrintTwice NumPassed & " test(s) passed"
-73        PrintTwice NumFailed & " test(s) failed"
-74        PrintTwice String(80, "=")
+91        PrintTwice NumPassed & " test(s) passed"
+92        PrintTwice NumFailed & " test(s) failed"
+93        PrintTwice String(80, "=")
 
-75        If Not SilentMode Then
-76            AppActivate Application.Caption
-77            MsgBox Prompt, IIf(NumFailed = 0, vbInformation, vbCritical), Title
-78        End If
+94        If Not SilentMode Then
+95            AppActivate Application.Caption
+96            MsgBox Prompt, IIf(NumFailed = 0, vbInformation, vbCritical), Title
+97        End If
 
-79        RunTests = NumFailed = 0
+98        RunTests = NumFailed = 0
 
-80        Exit Function
+99        Exit Function
 ErrHandler:
           Dim ErrText As String
-81        ErrText = ReThrow("RunTests", Err, True)
-82        TestLog = TestLog & ErrText & vbCrLf
-83        If Not SilentMode Then
-84            MsgBox ErrText, vbCritical, Title
-85        End If
-86        RunTests = False
+100       ErrText = ReThrow("RunTests", Err, True)
+101       TestLog = TestLog & ErrText & vbCrLf
+102       If Not SilentMode Then
+103           MsgBox ErrText, vbCritical, Title
+104       End If
+105       RunTests = False
 End Function
 
 Sub LoadAddIn()
@@ -951,14 +951,14 @@ Function TestRangeFloatVsCollect()
 2         y1 = ThrowIfError(CallFromExcel.JuliaEval("(1:1000).*pi"))
 3         y2 = ThrowIfError(CallFromExcel.JuliaEval("collect((1:1000).*pi)"))
 4         TestRangeFloatVsCollect = ArraysIdentical(y1, y2)
-          y1 = ThrowIfError(CallFromExcel.JuliaEvalVBA("0:0.01:1"))
-          y2 = ThrowIfError(CallFromExcel.JuliaEvalVBA("collect(0:0.01:1)"))
-          TestRangeFloatVsCollect = TestRangeFloatVsCollect And ArraysIdentical(y1, y2) And y1(LBound(y1) + 30) = 0.3
+5         y1 = ThrowIfError(CallFromExcel.JuliaEvalVBA("0:0.01:1"))
+6         y2 = ThrowIfError(CallFromExcel.JuliaEvalVBA("collect(0:0.01:1)"))
+7         TestRangeFloatVsCollect = TestRangeFloatVsCollect And ArraysIdentical(y1, y2) And y1(LBound(y1) + 30) = 0.3
 
-5         Exit Function
+8         Exit Function
 ErrHandler:
-6         PrintTwice ReThrow("TestRangeFloatVsCollect", Err, True)
-7         TestRangeFloatVsCollect = False
+9         PrintTwice ReThrow("TestRangeFloatVsCollect", Err, True)
+10        TestRangeFloatVsCollect = False
 End Function
 
 ' Confirms JuliaEvalVBA gives a genuine 1-D array for a range result.
@@ -1085,11 +1085,13 @@ End Function
 ' and that a missing ";", an odd number of arguments after it, and a repeated name are each
 ' raised as an error.
 Function TestNamedArgs()
+          Dim D1 As String
+          Dim D2 As String
+          Dim D3 As String
           Dim Expected1(1 To 4, 1 To 1) As Variant
           Dim Expected3(1 To 2, 1 To 1) As Variant
           Dim OK As Boolean
           Dim x As Variant
-          Dim D1 As String, D2 As String, D3 As String
 
 1         On Error GoTo ErrHandler
 2         ThrowIfError CallFromExcel.JuliaEval("named_args_test(x, y=0; a=1, b=2) = [x, y, a, b]; named_args_join(xs...; delim="","") = join(xs, delim)")
@@ -1097,28 +1099,28 @@ Function TestNamedArgs()
 3         Expected1(1, 1) = 10#: Expected1(2, 1) = 0#: Expected1(3, 1) = 1#: Expected1(4, 1) = 5#
 4         OK = ArraysIdentical(Expected1, ThrowIfError(CallFromExcel.JuliaCallNamedArgs("named_args_test", 10#, ";", "b", 5#)))
 
-          On Error Resume Next
-5         x = CallFromExcel.JuliaCallNamedArgs("named_args_test", 10#)
-          D1 = Err.Description: Err.Clear
-6         x = CallFromExcel.JuliaCallNamedArgs("named_args_test", 10#, ";", "b", 5#, "a")
-          D2 = Err.Description: Err.Clear
-          On Error GoTo ErrHandler
+5         On Error Resume Next
+6         x = CallFromExcel.JuliaCallNamedArgs("named_args_test", 10#)
+7         D1 = Err.Description: Err.Clear
+8         x = CallFromExcel.JuliaCallNamedArgs("named_args_test", 10#, ";", "b", 5#, "a")
+9         D2 = Err.Description: Err.Clear
+10        On Error GoTo ErrHandler
 
-7         Expected3(1, 1) = "a": Expected3(2, 1) = "b"
-8         OK = OK And ArraysIdentical(Expected3, ThrowIfError(CallFromExcel.JuliaCallNamedArgs("split", "a;;b", ";", ";", "keepempty", False)))
-9         OK = OK And CallFromExcel.JuliaCallNamedArgs("named_args_join", "a", ";", "b", ";", "delim", ";") = "a;;;b"
+11        Expected3(1, 1) = "a": Expected3(2, 1) = "b"
+12        OK = OK And ArraysIdentical(Expected3, ThrowIfError(CallFromExcel.JuliaCallNamedArgs("split", "a;;b", ";", ";", "keepempty", False)))
+13        OK = OK And CallFromExcel.JuliaCallNamedArgs("named_args_join", "a", ";", "b", ";", "delim", ";") = "a;;;b"
 
-          On Error Resume Next
-10        x = CallFromExcel.JuliaCallNamedArgs("named_args_test", 10#, ";", "a", 1, "a", 2)
-          D3 = Err.Description: Err.Clear
-          On Error GoTo ErrHandler
+14        On Error Resume Next
+15        x = CallFromExcel.JuliaCallNamedArgs("named_args_test", 10#, ";", "a", 1, "a", 2)
+16        D3 = Err.Description: Err.Clear
+17        On Error GoTo ErrHandler
 
-          OK = OK And Left$(D1, 14) = "ArgumentError:" And Left$(D2, 14) = "ArgumentError:" And Left$(D3, 14) = "ArgumentError:"
-11        TestNamedArgs = OK
-12        Exit Function
+18        OK = OK And Left$(D1, 14) = "ArgumentError:" And Left$(D2, 14) = "ArgumentError:" And Left$(D3, 14) = "ArgumentError:"
+19        TestNamedArgs = OK
+20        Exit Function
 ErrHandler:
-13        PrintTwice ReThrow("TestNamedArgs", Err, True)
-14        TestNamedArgs = False
+21        PrintTwice ReThrow("TestNamedArgs", Err, True)
+22        TestNamedArgs = False
 End Function
 
 ' Checks that the COM methods raise failures as VBA errors rather than returning "#...!"
@@ -1126,11 +1128,20 @@ End Function
 ' that can't be returned (a dictionary, or nested arrays, from JuliaEval), and Err.Source is
 ' "CallFromExcel". A string result that merely looks like an error is returned as it is.
 Function TestErrorsRaised() As Boolean
+          Dim D1 As String
+          Dim D2 As String
+          Dim D3 As String
+          Dim D4 As String
+          Dim D6 As String
+          Dim N1 As Long
+          Dim N2 As Long
+          Dim N3 As Long
+          Dim N4 As Long
+          Dim N5 As Long
+          Dim N6 As Long
           Dim OK As Boolean
-          Dim x As Variant
-          Dim N1 As Long, N2 As Long, N3 As Long, N4 As Long, N5 As Long, N6 As Long
-          Dim D1 As String, D2 As String, D3 As String, D4 As String, D6 As String
           Dim S1 As String
+          Dim x As Variant
 
 1         On Error GoTo ErrHandler
 2         OK = CallFromExcel.JuliaCallVBA("identity", "#Looks like an error!") = "#Looks like an error!"
@@ -1148,29 +1159,29 @@ Function TestErrorsRaised() As Boolean
 13        x = CallFromExcel.JuliaCallHandle("thisFunctionDoesNotExist12345")
 14        N5 = Err.Number: Err.Clear
           ' Arrays of integer vectors travel in compact form, which once bypassed the nesting check.
-          x = CallFromExcel.JuliaEval("[[1], [2]]")
-          N6 = Err.Number: D6 = Err.Description: Err.Clear
-15        On Error GoTo ErrHandler
+15        x = CallFromExcel.JuliaEval("[[1], [2]]")
+16        N6 = Err.Number: D6 = Err.Description: Err.Clear
+17        On Error GoTo ErrHandler
 
-16        OK = OK And N1 = vbObjectError + 1001 And Left$(D1, 13) = "UndefVarError" And S1 = "CallFromExcel"
-17        OK = OK And N2 = vbObjectError + 1001 And Left$(D2, 11) = "MethodError"
-18        OK = OK And N3 = vbObjectError + 1001 And Left$(D3, 13) = "ArgumentError"
-19        OK = OK And N4 = vbObjectError + 1003 And D4 = "Excel cannot display variables of type Dictionary"
-20        OK = OK And N5 = vbObjectError + 1001
-          OK = OK And N6 = vbObjectError + 1003 And D6 = "Excel cannot display arrays containing arrays"
-          x = CallFromExcel.JuliaEvalVBA("[[1], [2]]")
-          OK = OK And x(1)(1) = 1 And x(2)(1) = 2
-          If Not OK Then
-              PrintTwice "TestErrorsRaised got (Err.Number - vbObjectError, Err.Description):" & vbLf & _
+18        OK = OK And N1 = vbObjectError + 1001 And Left$(D1, 13) = "UndefVarError" And S1 = "CallFromExcel"
+19        OK = OK And N2 = vbObjectError + 1001 And Left$(D2, 11) = "MethodError"
+20        OK = OK And N3 = vbObjectError + 1001 And Left$(D3, 13) = "ArgumentError"
+21        OK = OK And N4 = vbObjectError + 1003 And D4 = "Excel cannot display variables of type Dictionary"
+22        OK = OK And N5 = vbObjectError + 1001
+23        OK = OK And N6 = vbObjectError + 1003 And D6 = "Excel cannot display arrays containing arrays"
+24        x = CallFromExcel.JuliaEvalVBA("[[1], [2]]")
+25        OK = OK And x(1)(1) = 1 And x(2)(1) = 2
+26        If Not OK Then
+27            PrintTwice "TestErrorsRaised got (Err.Number - vbObjectError, Err.Description):" & vbLf & _
                   N1 - vbObjectError & " " & D1 & " [" & S1 & "]" & vbLf & N2 - vbObjectError & " " & D2 & vbLf & _
                   N3 - vbObjectError & " " & D3 & vbLf & N4 - vbObjectError & " " & D4 & vbLf & N5 - vbObjectError & vbLf & _
                   N6 - vbObjectError & " " & D6
-          End If
-21        TestErrorsRaised = OK
-22        Exit Function
+28        End If
+29        TestErrorsRaised = OK
+30        Exit Function
 ErrHandler:
-23        PrintTwice ReThrow("TestErrorsRaised", Err, True)
-24        TestErrorsRaised = False
+31        PrintTwice ReThrow("TestErrorsRaised", Err, True)
+32        TestErrorsRaised = False
 End Function
 
 ' Checks JuliaCallNamedArgsVBA returns a vector as a 1-dimensional array, and that both
@@ -1440,11 +1451,11 @@ Function WsTest_RelaunchAfterExit() As Boolean
 4         ws.Range("A1").Formula2 = "=JuliaLaunch(,,""" & TestCommandLineOptions & """)"
 5         Result = ws.Range("A1").Text
 6         WsTest_RelaunchAfterExit = Left$(Result, 1) <> "#" And CallFromExcel.JuliaIsRunning()
-          If Not WsTest_RelaunchAfterExit Then PrintTwice "WsTest_RelaunchAfterExit: JuliaLaunch gave: " & Result & " JuliaIsRunning: " & CallFromExcel.JuliaIsRunning()
-7         Exit Function
+7         If Not WsTest_RelaunchAfterExit Then PrintTwice "WsTest_RelaunchAfterExit: JuliaLaunch gave: " & Result & " JuliaIsRunning: " & CallFromExcel.JuliaIsRunning()
+8         Exit Function
 ErrHandler:
-8         PrintTwice ReThrow("WsTest_RelaunchAfterExit", Err, True)
-9         WsTest_RelaunchAfterExit = False
+9         PrintTwice ReThrow("WsTest_RelaunchAfterExit", Err, True)
+10        WsTest_RelaunchAfterExit = False
 End Function
 
 ' Smoke test for Julia under WSL. Not part of RunTests (which needs a native session): run it by
@@ -1687,9 +1698,9 @@ End Function
 ' collect(...) gives. On a worksheet every number is a Double, but the range must still give the
 ' same (nearest) Doubles as collect.
 Function TestBigIntegerRangeVsCollect() As Boolean
+          Dim ws As Worksheet
           Dim y1 As Variant
           Dim y2 As Variant
-          Dim ws As Worksheet
 1         On Error GoTo ErrHandler
 2         y1 = ThrowIfError(CallFromExcel.JuliaEvalVBA("2^60+1:2^60+300"))
 3         y2 = ThrowIfError(CallFromExcel.JuliaEvalVBA("collect(2^60+1:2^60+300)"))
@@ -1710,8 +1721,8 @@ End Function
 ' #12/29/1899 6:00 AM# arrived in Julia as 1899-12-28T18:00. VBA counts such dates differently
 ' (OLE Automation dates) from Julia.
 Function TestDateBefore1900WithTime() As Boolean
-          Dim y As Variant
           Dim d As Date
+          Dim y As Variant
 1         On Error GoTo ErrHandler
 2         d = #12/29/1899 6:00:00 AM#
 3         y = ThrowIfError(CallFromExcel.JuliaEvalVBA("DateTime(1899,12,29,6)"))
@@ -1730,8 +1741,8 @@ End Function
 ' surrogate, or invalid UTF-8 such as Latin-1 text read into a String - failed as a whole. Each
 ' invalid character now arrives as U+FFFD (the replacement character).
 Function TestInvalidCharactersInArray() As Boolean
-          Dim y As Variant
           Dim ws As Worksheet
+          Dim y As Variant
 1         On Error GoTo ErrHandler
 2         y = ThrowIfError(CallFromExcel.JuliaEvalVBA("[""a\ud800b"", String(UInt8[0x63,0x61,0x66,0xe9]), ""next""]"))
 3         TestInvalidCharactersInArray = (y(LBound(y)) = "a" & ChrW(&HFFFD) & "b") And _
@@ -1753,9 +1764,9 @@ End Function
 ' Regression test: JuliaInclude (worksheet and VBA) used to load the file into the
 ' CallFromExcel module instead of Main, so JuliaCall couldn't find what it defined.
 Function WsTest_JuliaIncludeIntoMain() As Boolean
-          Dim ws As Worksheet
           Dim FileName As String
           Dim FileNum As Integer
+          Dim ws As Worksheet
 1         On Error GoTo ErrHandler
 2         Set ws = ScratchSheet()
 3         FileName = Environ("TEMP") & "\CallFromExcelIncludeTest.jl"
@@ -1895,4 +1906,5 @@ ErrHandler:
 12        PrintTwice ReThrow("WsTest_NamedFunctionRedefined", Err, True)
 13        WsTest_NamedFunctionRedefined = False
 End Function
+
 

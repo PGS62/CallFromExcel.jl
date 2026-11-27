@@ -70,6 +70,15 @@ namespace CallFromExcel.AddIn
         [ExcelCommand(Name = "JuliaHandleInvalidateAll")]
         public static void InvalidateAll()
         {
+            RebuildAll();
+        }
+
+        // Every worksheet handle gets a new object: a new generation means new topics, and #N/A
+        // for the old ones makes Excel recalculate their cells, in dependency order, which
+        // subscribe to the new topics. Returns how many handles there were. Handles created from
+        // VBA belong to the COM server, not to these topics, and are unaffected.
+        internal static int RebuildAll()
+        {
             generation++;
             var handles = new List<string>(Observers.Keys);
             foreach (string handle in handles)
@@ -79,6 +88,7 @@ namespace CallFromExcel.AddIn
                 Log("invalidate " + handle);
                 observer.OnNext(ExcelError.ExcelErrorNA);
             }
+            return handles.Count;
         }
 
         // Create/release events, for diagnostics and the drivers in dotnet-addin/spike-handles.

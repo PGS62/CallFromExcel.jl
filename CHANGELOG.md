@@ -20,6 +20,7 @@ Large or structured Julia objects - a big matrix, a fitted model, a DataFrame - 
 - A handle formula whose arguments change at every recalculation, such as `=JuliaCallHandle("sum", RANDARRAY(1000))`, gives an error saying so, rather than making Excel recalculate it, and create a new object, over and over in automatic calculation.
 - From VBA, handles from cells can be passed to `jl.JuliaCall` etc., and `jl.JuliaCallHandle` and `jl.JuliaEvalHandle` create handles that last until `jl.JuliaHandleRelease` or `jl.JuliaHandleReleaseAll` frees them. These methods are at the end of the COM interface, so VBA code compiled against the earlier type library is unaffected.
 - `JuliaHandleInfo("count")` shows how many handles are live, and `JuliaHandleInfo("events")` recent activity.
+- The ribbon's Rebuild Objects button rebuilds every handle's object, for example after changing the Julia code that builds them, and recalculates the cells that use them. Its arrow offers Rebuild Objects and Recalculate All, which also recalculates every formula, as Ctrl+Alt+F9 does.
 - 2,000 cells each creating a handle calculate in under a second (0.5 to 0.9 seconds in tests), and 2,000 `JuliaCall`s using them in about 0.3 seconds.
 - Any string of the form `jl:<label>#<id>@<session>` passed to a function is now taken to be a handle, so a string that merely looks like one gives a "not found" error rather than reaching Julia.
 

@@ -59,6 +59,20 @@ namespace CallFromExcel.AddIn
           <button id='RegisterFunctions' label='Register Functions' imageMso='FunctionWizard'
                   onAction='OnRegisterFunctions'
                   supertip='Make the Julia functions marked with @excel or expose_to_excel callable as worksheet functions. This happens automatically after JuliaLaunch, JuliaInclude and JuliaEval; use this button for functions exposed from the Julia REPL or from VBA.' />
+          <splitButton id='RebuildObjects'>
+            <button id='RebuildObjectsMain' label='Rebuild Objects' imageMso='RefreshAll'
+                    onAction='OnRebuildObjects'
+                    screentip='Rebuild Objects'
+                    supertip='Rebuild the Julia object of every handle on the worksheets, as after changing the Julia code that builds them. Cells using handles are then recalculated; other cells are not. The arrow offers to recalculate every formula too.' />
+            <menu id='RebuildObjectsMenu' itemSize='large'>
+              <button id='RebuildObjectsOnly' label='Rebuild Objects' imageMso='RefreshAll'
+                      onAction='OnRebuildObjects'
+                      description='Rebuild the Julia object of every handle on the worksheets. Cells using handles are recalculated; other cells are not.' />
+              <button id='RebuildObjectsRecalculateAll' label='Rebuild Objects and Recalculate All' imageMso='CalculateNow'
+                      onAction='OnRebuildObjectsRecalculateAll'
+                      description='Also recalculate every formula in every open workbook, as Ctrl+Alt+F9 does - so JuliaCall and other formulas use changed Julia code too. Can be slow.' />
+            </menu>
+          </splitButton>
           <button id='CallFromExcelHelp' label='Help' size='large' imageMso='Help'
                   onAction='OnHelp'
                   supertip='Open the CallFromExcel.jl documentation in your browser.' />
@@ -303,6 +317,53 @@ namespace CallFromExcel.AddIn
             }
             _ribbon?.InvalidateControl("DisplayResults");
             ShowBriefly("Julia closed");
+        }
+
+        // Rebuild Objects: a new object for every worksheet handle, built by the Julia code as it
+        // is now (JuliaHandles.RebuildAll); "and Recalculate All" also does a full recalculation,
+        // so formulas without handles use the new code too. Not when Julia isn't running: every
+        // handle cell would show an error until it is.
+        public void OnRebuildObjects(IRibbonControl control) => RebuildObjects(recalculateAll: false);
+
+        public void OnRebuildObjectsRecalculateAll(IRibbonControl control) => RebuildObjects(recalculateAll: true);
+
+        private static void RebuildObjects(bool recalculateAll)
+        {
+            if (!JuliaFunctions.JuliaIsRunning())
+            {
+                Inform("Julia isn't running. Use Launch Julia to start it first.");
+                return;
+            }
+            ExcelAsyncUtil.QueueAsMacro(() =>
+            {
+                try
+                {
+                    int n = JuliaHandles.RebuildAll();
+                    string rebuilt = n == 0 ? "No handles to rebuild" : n == 1 ? "Rebuilding 1 object" : "Rebuilding " + n + " objects";
+                    if (recalculateAll)
+                    {
+                        SetStatusBar(rebuilt + " and recalculating all open workbooks...");
+                        object app = ExcelDnaUtil.Application;
+                        app.GetType().InvokeMember("CalculateFull", BindingFlags.InvokeMethod, null, app, null);
+                        ShowBriefly(n == 0 ? "Recalculated all open workbooks" : rebuilt.Replace("Rebuilding", "Rebuilt") + " and recalculated all open workbooks");
+                    }
+                    else
+                    {
+                        // The new objects reach the cells through RTD, after Excel's RTD throttle
+                        // interval: in manual calculation the cells then wait for F9 (checked
+                        // 2026-11-27, dotnet-addin/spike-handles/HandleRebuild.ps1), so a
+                        // Calculate here would come too soon.
+                        object app = ExcelDnaUtil.Application;
+                        bool manual = Convert.ToInt32(app.GetType().InvokeMember("Calculation", BindingFlags.GetProperty, null, app, null)) == -4135;
+                        ShowBriefly(manual && n > 0 ? rebuilt + " - press F9 to calculate" : rebuilt);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    SetStatusBar(null);
+                    ShowError(ex);
+                }
+            });
         }
 
         private static void Inform(string message)

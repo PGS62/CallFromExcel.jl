@@ -12,6 +12,6 @@ All of these only reflect the most recent call, so debug before making another o
 For [handles](handles.md):
 * `=JuliaHandleInfo("count")` shows how many handles worksheet formulas hold, and how many objects Julia stores. If Julia stores more than the formulas hold, the difference is handles created from VBA and not yet released.
 * `=JuliaHandleInfo("events")` lists recent creates and releases, newest last - for example, to see whether a formula creates a new object at every recalculation.
-* The macro `JuliaHandleInvalidateAll` (Alt+F8, type the name, Run) rebuilds every handle's object, as happens when Julia restarts.
+* The ribbon's [Rebuild Objects](ribbon.md) button rebuilds every handle's object, as happens when Julia restarts. From VBA, `Application.Run "JuliaHandleInvalidateAll"` does the same.
 
 To step through your code with a debugger, attach a Julia session you already have open, such as one in VS Code - see [Attaching to a running Julia session](attaching.md).

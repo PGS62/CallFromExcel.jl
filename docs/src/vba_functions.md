@@ -1,6 +1,6 @@
 # VBA functions
 
-These functions can only be called from VBA, through the object described in [Calling from VBA](vba.md), as for example `jl.JuliaCallVBA(...)`. VBA can also call the [worksheet functions](functions.md), all except `JuliaHandleInfo`. A call that fails raises an [error](vba.md#Errors).
+These functions can only be called from VBA, through the object described in [Calling from VBA](vba.md), as for example `jl.JuliaCallVBA(...)`. VBA can also call the [worksheet functions](functions.md), all except `JuliaHandleInfo`. A call that fails raises an [error](@ref vba-errors).
 
 |Name|Description|
 |:---|:----------|

@@ -21,7 +21,7 @@ End Sub
 
 The functions ending in `VBA` - [`JuliaEvalVBA`](@ref juliaevalvba), [`JuliaCallVBA`](@ref juliacallvba) and [`JuliaCallNamedArgsVBA`](@ref juliacallnamedargsvba) - and [`JuliaEvalHandle`](@ref juliaevalhandle), [`JuliaHandleRelease`](@ref juliahandlerelease) and [`JuliaHandleReleaseAll`](@ref juliahandlereleaseall) can only be called from VBA. From VBA, the `JuliaCall` family takes at most 30 arguments after the function name.
 
-## Errors
+## [Errors](@id vba-errors)
 
 A call from VBA that fails raises an error, for `On Error` to handle, rather than returning a value. (On a worksheet, where a formula can't raise an error, the same failure shows as a string such as `#MethodError: ... Julia REPL has more details and stacktrace!`.) `Err.Source` is `"CallFromExcel"`, `Err.Description` the message, and `Err.Number` one of:
 

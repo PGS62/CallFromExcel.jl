@@ -35,9 +35,11 @@ CallFromExcel replaces [JuliaExcel](https://github.com/PGS62/JuliaExcel.jl). Its
    Dim jl As New CallFromExcel.ComServer
    ```
  * From VBA, `JuliaCall`, `JuliaCallVBA`, `JuliaCallNamedArgs` and `JuliaCallNamedArgsVBA` take at most 30 arguments after the function name.
- * A call that fails raises an error, rather than returning a string starting with `#` as JuliaExcel's functions did. Code that tests results for that, such as `If Left(Result, 1) = "#" Then`, no longer catches anything: use `On Error` instead - see [Errors](vba.md#Errors).
+ * A call that fails raises an error, rather than returning a string starting with `#` as JuliaExcel's functions did. Code that tests results for that, such as `If Left(Result, 1) = "#" Then`, no longer catches anything: use `On Error` instead - see [Errors](@ref vba-errors).
 
 **Julia.** Functions and variables formerly accessed as `JuliaExcel.xxx`, such as `JuliaExcel.serve_xl()` and `JuliaExcel.last_answer`, are now `CallFromExcel.xxx`, after `using CallFromExcel`.
 
 ## [Compatibility](@id compatibility)
-CallFromExcel requires 64-bit Excel for Windows - the default for Microsoft 365 - and has been tested on Excel under Microsoft 365. It is not compatible with 32-bit Excel: the installer checks, and stops with an error if Excel is 32-bit. It requires Excel 2016 or later, and _should_ work on 64-bit Excel 2016, 2019 and 2021, but has not been tested on them.
+CallFromExcel requires Julia 1.10 or later, under Windows or, for `JuliaLaunch(TRUE)`, under WSL. Some options need a later version: `--project=@temp` needs Julia 1.11.
+
+It requires 64-bit Excel for Windows - the default for Microsoft 365 - and has been tested on Excel under Microsoft 365. It is not compatible with 32-bit Excel: the installer checks, and stops with an error if Excel is 32-bit. It requires Excel 2016 or later, and _should_ work on 64-bit Excel 2016, 2019 and 2021, but has not been tested on them.

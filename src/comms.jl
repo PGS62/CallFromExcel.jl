@@ -294,7 +294,7 @@ temporary_project() =
     _encode_result_for_xl(result)::String
 Encode `result` for return to Excel, shared by `srv_eval_inner` and `srv_call_inner`. If
 `result` itself can't be encoded (e.g. it's a type with no `encode_for_xl` method), reports
-that to the Julia console and returns an encoded error string describing the problem
+that to the Julia console and returns a failure (see `_encode_failure`) describing the problem
 instead.
 
 Callers should invoke this via `Base.invokelatest`: if `result` is a value just defined by
@@ -309,9 +309,22 @@ function _encode_result_for_xl(result)::String
     catch e
         println("")
         @error "Result of type $(typeof(result)) could not be encoded for return to Excel."
-        encode_for_xl("#Expression evaluated to a variable of type $(typeof(result)), \
-            which cannot be returned to Excel because: $(e)!")
+        _encode_failure("Expression evaluated to a variable of type $(typeof(result)), \
+            which cannot be returned to Excel because: $(e)")
     end
+end
+
+"""
+    _encode_failure(message)::String
+
+The response to Excel for a call or evaluation that failed: `"X"` followed by the message.
+The add-in shows it on a worksheet as `"#<message>!"`, and raises it as an error in VBA - so
+a failure is never mistaken for a string result, whatever that string looks like. Only ever
+a whole response, never an element of an array.
+"""
+function _encode_failure(message::AbstractString)::String
+    s = encode_for_xl(String(message))           # a string, with invalid characters replaced
+    "X" * s[nextind(s, 1):end]
 end
 
 """
@@ -353,7 +366,7 @@ function srv_eval_inner(expression::String)::String
         end
         println("")
     end
-    Base.invokelatest(_encode_result_for_xl, last_answer)
+    success ? Base.invokelatest(_encode_result_for_xl, last_answer) : _encode_failure(last_answer)
 end
 
 """
@@ -362,7 +375,7 @@ end
 Reports an error to both the Julia console and back to Excel, to be called from a `catch e`
 block in `srv_eval_inner`/`srv_call_inner`. Prints the full error to `stdout`, including `e`'s
 stacktrace via `catch_backtrace()`, for inspection in the Julia REPL - then returns a short summary
-string to send back to Excel as the encoded result.
+to send back to Excel as a failure (see `_encode_failure`).
 
 The returned summary is deliberately short: only the first two lines of `showerror(io, e)` (the
 exception's own message - `showerror` only appends a stacktrace when explicitly passed one, which
@@ -382,7 +395,7 @@ function friendly_error(e)
     if length(error_desc) > 500
         error_desc = truncate(error_desc, 500) * "..."
     end
-    return "#$error_desc Julia REPL has more details and stacktrace!"
+    return "$error_desc Julia REPL has more details and stacktrace"
 end
 
 """
@@ -526,7 +539,7 @@ function srv_call_inner(payload::String; named_args::Bool=false)::String
         end
         println("")
     end
-    Base.invokelatest(_encode_result_for_xl, last_answer)
+    success ? Base.invokelatest(_encode_result_for_xl, last_answer) : _encode_failure(last_answer)
 end
 
 """
@@ -836,7 +849,7 @@ function setvar(name::String, arg)
         "Set global variable `$name` to $sizedesc$thetype"
 
     else
-        "#`$name` is not an allowed variable name in Julia!"
+        throw(ArgumentError("`$name` is not an allowed variable name in Julia"))
     end
 end
 

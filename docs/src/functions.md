@@ -135,7 +135,7 @@ Unlike `JuliaCallNamedArgs`, any `";"` argument starts the named arguments, so `
 
 Unlike `JuliaCall`, an error value as an argument, such as `#N/A`, is returned rather than passed to Julia: see [errors pass through](handles.md).
 
-From VBA, `jl.JuliaCallHandle` takes at most 30 arguments after the function name, and raises an error, rather than returning an error string, if the call fails. The handle lasts until `JuliaHandleRelease` or `JuliaHandleReleaseAll` frees it.
+From VBA, `jl.JuliaCallHandle` takes at most 30 arguments after the function name, and, as every function called from VBA, raises an [error](vba.md#Errors) if the call fails. The handle lasts until `JuliaHandleRelease` or `JuliaHandleReleaseAll` frees it.
 
 ## [`JuliaHandleInfo`](@id juliahandleinfo)
 Information about object handles: how many are live, or recent events.

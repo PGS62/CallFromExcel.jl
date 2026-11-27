@@ -63,14 +63,14 @@ namespace CallFromExcel.AddIn
             JuliaPort.SetJuliaPort(refreshedPort);
             if (refreshedPort == 0 || (refreshedPort == port && JuliaPort.TokenFor(port) == token))
             {
-                throw new InvalidOperationException(JuliaPort.NoConnectionErrorMessage);
+                throw new JuliaNotRunningException(JuliaPort.NoConnectionErrorMessage);
             }
             JuliaPort.CheckVersion(refreshedPort);
             if (TryPost(refreshedPort, path, payload, out result))
             {
                 return result;
             }
-            throw new InvalidOperationException(JuliaPort.NoConnectionErrorMessage);
+            throw new JuliaNotRunningException(JuliaPort.NoConnectionErrorMessage);
         }
 
         // False means Julia couldn't be reached on this port. A non-200 response is a real

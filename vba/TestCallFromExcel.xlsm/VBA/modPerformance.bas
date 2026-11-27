@@ -63,7 +63,7 @@ Private Sub SimpleSpeedTest()
           Dim t2 As Double
           
 1         LoadAddIn
-2         CallFromExcel.JuliaEval ("exit()")
+2         ExitJulia
 3         CallFromExcel.JuliaLaunch UseLinux, , gTestCommandOptions
 4         Res = CallFromExcel.JuliaEval(Expression)
 5         t1 = ElapsedTime
@@ -453,7 +453,7 @@ Function PerformanceTest() As String
 5         Report = Report & "Time now = " & Format$(Now(), "yyyy-mm-dd hh:mm:ss") & vbLf
 
           'Warm up
-6         CallFromExcel.JuliaEval "exit()" 'shuts down Julia if it's running
+6         ExitJulia 'shuts down Julia if it's running
 7         PreciseSleep 1000
 8         CallFromExcel.JuliaLaunch , , gTestCommandOptions
 9         ThrowIfError CallFromExcel.JuliaEval("1+1")
@@ -676,7 +676,7 @@ Sub DataframePerformanceTest()
 7         Report = Report & "'Computer = " & Environ$("ComputerName")
 
           'Warm up
-8         CallFromExcel.JuliaEval "exit()" 'shuts down Julia if it's running
+8         ExitJulia 'shuts down Julia if it's running
 9         PreciseSleep 1000
 10        CallFromExcel.JuliaLaunch , , gTestCommandOptions
 11        ThrowIfError CallFromExcel.JuliaEval("1+1")

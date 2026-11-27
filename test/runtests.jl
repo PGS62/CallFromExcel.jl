@@ -333,21 +333,29 @@ end
     end
 
     # friendly_error (comms.jl) - srv_eval_inner's error path for a JuliaEval expression that
-    # itself errors (as opposed to returning a value that fails to encode - see
-    # _encode_result_for_xl above). Checks the exact text so a regression (a stray backtrace frame,
-    # a changed cap, a wording change) is caught, not just "it's some string starting with #".
-    # Julia 1.11 added a second line to MethodError's message; on 1.10 that line is empty, and
-    # must not leave a double space.
-    let msg = CallFromExcel.decode_from_xl(CallFromExcel.srv_eval_inner("1+\"1\""))
+    # itself errors. The response is a failure, "X<message>" (see _encode_failure), which the
+    # add-in shows on a worksheet as "#<message>!" and raises in VBA. Checks the exact text so a
+    # regression (a stray backtrace frame, a changed cap, a wording change) is caught. Julia 1.11
+    # added a second line to MethodError's message; on 1.10 that line is empty, and must not
+    # leave a double space.
+    let msg = CallFromExcel.srv_eval_inner("1+\"1\"")
         if VERSION >= v"1.11"
-            @test msg == "#MethodError: no method matching +(::Int64, ::String) The function `+` \
+            @test msg == "XMethodError: no method matching +(::Int64, ::String) The function `+` \
                          exists, but no method is defined for this combination of argument types. \
-                         Julia REPL has more details and stacktrace!"
+                         Julia REPL has more details and stacktrace"
         else
-            @test msg == "#MethodError: no method matching +(::Int64, ::String) \
-                         Julia REPL has more details and stacktrace!"
+            @test msg == "XMethodError: no method matching +(::Int64, ::String) \
+                         Julia REPL has more details and stacktrace"
         end
     end
+    # A result that can't be encoded is a failure too; a string that merely looks like an error
+    # is an ordinary string result.
+    @test startswith(CallFromExcel.srv_eval_inner("struct EncodeFailureTest end; " *
+                                                  "Base.show(::IO, ::EncodeFailureTest) = error(\"no show\"); " *
+                                                  "EncodeFailureTest()"),
+                     "XExpression evaluated to a variable of type EncodeFailureTest")
+    @test CallFromExcel.srv_eval_inner("\"#Looks like an error!\"") == "£#Looks like an error!"
+    @test CallFromExcel._encode_failure("a\ud800b") == "Xa\ufffdb"   # invalid characters replaced
 
     # display_results (comms.jl) - toggles REPL echoing of calls from Excel; check both the
     # setter's return-value contract and the getter round-trips it correctly. Ends on false (the
@@ -413,15 +421,15 @@ end
         @test CallFromExcel.answer_again() == [1.2, 5.7]
     end
     let payload = CallFromExcel.encode_for_xl(Any["round", 1.5, ";", "digitz", 1])
-        @test startswith(CallFromExcel.decode_from_xl(CallFromExcel.srv_call_inner(payload; named_args=true)), "#MethodError")
+        @test startswith(CallFromExcel.srv_call_inner(payload; named_args=true), "XMethodError")
     end
     let payload = CallFromExcel.encode_for_xl(Any["round", 1.5, ";", "a", 1, "a", 2])
-        @test startswith(CallFromExcel.decode_from_xl(CallFromExcel.srv_call_inner(payload; named_args=true)),
-                         "#ArgumentError: Named argument `a` is given more than once")
+        @test startswith(CallFromExcel.srv_call_inner(payload; named_args=true),
+                         "XArgumentError: Named argument `a` is given more than once")
     end
     let payload = CallFromExcel.encode_for_xl(Any["sort", [3, 1, 2], ";", "rev", false, "foo"])
-        @test startswith(CallFromExcel.decode_from_xl(CallFromExcel.srv_call_inner(payload; named_args=true)),
-                         "#ArgumentError: Named arguments must be given as name-value pairs")
+        @test startswith(CallFromExcel.srv_call_inner(payload; named_args=true),
+                         "XArgumentError: Named arguments must be given as name-value pairs")
     end
 
     # _running_excel_pids (comms.jl) - used by serve_xl() to auto-detect the Excel process to
@@ -667,7 +675,7 @@ end
         @test isequal(got, v) && typeof(got) == typeof(v)
     end
     @test CallFromExcel.setvar("setvar_test_value", [1.0, 2.0]) == "Set global variable `setvar_test_value` to 2-element Vector{Float64}"
-    @test startswith(CallFromExcel.setvar("1bad", 1), "#")
+    @test_throws ArgumentError CallFromExcel.setvar("1bad", 1)
 
 end
 
@@ -919,7 +927,11 @@ end
 
     # Through the server (as =jl.f(...) arrives), the call is shown, saved and repeatable in the
     # REPL as a call of the function itself, with args_from_xl as the function receives them.
-    srv(args...) = C.decode_from_xl(C.srv_call_inner(C.encode_for_xl(Any["CallFromExcel._call_exposed", args...])))
+    # A failure ("X<message>") comes back as its message.
+    function srv(args...)
+        r = C.srv_call_inner(C.encode_for_xl(Any["CallFromExcel._call_exposed", args...]))
+        startswith(r, "X") ? r[2:end] : C.decode_from_xl(r)
+    end
     @test srv("jl.excel_test_scale", 2.0, 3.0) == 6.0
     @test C.last_question == "excel_test_scale(args_from_xl...)"
     @test C.args_from_xl == [2.0, 3.0] && C.answer_again() == 6.0

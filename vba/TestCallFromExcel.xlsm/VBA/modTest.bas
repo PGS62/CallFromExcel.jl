@@ -58,6 +58,13 @@ Function GetTestLog() As String
 1         GetTestLog = TestLog
 End Function
 
+' Shuts Julia down if it's running. JuliaEval("exit()") raises an error - Julia exits
+' without answering, or isn't running - which is expected here.
+Sub ExitJulia()
+          On Error Resume Next
+          CallFromExcel.JuliaEval "exit()"
+End Sub
+
 ' -----------------------------------------------------------------------------------------------------------------------
 ' Procedure  : RunTests
 ' Purpose    : Test CallFromExcel's C#/Excel-DNA add-in for a variety of data types and both call
@@ -78,7 +85,7 @@ Function RunTests(Optional SilentMode As Boolean = False, Optional CommandLineOp
 
 2         LoadAddIn
 
-3         CallFromExcel.JuliaEval "exit()"
+3         ExitJulia
 4         Sleep 1000 'Give time to shut down properly, otherwise launch can fail thinking Julia still running but unresponsive
 5         ThrowIfError CallFromExcel.JuliaLaunch(, , CommandLineOptions)
           TestCommandLineOptions = CommandLineOptions
@@ -133,6 +140,7 @@ Function RunTests(Optional SilentMode As Boolean = False, Optional CommandLineOp
 51        AccResult "TestArrayOfSingleCharacters", TestArrayOfSingleCharacters, NumPassed, NumFailed
 52        AccResult "TestNamedArgs", TestNamedArgs, NumPassed, NumFailed
 53        AccResult "TestNamedArgsVBA", TestNamedArgsVBA, NumPassed, NumFailed
+          AccResult "TestErrorsRaised", TestErrorsRaised, NumPassed, NumFailed
 54        AccResult "TestVFormatBoundarySizes", TestVFormatBoundarySizes, NumPassed, NumFailed
 55        AccResult "TestJuliaEvalMultiLineWithComment", TestJuliaEvalMultiLineWithComment, NumPassed, NumFailed
 
@@ -1075,11 +1083,13 @@ End Function
 ' Checks JuliaCallNamedArgs passes the arguments after ";" as keyword arguments, including
 ' with ";" also used as a positional argument and as the value of the last named argument,
 ' and that a missing ";", an odd number of arguments after it, and a repeated name are each
-' reported as an error.
+' raised as an error.
 Function TestNamedArgs()
           Dim Expected1(1 To 4, 1 To 1) As Variant
           Dim Expected3(1 To 2, 1 To 1) As Variant
           Dim OK As Boolean
+          Dim x As Variant
+          Dim D1 As String, D2 As String, D3 As String
 
 1         On Error GoTo ErrHandler
 2         ThrowIfError CallFromExcel.JuliaEval("named_args_test(x, y=0; a=1, b=2) = [x, y, a, b]; named_args_join(xs...; delim="","") = join(xs, delim)")
@@ -1087,20 +1097,73 @@ Function TestNamedArgs()
 3         Expected1(1, 1) = 10#: Expected1(2, 1) = 0#: Expected1(3, 1) = 1#: Expected1(4, 1) = 5#
 4         OK = ArraysIdentical(Expected1, ThrowIfError(CallFromExcel.JuliaCallNamedArgs("named_args_test", 10#, ";", "b", 5#)))
 
-5         OK = OK And Left$(CallFromExcel.JuliaCallNamedArgs("named_args_test", 10#), 15) = "#ArgumentError:"
-6         OK = OK And Left$(CallFromExcel.JuliaCallNamedArgs("named_args_test", 10#, ";", "b", 5#, "a"), 15) = "#ArgumentError:"
+          On Error Resume Next
+5         x = CallFromExcel.JuliaCallNamedArgs("named_args_test", 10#)
+          D1 = Err.Description: Err.Clear
+6         x = CallFromExcel.JuliaCallNamedArgs("named_args_test", 10#, ";", "b", 5#, "a")
+          D2 = Err.Description: Err.Clear
+          On Error GoTo ErrHandler
 
 7         Expected3(1, 1) = "a": Expected3(2, 1) = "b"
 8         OK = OK And ArraysIdentical(Expected3, ThrowIfError(CallFromExcel.JuliaCallNamedArgs("split", "a;;b", ";", ";", "keepempty", False)))
 9         OK = OK And CallFromExcel.JuliaCallNamedArgs("named_args_join", "a", ";", "b", ";", "delim", ";") = "a;;;b"
 
-10        OK = OK And Left$(CallFromExcel.JuliaCallNamedArgs("named_args_test", 10#, ";", "a", 1, "a", 2), 15) = "#ArgumentError:"
+          On Error Resume Next
+10        x = CallFromExcel.JuliaCallNamedArgs("named_args_test", 10#, ";", "a", 1, "a", 2)
+          D3 = Err.Description: Err.Clear
+          On Error GoTo ErrHandler
 
+          OK = OK And Left$(D1, 14) = "ArgumentError:" And Left$(D2, 14) = "ArgumentError:" And Left$(D3, 14) = "ArgumentError:"
 11        TestNamedArgs = OK
 12        Exit Function
 ErrHandler:
 13        PrintTwice ReThrow("TestNamedArgs", Err, True)
 14        TestNamedArgs = False
+End Function
+
+' Checks that the COM methods raise failures as VBA errors rather than returning "#...!"
+' strings: Err.Number is vbObjectError + 1001 for an exception in Julia, + 1003 for a result
+' that can't be returned, and Err.Source is "CallFromExcel". A string result that merely looks
+' like an error is returned as it is.
+Function TestErrorsRaised() As Boolean
+          Dim OK As Boolean
+          Dim x As Variant
+          Dim N1 As Long, N2 As Long, N3 As Long, N4 As Long, N5 As Long
+          Dim D1 As String, D2 As String, D3 As String, D4 As String
+          Dim S1 As String
+
+1         On Error GoTo ErrHandler
+2         OK = CallFromExcel.JuliaCallVBA("identity", "#Looks like an error!") = "#Looks like an error!"
+3         OK = OK And CallFromExcel.JuliaCall("identity", "#Looks like an error!") = "#Looks like an error!"
+
+4         On Error Resume Next
+5         x = CallFromExcel.JuliaCallVBA("thisFunctionDoesNotExist12345")
+6         N1 = Err.Number: D1 = Err.Description: S1 = Err.Source: Err.Clear
+7         x = CallFromExcel.JuliaEval("1 + ""1""")
+8         N2 = Err.Number: D2 = Err.Description: Err.Clear
+9         x = CallFromExcel.JuliaSetVar("1bad", 1)
+10        N3 = Err.Number: D3 = Err.Description: Err.Clear
+11        x = CallFromExcel.JuliaEval("Dict(1 => 2)")
+12        N4 = Err.Number: D4 = Err.Description: Err.Clear
+13        x = CallFromExcel.JuliaCallHandle("thisFunctionDoesNotExist12345")
+14        N5 = Err.Number: Err.Clear
+15        On Error GoTo ErrHandler
+
+16        OK = OK And N1 = vbObjectError + 1001 And Left$(D1, 13) = "UndefVarError" And S1 = "CallFromExcel"
+17        OK = OK And N2 = vbObjectError + 1001 And Left$(D2, 11) = "MethodError"
+18        OK = OK And N3 = vbObjectError + 1001 And Left$(D3, 13) = "ArgumentError"
+19        OK = OK And N4 = vbObjectError + 1003 And D4 = "Excel cannot display variables of type Dictionary"
+20        OK = OK And N5 = vbObjectError + 1001
+          If Not OK Then
+              PrintTwice "TestErrorsRaised got (Err.Number - vbObjectError, Err.Description):" & vbLf & _
+                  N1 - vbObjectError & " " & D1 & " [" & S1 & "]" & vbLf & N2 - vbObjectError & " " & D2 & vbLf & _
+                  N3 - vbObjectError & " " & D3 & vbLf & N4 - vbObjectError & " " & D4 & vbLf & N5 - vbObjectError
+          End If
+21        TestErrorsRaised = OK
+22        Exit Function
+ErrHandler:
+23        PrintTwice ReThrow("TestErrorsRaised", Err, True)
+24        TestErrorsRaised = False
 End Function
 
 ' Checks JuliaCallNamedArgsVBA returns a vector as a 1-dimensional array, and that both
@@ -1366,10 +1429,11 @@ Function WsTest_RelaunchAfterExit() As Boolean
           Dim ws As Worksheet
 1         On Error GoTo ErrHandler
 2         Set ws = ScratchSheet()
-3         CallFromExcel.JuliaEval "exit()"
+3         ExitJulia
 4         ws.Range("A1").Formula2 = "=JuliaLaunch(,,""" & TestCommandLineOptions & """)"
 5         Result = ws.Range("A1").Text
 6         WsTest_RelaunchAfterExit = Left$(Result, 1) <> "#" And CallFromExcel.JuliaIsRunning()
+          If Not WsTest_RelaunchAfterExit Then PrintTwice "WsTest_RelaunchAfterExit: JuliaLaunch gave: " & Result & " JuliaIsRunning: " & CallFromExcel.JuliaIsRunning()
 7         Exit Function
 ErrHandler:
 8         PrintTwice ReThrow("WsTest_RelaunchAfterExit", Err, True)
@@ -1401,7 +1465,7 @@ Function RunWSLTest(Optional SilentMode As Boolean = False) As Boolean
 
 11        Prompt = IIf(RunWSLTest, "RunWSLTest passed", "RunWSLTest FAILED: Julia did not report running under Linux")
 12        PrintTwice Prompt
-13        CallFromExcel.JuliaEval "exit()"
+13        ExitJulia
 14        If Not SilentMode Then MsgBox Prompt, IIf(RunWSLTest, vbInformation, vbCritical), Title
 15        Exit Function
 ErrHandler:

@@ -237,7 +237,7 @@ namespace CallFromExcel.AddIn
         {
             int port = GetJuliaPortOrZero();
             if (port > 0) return port;
-            throw new InvalidOperationException(NoConnectionMessage);
+            throw new JuliaNotRunningException(NoConnectionMessage);
         }
 
         // Non-throwing variant, for JuliaCall/JuliaEval's own "please call JuliaLaunch first"

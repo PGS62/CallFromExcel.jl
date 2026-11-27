@@ -18,6 +18,11 @@ namespace CallFromExcel.AddIn
     // or interface marked as restricted, or the function uses an Automation type not supported
     // in Visual Basic"), and with IDispatch-only + vararg its IntelliSense crashed outright.
     // See ArgsList below for how omitted arguments are dropped.
+    //
+    // Every failure is raised as a VBA error (see Raising below), never returned as a string:
+    // a Julia exception, Julia not running, an argument that can't be sent or a result that
+    // can't be returned. Excel error values in a result (#N/A etc.) are data, returned as
+    // CVErr values.
     [ComVisible(true)]
     [Guid("8ba635c2-d745-4d97-8fec-6cbfb398ae6d")]
     [InterfaceType(ComInterfaceType.InterfaceIsDual)]
@@ -84,8 +89,7 @@ namespace CallFromExcel.AddIn
         // end of the interface so code compiled against the earlier type library is unaffected.
         // A worksheet handle's lifetime comes from Excel's RTD machinery (it lives while a
         // formula uses it); a COM call has no calling cell, so a handle created here lives
-        // until JuliaHandleRelease or JuliaHandleReleaseAll frees it. Errors are raised (as by
-        // JuliaCallVBA) rather than returned as strings, which could be mistaken for a handle.
+        // until JuliaHandleRelease or JuliaHandleReleaseAll frees it.
         string JuliaCallHandle(string JuliaFunction,
             [Optional] object Arg1, [Optional] object Arg2, [Optional] object Arg3, [Optional] object Arg4, [Optional] object Arg5,
             [Optional] object Arg6, [Optional] object Arg7, [Optional] object Arg8, [Optional] object Arg9, [Optional] object Arg10,
@@ -139,6 +143,34 @@ namespace CallFromExcel.AddIn
                 Arg21, Arg22, Arg23, Arg24, Arg25, Arg26, Arg27, Arg28, Arg29, Arg30), "/call");
         }
 
+        // Errors raised to VBA: Err.Number is one of these, Err.Description the message
+        // (without the "#" and "!" a worksheet cell shows around it) and Err.Source
+        // "CallFromExcel". vbObjectError + n, as VBA asks of a component's own errors; the
+        // documentation ("Calling from VBA") lists them, so they must not change.
+        private const int VbObjectError = unchecked((int)0x80040000);
+        private const int ErrJuliaException = VbObjectError + 1001;   // the Julia code threw
+        private const int ErrJuliaNotRunning = VbObjectError + 1002;  // not launched, exited or still starting
+        private const int ErrOther = VbObjectError + 1003;            // anything else
+
+        // Runs a method's body, raising any failure to VBA as a COMException with one of the
+        // numbers above.
+        private static T Raising<T>(System.Func<T> body)
+        {
+            try
+            {
+                return body();
+            }
+            catch (System.Exception ex) when (!(ex is COMException))
+            {
+                int number = ex is JuliaException ? ErrJuliaException
+                    : ex is JuliaNotRunningException ? ErrJuliaNotRunning
+                    : ErrOther;
+                string message = ex.Message;
+                if (message.StartsWith("#", System.StringComparison.Ordinal)) message = message.Substring(1);
+                throw new COMException(message, number) { Source = "CallFromExcel" };
+            }
+        }
+
         public object JuliaCallNamedArgsVBA(string JuliaFunction,
             object Arg1, object Arg2, object Arg3, object Arg4, object Arg5,
             object Arg6, object Arg7, object Arg8, object Arg9, object Arg10,
@@ -176,11 +208,7 @@ namespace CallFromExcel.AddIn
 
         public object JuliaEvalVBA(object JuliaExpression)
         {
-            string expression = JuliaExpressionToString(JuliaExpression);
-            string responseWire = JuliaHttpClient.Post(expression, "/eval");
-            object result = WireFormatDecode.Decode(responseWire, allowNesting: true, stringLengthLimit: 0, vectorToColumn: false);
-            result = WireFormatDecode.MapErrorValues(result, MapToComError);
-            return ForVba(result);
+            return Raising(() => EvalCore(JuliaExpression, allowNesting: true, stringLengthLimit: 0, vectorToColumn: false));
         }
 
         public object JuliaCall(string JuliaFunction,
@@ -199,22 +227,16 @@ namespace CallFromExcel.AddIn
 
         public object JuliaEval(object JuliaExpression)
         {
-            try
-            {
-                if (JuliaPort.GetJuliaPortOrZero() == 0)
-                {
-                    return "#Please call JuliaLaunch before calling JuliaEval or JuliaCall!";
-                }
-                string expression = JuliaExpressionToString(JuliaExpression);
-                string responseWire = JuliaHttpClient.Post(expression, "/eval");
-                object result = WireFormatDecode.Decode(responseWire, allowNesting: false, stringLengthLimit: StringLengthLimit, vectorToColumn: true);
-                result = WireFormatDecode.MapErrorValues(result, MapToComError);
-                return ForVba(result);
-            }
-            catch (System.Exception ex)
-            {
-                return "#" + ex.Message;
-            }
+            return Raising(() => EvalCore(JuliaExpression, allowNesting: false, stringLengthLimit: StringLengthLimit, vectorToColumn: true));
+        }
+
+        private static object EvalCore(object juliaExpression, bool allowNesting, int stringLengthLimit, bool vectorToColumn)
+        {
+            string expression = JuliaExpressionToString(juliaExpression);
+            string responseWire = JuliaHttpClient.Post(expression, "/eval");
+            object result = WireFormatDecode.Decode(responseWire, allowNesting: allowNesting, stringLengthLimit: stringLengthLimit, vectorToColumn: vectorToColumn);
+            result = WireFormatDecode.MapErrorValues(result, MapToComError);
+            return ForVba(result);
         }
 
         public object JuliaCallNamedArgs(string JuliaFunction,
@@ -257,14 +279,7 @@ namespace CallFromExcel.AddIn
         // typed `object` to detect ExcelMissing, an XLL-only concept).
         public object JuliaLaunch(bool UseLinux = false, bool MinimiseWindow = false, string CommandLineOptions = "", string Packages = "", string BashStatements = "", int TimeOut = 30)
         {
-            try
-            {
-                return global::CallFromExcel.AddIn.JuliaLaunch.Launch(useLinux: UseLinux, minimiseWindow: MinimiseWindow, commandLineOptions: CommandLineOptions, packages: Packages, bashStatements: BashStatements, timeoutSeconds: TimeOut);
-            }
-            catch (System.Exception ex)
-            {
-                return "#" + ex.Message;
-            }
+            return Raising<object>(() => global::CallFromExcel.AddIn.JuliaLaunch.Launch(useLinux: UseLinux, minimiseWindow: MinimiseWindow, commandLineOptions: CommandLineOptions, packages: Packages, bashStatements: BashStatements, timeoutSeconds: TimeOut));
         }
 
         // Handles created by JuliaCallHandle/JuliaEvalHandle and not yet released. Only
@@ -292,13 +307,13 @@ namespace CallFromExcel.AddIn
             var createArgs = new object[1 + args.Length];
             createArgs[0] = JuliaFunction;
             System.Array.Copy(args, 0, createArgs, 1, args.Length);
-            return CreateHandle("CallFromExcel.handle_create", createArgs);
+            return Raising(() => CreateHandle("CallFromExcel.handle_create", createArgs));
         }
 
         public string JuliaEvalHandle(object JuliaExpression)
         {
             // The code goes as text, even if it looks like a handle.
-            return CreateHandle("CallFromExcel.handle_eval", new object[] { JuliaExpressionToString(JuliaExpression) }, mapHandles: false);
+            return Raising(() => CreateHandle("CallFromExcel.handle_eval", new object[] { JuliaExpressionToString(JuliaExpression) }, mapHandles: false));
         }
 
         // TRUE if Handle was a live handle created from VBA, now freed. FALSE if it isn't one
@@ -326,10 +341,6 @@ namespace CallFromExcel.AddIn
 
         private static string CreateHandle(string juliaFunction, object[] args, bool mapHandles = true)
         {
-            if (JuliaPort.GetJuliaPortOrZero() == 0)
-            {
-                throw new System.InvalidOperationException("Please call JuliaLaunch before calling JuliaCallHandle or JuliaEvalHandle");
-            }
             string responseWire = JuliaHttpClient.Post(BuildCallPayload(juliaFunction, args, mapHandles), "/call");
             object result = WireFormatDecode.Decode(responseWire, allowNesting: false, stringLengthLimit: 0, vectorToColumn: true);
             string handle = result as string;
@@ -338,9 +349,8 @@ namespace CallFromExcel.AddIn
                 VbaHandles[handle] = key;
                 return handle;
             }
-            // Julia reports a failed call as a string "#<message> Julia REPL has more details...".
-            string message = handle != null ? handle.TrimStart('#') : "Julia returned " + System.Convert.ToString(result) + " rather than a handle";
-            throw new System.InvalidOperationException(message);
+            // A failed call was raised by Decode, so this would be a bug.
+            throw new System.InvalidOperationException("Julia returned " + System.Convert.ToString(result) + " rather than a handle");
         }
 
         // Julia not running, or restarted: its objects are gone anyway (and handle_free ignores
@@ -384,39 +394,33 @@ namespace CallFromExcel.AddIn
         // (JuliaCall/JuliaCallNamedArgs/JuliaSetVar/JuliaInclude) so that old VBA code calling
         // these by their original (non-"VBA"-suffixed) names keeps their original restricted
         // behaviour (string-length cap, no nested arrays/Dictionaries, 1-D arrays become a
-        // column) and their original "return an error string" handling, rather than silently
-        // switching to JuliaCallVBA's unrestricted, exception-raising behaviour just because
-        // the call now goes through COM. Deliberately does not call into JuliaFunctions.cs:
+        // column), rather than silently switching to JuliaCallVBA's unrestricted behaviour just
+        // because the call now goes through COM. Failures are raised, as by every method here
+        // (until 0.2.0 these returned "#...!" strings). Deliberately does not call into JuliaFunctions.cs:
         // its ExcelMissing/ExcelEmpty handling requires ExcelDna.Integration.dll, which is
         // embedded in the packed .xll and only resolvable when Excel-DNA's own loader has
         // already loaded it into the process -- not guaranteed for a bare CreateObject of
         // this COM server, which COM/VBA calls never produce those sentinel types for anyway.
         private static object CallCore(string juliaFunction, object[] args, string endpoint)
         {
-            try
+            return Raising(() =>
             {
-                if (JuliaPort.GetJuliaPortOrZero() == 0)
-                {
-                    return "#Please call JuliaLaunch before calling JuliaEval or JuliaCall!";
-                }
-
                 string responseWire = JuliaHttpClient.Post(BuildCallPayload(juliaFunction, args), endpoint);
                 object result = WireFormatDecode.Decode(responseWire, allowNesting: false, stringLengthLimit: StringLengthLimit, vectorToColumn: true);
                 result = WireFormatDecode.MapErrorValues(result, MapToComError);
                 return ForVba(result);
-            }
-            catch (System.Exception ex)
-            {
-                return "#" + ex.Message;
-            }
+            });
         }
 
         private static object CallVBACore(string juliaFunction, object[] args, string endpoint)
         {
-            string responseWire = JuliaHttpClient.Post(BuildCallPayload(juliaFunction, args), endpoint);
-            object result = WireFormatDecode.Decode(responseWire, allowNesting: true, stringLengthLimit: 0, vectorToColumn: false);
-            result = WireFormatDecode.MapErrorValues(result, MapToComError);
-            return ForVba(result);
+            return Raising(() =>
+            {
+                string responseWire = JuliaHttpClient.Post(BuildCallPayload(juliaFunction, args), endpoint);
+                object result = WireFormatDecode.Decode(responseWire, allowNesting: true, stringLengthLimit: 0, vectorToColumn: false);
+                result = WireFormatDecode.MapErrorValues(result, MapToComError);
+                return ForVba(result);
+            });
         }
 
         // Maps a wire-format error code (VBA's own XlCVError UI numbering, e.g. 2042 for

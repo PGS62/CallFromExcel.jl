@@ -171,6 +171,8 @@ namespace CallFromExcel.AddIn
         // nothing/missing an empty cell.
         private static object DecodeForWorksheet(string responseWire)
         {
+            string failure = WireFormatDecode.FailureMessage(responseWire);
+            if (failure != null) return "#" + failure + "!";
             object result = WireFormatDecode.Decode(responseWire, allowNesting: false, stringLengthLimit: StringLengthLimit, vectorToColumn: true, forWorksheet: true);
             return WireFormatDecode.MapLeaves(result, v => v is ExcelErrorValue ev ? MapToExcelDnaError(ev.Code) : v ?? ExcelEmpty.Value);
         }

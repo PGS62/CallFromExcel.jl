@@ -4,6 +4,10 @@ CallFromExcel is the successor to [JuliaExcel](https://github.com/PGS62/JuliaExc
 
 ## [Unreleased]
 
+### Breaking: failures raise errors in VBA
+
+Functions called from VBA (`jl.JuliaCallVBA`, `jl.JuliaEvalVBA`, `jl.JuliaCall`, `jl.JuliaEval`, `jl.JuliaSetVar`, `jl.JuliaInclude`, `jl.JuliaLaunch` and the rest) now raise an error when they fail, rather than returning a string starting with `#`. `Err.Number` says whether the Julia code threw an exception (`vbObjectError + 1001`), Julia isn't running (`vbObjectError + 1002`) or something else went wrong (`vbObjectError + 1003`), and `Err.Description` gives the message. A string result that merely looks like an error is no longer mistaken for one. Code that tested results, such as `If Left(Result, 1) = "#" Then`, should use `On Error` instead. Worksheet formulas are unchanged. See [Calling from VBA](https://pgs62.github.io/CallFromExcel.jl/stable/vba/#Errors) in the documentation.
+
 ### Object handles
 
 Large or structured Julia objects - a big matrix, a fitted model, a DataFrame - can now stay in Julia, with Excel holding a short string naming each one, a _handle_ such as `jl:Array#17@k3x9`. See [Object handles](https://pgs62.github.io/CallFromExcel.jl/stable/handles/) in the documentation.

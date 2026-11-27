@@ -23,6 +23,9 @@ namespace CallFromExcel.AddIn
     //   V Array of Float64 only, no per-element type indicator/length (Julia -> Excel
     //     only): "V<rank>,<dims>;<hex>", 16 hex chars/element, no delimiters
     //   R Integer range (Julia -> Excel only), "RI,<n>,<first>,<step>;", reconstructed via arithmetic
+    //   X A failed call or evaluation (Julia -> Excel only, a whole response, never an element):
+    //     "X<message>". Decode throws JuliaException; the worksheet functions check for it
+    //     first (FailureMessage) and show "#<message>!" instead.
     public static class WireFormatDecode
     {
         public static object Decode(string wire, bool allowNesting = true, int stringLengthLimit = 0, bool vectorToColumn = false, bool forWorksheet = false)
@@ -70,8 +73,17 @@ namespace CallFromExcel.AddIn
                 case 'V': return DecodeV(wire, vectorToColumn);
                 case 'L': return DecodeL(wire, allowNesting, vectorToColumn, forWorksheet);
                 case 'R': return DecodeRange(wire, vectorToColumn, forWorksheet);
+                case 'X':
+                    if (depth == 1) throw new JuliaException(wire.Substring(1));
+                    throw new FormatException("A failure (X) can only be a whole response, not an element");
                 default: throw new FormatException("Character '" + tag + "' is not recognised as a type identifier");
             }
+        }
+
+        // The message of a failed call or evaluation (a response "X<message>"), else null.
+        public static string FailureMessage(string wire)
+        {
+            return wire.Length > 0 && wire[0] == 'X' ? wire.Substring(1) : null;
         }
 
         // Decodes the array element at wire[pos, pos + len). The commonest kinds are read where
